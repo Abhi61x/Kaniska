@@ -3,234 +3,343 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kaniska | Advanced AI Assistant</title>
+    <title>Kaniska | AI Voice Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg-color: #020810;
-        --primary-color: #00eaff;
-        --secondary-color: #008cff;
-        --text-color: #d0faff;
-        --border-color: rgba(0, 234, 255, 0.4);
-        --panel-bg: rgba(0, 15, 25, 0.85);
-        --panel-glow: rgba(0, 234, 255, 0.2);
-        --glow-filter: drop-shadow(0 0 4px var(--primary-color));
+        --bg-color: #0d1117;
+        --panel-bg: #161b22;
+        --primary-color: #22d3ee; /* Cyan */
+        --border-color: #30363d;
+        --text-color: #c9d1d9;
+        --text-color-muted: #8b949e;
+        --assistant-bubble-bg: #21262d;
       }
       body {
-        font-family: 'Orbitron', sans-serif;
+        font-family: 'Inter', sans-serif;
         background-color: var(--bg-color);
         color: var(--text-color);
         overflow: hidden;
       }
-      #matrix-background {
-        position: fixed;
+      .glowing-text {
+        color: var(--primary-color);
+        text-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+      }
+       /* --- Custom scrollbar --- */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background-color: var(--primary-color); }
+      
+      /* --- Hologram Icon --- */
+      .hologram-svg {
+        color: var(--primary-color);
+        filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.7));
+      }
+
+      /* --- Holographic Avatar Styles --- */
+      .hologram-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 330px;
+        height: 330px;
+      }
+      .avatar{
+        width: 330px;
+        max-width: 100%;
+        height: auto;
+        /* Animation is now handled by expression classes */
+        position: relative; /* Keep avatar on top */
+        z-index: 1;
+        transition: filter 0.3s ease, transform 0.3s ease;
+      }
+
+      .hologram-container::before, .hologram-container::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          border: 1px solid rgba(34, 211, 238, 0.4);
+          width: 85%;
+          padding-bottom: 85%; /* Maintain aspect ratio for circle */
+          border-radius: 50%;
+          transform: translate(-50%, -50%) scale(0.5);
+          opacity: 0;
+          animation: pulse 4s infinite ease-out;
+      }
+
+      .hologram-container::after {
+          animation-delay: 2s;
+          border-style: dashed;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: translate(-50%, -50%) scale(0.7);
+          opacity: 0;
+        }
+        40% {
+          opacity: 0.8;
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1.3);
+          opacity: 0;
+        }
+      }
+      
+      @keyframes glow {
+        from {
+          opacity: .9;
+          filter: drop-shadow(0 0 15px #00b3ff);
+        }
+        to {
+          opacity: 1;
+          filter: drop-shadow(0 0 30px var(--primary-color));
+        }
+      }
+      
+      /* --- Expression Animations --- */
+      .avatar.expression-idle {
+        animation: glow 2.5s infinite alternate ease-in-out;
+      }
+
+      @keyframes listen-glow {
+        0%   { transform: scale(1); opacity: 0.9; filter: drop-shadow(0 0 18px var(--primary-color)); }
+        50%  { transform: scale(1.015); opacity: 1; filter: drop-shadow(0 0 30px var(--primary-color)); }
+        100% { transform: scale(1); opacity: 0.9; filter: drop-shadow(0 0 18px var(--primary-color)); }
+      }
+      .avatar.expression-listening {
+        animation: listen-glow 3s infinite ease-in-out;
+      }
+
+      @keyframes speak-vibrate {
+        0%, 100% { transform: scaleY(1) translateY(0); }
+        25%      { transform: scaleY(1.01) translateY(-1px); }
+        75%      { transform: scaleY(0.99) translateY(1px); }
+      }
+      @keyframes speak-glow {
+        0%, 100% { filter: drop-shadow(0 0 25px var(--primary-color)) brightness(1); }
+        50%      { filter: drop-shadow(0 0 35px #fff) brightness(1.2); }
+      }
+      .avatar.expression-speaking {
+        animation: speak-vibrate 0.6s ease-in-out infinite, speak-glow 1.2s ease-in-out infinite;
+      }
+
+      @keyframes glitch-glow {
+        0%, 100% { filter: drop-shadow(0 0 18px #00e5ff); transform: translate(0, 0); }
+        20% { filter: drop-shadow(0 0 25px #ff0055); transform: translate(-2px, 1px); }
+        40% { filter: drop-shadow(0 0 15px #00ff55); transform: translate(1px, -1px); }
+        60% { filter: drop-shadow(0 0 30px #0055ff); transform: translate(2px, 2px); }
+        80% { filter: drop-shadow(0 0 20px #ff00ff); transform: translate(-1px, 2px); }
+      }
+      .avatar.expression-error {
+          animation: glow 2s infinite alternate ease-in-out, glitch-glow 0.4s steps(2, end) infinite;
+      }
+      .avatar.expression-thinking {
+          animation: glow 1s infinite alternate ease-in-out;
+          filter: drop-shadow(0 0 30px #a78bfa); /* Violet */
+      }
+
+      @keyframes surprise-glow {
+        0% { transform: scale(1); filter: drop-shadow(0 0 25px #00e5ff); }
+        25% { transform: scale(1.08); filter: drop-shadow(0 0 45px #ffffff); }
+        100% { transform: scale(1); filter: drop-shadow(0 0 25px #00e5ff); }
+      }
+      .avatar.expression-surprised {
+        animation: surprise-glow 0.5s ease-out;
+      }
+
+      @keyframes sad-glow {
+        0% { opacity: 0.7; filter: drop-shadow(0 0 10px #5a9eff); }
+        100% { opacity: 0.6; filter: drop-shadow(0 0 8px #5a9eff); }
+      }
+      .avatar.expression-sad {
+        animation: sad-glow 4s infinite alternate ease-in-out;
+      }
+
+      @keyframes celebrate-glow {
+        0% { filter: drop-shadow(0 0 25px #00e5ff); }
+        25% { filter: drop-shadow(0 0 40px #34d399); } /* Emerald */
+        50% { filter: drop-shadow(0 0 35px #f472b6); } /* Pink */
+        75% { filter: drop-shadow(0 0 40px #f59e0b); } /* Amber */
+        100% { filter: drop-shadow(0 0 25px #00e5ff); }
+      }
+      .avatar.expression-celebrating {
+         animation: glow 1s infinite alternate ease-in-out, celebrate-glow 1.5s linear infinite;
+      }
+
+
+      /* --- Footer Button --- */
+      .footer-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        color: var(--text-color-muted);
+        transition: all 0.2s ease-in-out;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 8px 12px;
+      }
+      .footer-button:hover:not(:disabled) {
+        color: var(--primary-color);
+        background-color: rgba(34, 211, 238, 0.1);
+        border-color: rgba(34, 211, 238, 0.3);
+      }
+      .footer-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+       .footer-button.active {
+        color: #f77272; /* Red for 'Stop' */
+      }
+      .footer-button.active:hover {
+        background-color: rgba(247, 114, 114, 0.1);
+        border-color: rgba(247, 114, 114, 0.3);
+      }
+
+      /* --- Chat Bubble & Panel Animations --- */
+      @keyframes fade-slide-up {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .chat-bubble-animation { animation: fade-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      
+      @keyframes panel-enter {
+        from { opacity: 0; transform: translateY(10px); filter: blur(2px); }
+        to { opacity: 1; transform: translateY(0); filter: blur(0); }
+      }
+      .animate-panel-enter { animation: panel-enter 0.4s ease-out forwards; }
+      
+      /* --- Tabs --- */
+      .tab-button {
+        padding: 8px 16px;
+        border-bottom: 2px solid transparent;
+        color: var(--text-color-muted);
+        transition: all 0.2s ease-in-out;
+      }
+      .tab-button:hover {
+        color: var(--text-color);
+      }
+      .tab-button.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+        font-weight: 600;
+      }
+
+      /* --- YouTube Player --- */
+      .youtube-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio */
+        height: 0;
+        background-color: #000;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .youtube-container iframe {
+        position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        z-index: -2;
-        opacity: 0.3;
       }
-      .glowing-text {
-        color: var(--primary-color);
-        text-shadow: 0 0 5px var(--primary-color), 0 0 10px var(--primary-color), 0 0 15px var(--secondary-color);
+
+      /* --- Timer --- */
+      .timer-circle {
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+        transition: stroke-dashoffset 1s linear;
       }
-      .jarvis-panel {
-        position: relative;
-        background: var(--panel-bg);
-        backdrop-filter: blur(8px);
+
+      /* --- Header Clock --- */
+      .header-clock {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 500;
+        color: var(--text-color-muted);
+        background-color: var(--panel-bg);
+        padding: 4px 12px;
+        border-radius: 6px;
         border: 1px solid var(--border-color);
-        box-shadow: 0 0 25px var(--panel-glow), inset 0 0 15px var(--panel-glow);
-        border-radius: 0;
-      }
-      .jarvis-panel::before, .jarvis-panel::after,
-      .panel-content-wrapper::before, .panel-content-wrapper::after {
-        content: '';
-        position: absolute;
-        width: 15px;
-        height: 15px;
-        border-color: var(--primary-color);
-        border-style: solid;
-        opacity: 0.9;
-        filter: var(--glow-filter);
-        animation: flicker 5s linear infinite alternate;
-      }
-      .jarvis-panel::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
-      .jarvis-panel::after { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
-      .panel-content-wrapper::before { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
-      .panel-content-wrapper::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
-
-      /* --- Animations --- */
-      @keyframes flicker {
-          0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 0.9; filter: drop-shadow(0 0 4px var(--primary-color)); }
-          20%, 24%, 55% { opacity: 0.6; filter: drop-shadow(0 0 8px var(--secondary-color)); }
-      }
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      @keyframes spin-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-      @keyframes pulse { 50% { opacity: 0.7; transform: scale(0.98); } }
-      @keyframes fade-in-scale-up {
-        from { opacity: 0; transform: translate(-50%, -45%) scale(0.95); }
-        to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-      }
-      .animate-fade-in-scale-up { animation: fade-in-scale-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      @keyframes fade-out-scale-down {
-        from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        to { opacity: 0; transform: translate(-50%, -45%) scale(0.95); }
-      }
-      .animate-fade-out-scale-down { animation: fade-out-scale-down 0.4s ease-in forwards; }
-
-      /* --- Arc Reactor Button --- */
-      .arc-container {
-        position: relative;
-        width: 180px;
-        height: 180px;
-        filter: var(--glow-filter);
-        transition: transform 0.3s ease-out;
-      }
-      .arc-container:hover { transform: scale(1.05); }
-      .arc-ring {
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        border: 2px solid transparent;
-      }
-      .ring-1 {
-        border-color: var(--primary-color);
-        animation: spin 20s linear infinite;
-        opacity: 0.5;
-      }
-      .ring-2 {
-        inset: 6px;
-        border-width: 3px;
-        border-top-color: var(--primary-color);
-        border-bottom-color: var(--primary-color);
-        animation: spin-reverse 15s linear infinite;
-      }
-      .ring-3 {
-        inset: 16px;
-        border-width: 1px;
-        border-top-color: var(--primary-color);
-        border-left-color: var(--primary-color);
-        border-right-color: var(--primary-color);
-        animation: spin 10s linear infinite;
-        opacity: 0.8;
-      }
-      .ring-4 {
-        inset: 22px;
-        border: 4px dotted var(--secondary-color);
-        opacity: 0.4;
-        animation: spin 18s linear infinite;
-      }
-      .arc-core {
-        position: absolute;
-        inset: 28px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-image: radial-gradient(circle, var(--primary-color) 0%, var(--bg-color) 70%);
-        box-shadow: inset 0 0 15px var(--primary-color), 0 0 10px var(--secondary-color);
-        transition: all 0.3s ease;
-        animation: pulse 2.5s ease-in-out infinite;
-      }
-      .arc-core svg {
-        transition: all 0.3s ease;
-        filter: drop-shadow(0 0 3px #000);
-      }
-      .arc-container.listening .arc-core, .arc-container.thinking .arc-core {
-        animation-duration: 0.8s;
-        box-shadow: inset 0 0 25px #fff, 0 0 20px var(--primary-color);
-      }
-      .arc-container.listening .ring-2, .arc-container.thinking .ring-2 { animation-duration: 3s; }
-      .arc-container.listening .ring-3, .arc-container.thinking .ring-3 { animation-duration: 2s; }
-      .arc-container.speaking .arc-core { animation-duration: 1.2s; }
-
-      /* Cooldown Timer Animation */
-      .cooldown-circle-animation {
-        stroke-dasharray: 283;
-        stroke-dashoffset: 0;
-        animation: cooldown-timer 60s linear forwards;
-        stroke: #ff3333;
-      }
-      @keyframes cooldown-timer { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 283; } }
-
-      /* --- Code Editor Styles --- */
-      .code-editor-wrapper { position: relative; flex-grow: 1; display: flex; overflow: hidden; background: rgba(0,0,0,0.3); }
-      .line-numbers { padding: 1rem; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 14px; line-height: 1.5; color: rgba(208, 250, 255, 0.4); text-align: right; user-select: none; background-color: rgba(0,0,0,0.2); border-right: 1px solid var(--border-color); overflow-y: hidden; }
-      .editor-main { position: relative; flex-grow: 1; }
-      .editor-main > textarea, .editor-main > pre { margin: 0; padding: 1rem; border: 0; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 0; overflow: auto; }
-      .editor-main > textarea { z-index: 1; background-color: transparent; color: transparent; caret-color: var(--text-color); resize: none; outline: none; }
-      .editor-main > pre { z-index: 0; pointer-events: none; }
-      .code-editor-wrapper code { color: var(--text-color); }
-      .hljs { background: transparent !important; }
-      .find-replace-bar input { background-color: rgba(0,0,0,0.5); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 0; color: var(--text-color); font-family: 'Orbitron', sans-serif; font-size: 12px; width: 140px; }
-      .find-replace-bar input::placeholder { color: rgba(208, 250, 255, 0.4); }
-      .find-replace-bar button { font-size: 12px; padding: 4px 10px; border-radius: 0; }
-
-      /* --- YouTube Fullscreen Mode --- */
-      .jarvis-panel.youtube-mode {
-        background: #000;
-        backdrop-filter: none;
-        border: none;
-        box-shadow: none;
-      }
-      .jarvis-panel.youtube-mode::before, .jarvis-panel.youtube-mode::after,
-      .jarvis-panel.youtube-mode .panel-content-wrapper::before,
-      .jarvis-panel.youtube-mode .panel-content-wrapper::after {
-        display: none;
+        letter-spacing: 0.05em;
       }
       
-      /* --- Settings Modal & Select Element --- */
-      #voice-select {
-        appearance: none;
-        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300eaff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-        background-repeat: no-repeat;
-        background-position: right 1rem center;
-        background-size: 1em;
-        padding-right: 2.5rem;
+      /* --- News Panel --- */
+      .news-article {
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
       }
-      #voice-select:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 8px var(--panel-glow);
-      }
-      #voice-select optgroup {
-        background: var(--bg-color);
-        color: var(--secondary-color);
-        font-weight: bold;
-      }
-      #voice-select option {
-        background: var(--bg-color);
-        color: var(--text-color);
-        padding: 8px;
+      .news-article:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
       }
 
-      /* Custom scrollbar */
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background-color: var(--primary-color); border-radius: 0; border: 1px solid var(--bg-color); }
-      ::-webkit-scrollbar-thumb:hover { background-color: var(--text-color); }
-
-      /* HUD Elements */
-      .hud-element {
-        position: fixed;
-        border-color: var(--primary-color);
-        opacity: 0.7;
-        filter: var(--glow-filter);
-        pointer-events: none;
-        z-index: 5;
-        animation: flicker 6s linear infinite alternate;
+      /* --- Weather Panel & Animations --- */
+      .weather-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        text-align: center;
+        gap: 0.5rem;
       }
-      .corner-bracket { width: 40px; height: 40px; }
-      .corner-top-left { top: 20px; left: 20px; border-top: 2px solid; border-left: 2px solid; }
-      .corner-top-right { top: 20px; right: 20px; border-top: 2px solid; border-right: 2px solid; }
-      .corner-bottom-left { bottom: 20px; left: 20px; border-bottom: 2px solid; border-left: 2px solid; }
-      .corner-bottom-right { bottom: 20px; right: 20px; border-bottom: 2px solid; border-right: 2px solid; }
-      .horizontal-line { height: 1px; width: 25%; background: var(--primary-color); }
-      .vertical-line { width: 1px; height: 25%; background: var(--primary-color); }
+      .weather-icon-container {
+        width: 150px;
+        height: 120px;
+        position: relative;
+        margin-bottom: 1rem;
+      }
+      .weather-icon-container svg {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0; left: 0;
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+      }
+
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+      @keyframes rain-fall { 
+        0% { transform: translateY(-20px) scaleY(1); opacity: 1; } 
+        100% { transform: translateY(80px) scaleY(1.5); opacity: 0; } 
+      }
+
+      .weather-sun { animation: spin 20s linear infinite; color: #f59e0b; }
+      .weather-cloud { animation: float 8s ease-in-out infinite; color: #9ca3af; }
+      .weather-cloud-back { animation-delay: -4s; transform: scale(0.8) translateX(20px); opacity: 0.7; }
+      
+      .rain-container {
+        position: absolute;
+        top: 50%;
+        left: 20%;
+        width: 60%;
+        height: 50%;
+      }
+      .weather-rain-drop {
+        position: absolute;
+        width: 2px;
+        height: 10px;
+        background: var(--primary-color);
+        border-radius: 1px;
+        animation-name: rain-fall;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+        animation-duration: 1s;
+      }
 
     </style>
   <script type="importmap">
@@ -244,50 +353,9 @@
   }
 }
 </script>
+<script src="https://www.youtube.com/iframe_api"></script>
 </head>
-  <body data-assistant-state="idle">
-    <canvas id="matrix-background"></canvas>
-    <div id="background-vignette" class="fixed inset-0 z-[-1]" style="background: radial-gradient(ellipse at center, transparent 40%, var(--bg-color) 85%);"></div>
+  <body>
     <div id="root"></div>
-    <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script>
-      // Matrix background effect
-      const canvas = document.getElementById('matrix-background');
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const fontSize = 14;
-      const columns = canvas.width / fontSize;
-      const drops = Array.from({ length: columns }).map(() => 1);
-
-      function drawMatrix() {
-        ctx.fillStyle = 'rgba(2, 8, 16, 0.05)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
-        ctx.font = fontSize + 'px monospace';
-
-        for (let i = 0; i < drops.length; i++) {
-          const text = chars[Math.floor(Math.random() * chars.length)];
-          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-          if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-            drops[i] = 0;
-          }
-          drops[i]++;
-        }
-      }
-
-      setInterval(drawMatrix, 40);
-      window.addEventListener('resize', () => {
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
-          drops.length = 0;
-          const newColumns = canvas.width / fontSize;
-          for(let i = 0; i < newColumns; i++) drops.push(1);
-      });
-    </script>
   </body>
 </html>

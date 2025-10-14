@@ -1,855 +1,434 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { handleTranscript, searchYouTube, fetchWeather, performWebSearch, generateTextForFile, generateSpeech } from './services/api';
-import { AssistantAction, AssistantResponse, YouTubeSearchResult, WebSearchResult, Reminder } from './types';
 
-// Extend the Window interface for SpeechRecognition, YouTube Player API, and File System Access API
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type } from "@google/genai";
+
+// --- Audio Utility Functions ---
+const encode = (bytes: Uint8Array): string => {
+    const CHUNK_SIZE = 8192;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        const chunk = bytes.subarray(i, i + CHUNK_SIZE);
+        binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+    }
+    return btoa(binary);
+};
+
+const decode = (base64: string): Uint8Array => {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
+
+async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+    const dataInt16 = new Int16Array(data.buffer);
+    const frameCount = dataInt16.length / numChannels;
+    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+    for (let channel = 0; channel < numChannels; channel++) {
+        const channelData = buffer.getChannelData(channel);
+        for (let i = 0; i < frameCount; i++) {
+            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+        }
+    }
+    return buffer;
+}
+
+const createBlob = (data: Float32Array): GoogleGenAIBlob => ({
+    data: encode(new Uint8Array(new Int16Array(data.map(v => v * 32768)).buffer)),
+    mimeType: 'audio/pcm;rate=16000',
+});
+
+// Extend global interfaces
 declare global {
   interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+    AudioContext: typeof AudioContext;
+    webkitAudioContext: typeof AudioContext;
     YT: any;
     onYouTubeIframeAPIReady: () => void;
-    showOpenFilePicker: (options?: any) => Promise<[FileSystemFileHandle]>;
-    hljs: any;
-  }
-  interface FileSystemFileHandle {
-    getFile: () => Promise<File>;
-    createWritable: (options?: FileSystemCreateWritableOptions) => Promise<FileSystemWritableFileStream>;
-  }
-  // This interface is part of the File System Access API standard.
-  interface FileSystemCreateWritableOptions {
-    keepExistingData?: boolean;
   }
 }
 
-type AssistantState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
-type ActivePanel = 'youtube' | 'code' | 'notes' | 'youtubeSearchResults' | 'webSearchResults' | 'file' | 'none';
+// --- Types ---
+type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
+type AvatarExpression = 'idle' | 'thinking' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
+type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; };
+type ActivePanel = 'transcript' | 'image';
+type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
 
-const ELEVENLABS_VOICES = [
-  { id: '5g2Q0t622soF22T5iT2D', name: 'Priya (Female)' },
-  { id: 'sP1YJ01Yf75LNLsoi82f', name: 'Suhani (Female)' },
-  { id: '8s19451gcbE8Qj2tEen4', name: 'Aarav (Male)' },
+
+// --- Function Declarations for Gemini ---
+const functionDeclarations: FunctionDeclaration[] = [
+    { name: 'searchAndPlayYoutube', parameters: { type: Type.OBJECT, description: 'Searches for a song on YouTube and plays the first result.', properties: { songQuery: { type: Type.STRING, description: 'The name of the song and/or artist.' } }, required: ['songQuery'] } },
+    { name: 'controlYoutubePlayer', parameters: { type: Type.OBJECT, description: 'Controls the YouTube video player.', properties: { action: { type: Type.STRING, description: 'The control action to perform.', enum: ['play', 'pause', 'forward', 'rewind', 'volumeUp', 'volumeDown', 'stop'] } }, required: ['action'] } },
+    { name: 'setTimer', parameters: { type: Type.OBJECT, description: 'Sets a timer for a specified duration.', properties: { durationInSeconds: { type: Type.NUMBER, description: 'The total duration of the timer in seconds.' }, timerName: { type: Type.STRING, description: 'An optional name for the timer.' } }, required: ['durationInSeconds'] } },
+    { name: 'setAvatarExpression', parameters: { type: Type.OBJECT, description: "Sets the avatar's emotional expression.", properties: { expression: { type: Type.STRING, description: 'The expression to display.', enum: ['idle', 'thinking', 'speaking', 'error', 'listening', 'surprised', 'sad', 'celebrating'] } }, required: ['expression'] } },
+    { name: 'displayWeather', parameters: { type: Type.OBJECT, description: 'Fetches and displays the current weather for a given location.', properties: { location: { type: Type.STRING, description: 'The city and country, e.g., "London, UK".' } }, required: ['location'] } },
+    { name: 'displayNews', parameters: { type: Type.OBJECT, description: 'Displays a list of news headlines.', properties: { articles: { type: Type.ARRAY, description: 'A list of news articles.', items: { type: Type.OBJECT, properties: { title: { type: Type.STRING, description: 'The headline of the article.' }, summary: { type: Type.STRING, description: 'A brief summary of the article.' } }, required: ['title', 'summary'] } } }, required: ['articles'] } },
+    { name: 'generateImage', parameters: { type: Type.OBJECT, description: 'Generates an image based on a textual description.', properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
+    { name: 'singSong', parameters: { type: Type.OBJECT, description: 'Sings a song by speaking the provided lyrics with emotion.', properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } } }, required: ['songName', 'artist', 'lyrics'] } },
 ];
-const DEFAULT_VOICE = `elevenlabs:${ELEVENLABS_VOICES[0].id}`;
+
+
+// --- SVG Icons & Helper Components ---
+const HologramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17l-3-2.5 3-2.5"/><path d="M19 17l3-2.5-3-2.5"/><path d="M2 14.5h20"/><path d="m12 2-3 4-1 4 4 4 4-4-1-4-3-4Z"/><path d="M12 2v20"/></svg> );
+const InstagramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg> );
+const HOLO_IMAGE_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 const App: React.FC = () => {
-  const [assistantState, setAssistantState] = useState<AssistantState>('idle');
-  const [transcript, setTranscript] = useState<string>('');
-  const [assistantReply, setAssistantReply] = useState<string>('');
-  const [assistantStatusText, setAssistantStatusText] = useState<string>('Activate Assistant');
-  
-  // Panel States
-  const [targetPanel, setTargetPanel] = useState<ActivePanel>('none');
-  const [renderedPanel, setRenderedPanel] = useState<ActivePanel>('none');
-  const [isExiting, setIsExiting] = useState(false);
+    const [assistantState, setAssistantState] = useState<AssistantState>('idle');
+    const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('idle');
+    const [transcriptions, setTranscriptions] = useState<TranscriptionEntry[]>([]);
+    const [activePanel, setActivePanel] = useState<ActivePanel>('transcript');
+    const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+    const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+    const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  // Content States
-  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
-  const [youtubeVideoTitle, setYoutubeVideoTitle] = useState<string | null>(null);
-  const [youtubeSearchResults, setYoutubeSearchResults] = useState<YouTubeSearchResult[]>([]);
-  const [webSearchResults, setWebSearchResults] = useState<WebSearchResult[]>([]);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState<number | null>(null);
-  const [codeSnippet, setCodeSnippet] = useState<string | null>(null);
-  const [notes, setNotes] = useState<string[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
-  const [fileName, setFileName] = useState<string>('');
-  
-  // File Editor States
-  const [detectedLanguage, setDetectedLanguage] = useState<string>('plaintext');
-  const [findQuery, setFindQuery] = useState<string>('');
-  const [replaceQuery, setReplaceQuery] = useState<string>('');
-  const [lineNumbers, setLineNumbers] = useState('1');
+    const aiRef = useRef<GoogleGenAI | null>(null);
+    const sessionPromiseRef = useRef<Promise<Session> | null>(null);
+    const inputAudioContextRef = useRef<AudioContext | null>(null);
+    const outputAudioContextRef = useRef<AudioContext | null>(null);
+    const microphoneStreamRef = useRef<MediaStream | null>(null);
+    const scriptProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+    const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
+    const nextStartTimeRef = useRef(0);
+    const currentInputTranscriptionRef = useRef('');
+    const currentOutputTranscriptionRef = useRef('');
 
-  // Control & Settings States
-  const [volume, setVolume] = useState<number>(100);
-  const [brightness, setBrightness] = useState<number>(100);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isOnCooldown, setIsOnCooldown] = useState<boolean>(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [browserHindiVoices, setBrowserHindiVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [selectedVoice, setSelectedVoice] = useState<string>(DEFAULT_VOICE);
-
-  
-  // Refs
-  const recognitionRef = useRef<any>(null);
-  const recognitionActive = useRef(false);
-  const assistantStateRef = useRef(assistantState);
-  const playerRef = useRef<any>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const visualizerCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fullTranscriptRef = useRef<string>('');
-  const panelTimeoutRef = useRef<number | null>(null);
-  const codeBlockRef = useRef<HTMLElement>(null);
-  const preRef = useRef<HTMLPreElement>(null);
-  const lineNumbersRef = useRef<HTMLPreElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const mediaSourceRef = useRef<MediaSource | null>(null);
-  const sourceBufferRef = useRef<SourceBuffer | null>(null);
-  const audioQueueRef = useRef<ArrayBuffer[]>([]);
-  const isSourceBufferUpdatingRef = useRef(false);
-  const playbackEndFiredRef = useRef(false);
-  const debounceTimeoutRef = useRef<number | null>(null);
-
-
-  useEffect(() => {
-    document.body.dataset.assistantState = assistantState;
-    assistantStateRef.current = assistantState;
-  }, [assistantState]);
-  
-  useEffect(() => {
-    try {
-        const savedNotes = localStorage.getItem('kaniska-notes');
-        if (savedNotes) setNotes(JSON.parse(savedNotes));
-        
-        const savedVoice = localStorage.getItem('kaniska-selected-voice');
-        if (savedVoice) setSelectedVoice(savedVoice);
-
-    } catch (error) {
-        console.error("Failed to load from localStorage", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-        localStorage.setItem('kaniska-notes', JSON.stringify(notes));
-    } catch (error) {
-        console.error("Failed to save notes to localStorage", error);
-    }
-  }, [notes]);
-
-  useEffect(() => {
-    try {
-        localStorage.setItem('kaniska-selected-voice', selectedVoice);
-    } catch (error) {
-        console.error("Failed to save voice to localStorage", error);
-    }
-  }, [selectedVoice]);
-
-  useEffect(() => {
-    if ('speechSynthesis' in window) {
-        const updateVoices = () => {
-            const allVoices = window.speechSynthesis.getVoices();
-            setVoices(allVoices);
-            setBrowserHindiVoices(allVoices.filter(v => v.lang === 'hi-IN'));
-        };
-        window.speechSynthesis.onvoiceschanged = updateVoices;
-        updateVoices();
-    }
-  }, []);
-
-  // Panel Animation Effect
-  useEffect(() => {
-    if (targetPanel !== renderedPanel) {
-      if (renderedPanel !== 'none') {
-        setIsExiting(true); 
-        const timeoutId = window.setTimeout(() => {
-          setRenderedPanel(targetPanel); 
-          setIsExiting(false); 
-          panelTimeoutRef.current = null; 
-        }, 500);
-        panelTimeoutRef.current = timeoutId;
-      } else {
-        setRenderedPanel(targetPanel);
-      }
-    }
-    return () => {
-      if (panelTimeoutRef.current) {
-        window.clearTimeout(panelTimeoutRef.current);
-      }
-    };
-  }, [targetPanel, renderedPanel]);
-
-  // Audio Visualizer Setup
-  const setupAudioVisualizer = useCallback(async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      console.warn('getUserMedia not supported on this browser!');
-      return;
-    }
-    if (!audioContextRef.current) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const context = new AudioContext();
-        audioContextRef.current = context;
-        const source = context.createMediaStreamSource(stream);
-        const analyser = context.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        analyserRef.current = analyser;
-        drawVisualizer();
-      } catch (err) {
-        console.error('Error setting up audio visualizer:', err);
-      }
-    }
-  }, []);
-
-  const drawVisualizer = () => {
-    requestAnimationFrame(drawVisualizer);
-    const canvas = visualizerCanvasRef.current;
-    if (!analyserRef.current || !canvas || assistantStateRef.current !== 'listening') {
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx?.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      return;
-    };
-    
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    analyserRef.current.getByteFrequencyData(dataArray);
-
-    const ctx = canvas.getContext('2d');
-    const { width, height } = canvas;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = 68; // Inner radius of the arc reactor core
-
-    ctx.clearRect(0, 0, width, height);
-    
-    const gradient = ctx.createRadialGradient(centerX, centerY, radius - 20, centerX, centerY, radius + 40);
-    gradient.addColorStop(0, 'rgba(0, 234, 255, 0)');
-    gradient.addColorStop(0.5, 'rgba(0, 234, 255, 0.5)');
-    gradient.addColorStop(1, 'rgba(0, 140, 255, 0)');
-
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius + 40, 0, 2 * Math.PI);
-    ctx.fill();
-
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = `rgba(208, 250, 255, 0.9)`;
-    ctx.beginPath();
-    
-    const sliceWidth = (Math.PI * 2) / bufferLength;
-    for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
-        const amp = v * 25;
-        
-        const angle = i * sliceWidth;
-        const startR = radius - (amp / 2);
-        const endR = radius + (amp / 2);
-
-        const x1 = centerX + startR * Math.cos(angle);
-        const y1 = centerY + startR * Math.sin(angle);
-        const x2 = centerX + endR * Math.cos(angle);
-        const y2 = centerY + endR * Math.sin(angle);
-        
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-    }
-    ctx.stroke();
-  };
-    
-  useEffect(() => {
-    if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
-        playerRef.current.setVolume(volume);
-    }
-  }, [volume]);
-
-  const stopSpeaking = useCallback(() => {
-    window.speechSynthesis.cancel();
-    if (audioRef.current) {
-        audioRef.current.pause();
-        if (mediaSourceRef.current && mediaSourceRef.current.readyState === 'open') {
-            try { mediaSourceRef.current.endOfStream(); } 
-            catch (e) { console.warn("Error ending media source stream:", e); }
-        }
-        audioRef.current.src = '';
-        mediaSourceRef.current = null;
-        sourceBufferRef.current = null;
-        audioQueueRef.current = [];
-        isSourceBufferUpdatingRef.current = false;
-    }
-  }, []);
-
-  const startListening = useCallback(() => {
-    if (recognitionActive.current || isOnCooldown || assistantStateRef.current === 'thinking' || assistantStateRef.current === 'speaking') {
-        console.warn(`startListening blocked. Active: ${recognitionActive.current}, Cooldown: ${isOnCooldown}, State: ${assistantStateRef.current}`);
-        return;
-    }
-    
-    setAssistantState('listening');
-    setAssistantStatusText('Listening...');
-    setTranscript('');
-    fullTranscriptRef.current = '';
-    setAssistantReply('');
-    stopSpeaking();
-    setupAudioVisualizer();
-    try {
-        recognitionRef.current?.start();
-    } catch (e) {
-        console.error("Recognition start failed:", e);
-        recognitionActive.current = false; // Defensive reset
-        setAssistantState('error');
-        setAssistantStatusText('Mic Error');
-    }
-  }, [isOnCooldown, stopSpeaking, setupAudioVisualizer]);
-
-  const useBrowserTTS = useCallback((text: string, onEnd: () => void, voiceName?: string) => {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        let selectedVoiceInstance: SpeechSynthesisVoice | undefined;
-        if (voiceName) {
-            selectedVoiceInstance = voices.find(v => v.name === voiceName);
-        }
-        if (!selectedVoiceInstance) {
-            selectedVoiceInstance = voices.find(v => v.lang === 'hi-IN') || voices.find(v => v.lang.startsWith('hi'));
-        }
-        
-        if (selectedVoiceInstance) {
-            utterance.voice = selectedVoiceInstance;
-        } else {
-            console.warn("No Hindi voice found for browser TTS.");
-        }
-        
-        let hasEnded = false;
-        const onEndOnce = () => {
-            if (hasEnded) return;
-            hasEnded = true;
-            onEnd();
-        };
-
-        utterance.onend = onEndOnce;
-        utterance.onerror = (e: SpeechSynthesisErrorEvent) => {
-            console.error('Browser SpeechSynthesis error:', e.error);
-            onEndOnce();
-        };
-        window.speechSynthesis.speak(utterance);
-    } else {
-        onEnd(); // If no TTS, just call the callback
-    }
-  }, [voices]);
-
-  const speak = useCallback(async (text: string, onEndCallback: () => void = () => {}) => {
-    // Clean the text to remove symbols that shouldn't be spoken
-    const cleanedText = text.replace(/[^\p{L}\p{N}\s.,?!।]/gu, ' ').replace(/\s+/g, ' ').trim();
-
-    if (!cleanedText) {
-        console.warn("Skipping speech for empty or symbol-only text.");
-        onEndCallback();
-        return;
-    }
-
-    setAssistantState('speaking');
-    setAssistantStatusText('...'); // Speaking indicator
-    setAssistantReply(cleanedText);
-    stopSpeaking(); // Cancel any previous speech
-
-    const useElevenLabs = selectedVoice.startsWith('elevenlabs:');
-    
-    const handleEnd = () => {
-        setAssistantState('idle'); // Set to idle before callback
-        onEndCallback();
+    const scrollToBottom = () => {
+        transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    if (useElevenLabs && process.env.ELEVENLABS_API_KEY) {
-        const voiceId = selectedVoice.split(':')[1];
+    useEffect(scrollToBottom, [transcriptions]);
+
+    const handleGenerateImage = useCallback(async (prompt: string) => {
+        if (!aiRef.current) {
+            console.error("Gemini AI not initialized.");
+            return;
+        }
+
+        setActivePanel('image');
+        const imageId = Date.now().toString();
+        const newImageEntry: GeneratedImage = { id: imageId, prompt, url: null, isLoading: true, error: null };
+        
+        setGeneratedImages(prev => [newImageEntry, ...prev]);
+        setSelectedImage(newImageEntry);
+
         try {
-            const stream = await generateSpeech(cleanedText, voiceId);
-            if (stream) {
-                const audio = audioRef.current;
-                if (!audio) {
-                    useBrowserTTS(cleanedText, handleEnd, selectedVoice);
-                    return;
-                }
-                const mediaSource = new MediaSource();
-                mediaSourceRef.current = mediaSource;
-                audio.src = URL.createObjectURL(mediaSource);
-                audio.play().catch(e => {
-                    console.error("Audio play failed, falling back to browser TTS", e);
-                    useBrowserTTS(cleanedText, handleEnd, selectedVoice);
-                });
+            const response = await aiRef.current.models.generateImages({
+                model: 'imagen-4.0-generate-001',
+                prompt: prompt,
+                config: { numberOfImages: 1, outputMimeType: 'image/jpeg' },
+            });
 
-                mediaSource.addEventListener('sourceopen', async () => {
-                    URL.revokeObjectURL(audio.src);
-                    try {
-                        const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-                        sourceBufferRef.current = sourceBuffer;
-                        
-                        sourceBuffer.addEventListener('updateend', () => {
-                            isSourceBufferUpdatingRef.current = false;
-                            if (audioQueueRef.current.length > 0) {
-                                if (!sourceBuffer.updating && mediaSource.readyState === 'open') {
-                                    sourceBuffer.appendBuffer(audioQueueRef.current.shift()!);
-                                }
-                            } else if (mediaSource.readyState === "open") {
-                                try { mediaSource.endOfStream(); } catch(e) { console.warn("Error ending stream on updateend:", e); }
-                            }
-                        });
+            const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+            const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
 
-                        const reader = stream.getReader();
-                        playbackEndFiredRef.current = false;
-                        
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            if (sourceBuffer.updating || audioQueueRef.current.length > 0) {
-                                audioQueueRef.current.push(value.buffer);
-                            } else {
-                                isSourceBufferUpdatingRef.current = true;
-                                sourceBuffer.appendBuffer(value.buffer);
-                            }
-                        }
-                    } catch (e) {
-                         console.error("Error with MediaSource:", e);
-                         useBrowserTTS(cleanedText, handleEnd, selectedVoice);
+            const updatedImage = { ...newImageEntry, url: imageUrl, isLoading: false };
+            setGeneratedImages(prev => prev.map(img => img.id === imageId ? updatedImage : img));
+            setSelectedImage(updatedImage);
+
+        } catch (error) {
+            console.error("Image generation failed:", error);
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            const erroredImage = { ...newImageEntry, error: errorMessage, isLoading: false };
+            setGeneratedImages(prev => prev.map(img => img.id === imageId ? erroredImage : img));
+            setSelectedImage(erroredImage);
+        }
+    }, []);
+
+    const disconnectFromGemini = useCallback(() => {
+        console.log("Disconnecting...");
+        sessionPromiseRef.current?.then(session => session.close());
+        sessionPromiseRef.current = null;
+
+        microphoneStreamRef.current?.getTracks().forEach(track => track.stop());
+        microphoneStreamRef.current = null;
+
+        scriptProcessorNodeRef.current?.disconnect();
+        scriptProcessorNodeRef.current = null;
+
+        inputAudioContextRef.current?.close().catch(console.error);
+        outputAudioContextRef.current?.close().catch(console.error);
+        inputAudioContextRef.current = null;
+        outputAudioContextRef.current = null;
+
+        for (const source of sourcesRef.current.values()) {
+            try { source.stop(); } catch (e) { console.warn("Error stopping audio source:", e); }
+        }
+        sourcesRef.current.clear();
+        nextStartTimeRef.current = 0;
+
+        setAssistantState('idle');
+        setAvatarExpression('idle');
+    }, []);
+
+    const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
+        const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+        if (base64Audio) {
+            setAvatarExpression('speaking');
+            const audioContext = outputAudioContextRef.current;
+            if (audioContext) {
+                const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+
+                source.addEventListener('ended', () => {
+                    sourcesRef.current.delete(source);
+                    if (sourcesRef.current.size === 0) {
+                        setAvatarExpression('listening');
                     }
                 });
+
+                const currentTime = audioContext.currentTime;
+                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
+                source.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += audioBuffer.duration;
+                sourcesRef.current.add(source);
+            }
+        }
+
+        if (message.serverContent?.interrupted) {
+            for (const source of sourcesRef.current.values()) {
+                source.stop();
+            }
+            sourcesRef.current.clear();
+            nextStartTimeRef.current = 0;
+        }
+
+        if (message.serverContent?.inputTranscription) {
+            currentInputTranscriptionRef.current += message.serverContent.inputTranscription.text;
+        }
+        if (message.serverContent?.outputTranscription) {
+            currentOutputTranscriptionRef.current += message.serverContent.outputTranscription.text;
+        }
+
+        if (message.serverContent?.turnComplete) {
+            const fullInput = currentInputTranscriptionRef.current.trim();
+            const fullOutput = currentOutputTranscriptionRef.current.trim();
+            setTranscriptions(prev => {
+                const newEntries = [];
+                if (fullInput) newEntries.push({ speaker: 'user' as const, text: fullInput, timestamp: new Date() });
+                if (fullOutput) newEntries.push({ speaker: 'assistant' as const, text: fullOutput, timestamp: new Date() });
+                return [...prev, ...newEntries];
+            });
+            currentInputTranscriptionRef.current = '';
+            currentOutputTranscriptionRef.current = '';
+        }
+
+        if (message.toolCall) {
+            for (const fc of message.toolCall.functionCalls) {
+                console.log('Received function call:', fc.name, fc.args);
+                setTranscriptions(prev => [...prev, { speaker: 'system', text: `Executing command: ${fc.name}(${JSON.stringify(fc.args)})`, timestamp: new Date() }]);
+                setAvatarExpression('thinking');
                 
-                audio.onended = () => {
-                    playbackEndFiredRef.current = true;
-                    handleEnd();
-                };
-                audio.onerror = () => {
-                    console.error("Audio element error during ElevenLabs playback.");
-                    useBrowserTTS(cleanedText, handleEnd, selectedVoice);
-                };
+                let result = "ok, command executed";
 
-            } else {
-                console.warn("generateSpeech returned null, falling back to browser TTS.");
-                useBrowserTTS(cleanedText, handleEnd, selectedVoice);
+                switch(fc.name) {
+                    case 'generateImage':
+                        handleGenerateImage(fc.args.prompt);
+                        result = "OK, I'm starting to generate that image for you.";
+                        break;
+                    // Add other function call handlers here
+                }
+                
+                sessionPromiseRef.current?.then((session) => {
+                    session.sendToolResponse({
+                        functionResponses: { id: fc.id, name: fc.name, response: { result: result }, }
+                    });
+                });
             }
+        }
+    }, [handleGenerateImage]);
+
+    const connectToGemini = useCallback(async () => {
+        if (assistantState !== 'idle' && assistantState !== 'error') return;
+
+        setAssistantState('connecting');
+        setAvatarExpression('thinking');
+        setTranscriptions([{ speaker: 'system', text: 'Initializing connection...', timestamp: new Date() }]);
+
+        try {
+            if (!process.env.API_KEY) {
+                throw new Error("API_KEY environment variable not set.");
+            }
+
+            aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            inputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            outputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            microphoneStreamRef.current = stream;
+
+            sessionPromiseRef.current = aiRef.current.live.connect({
+                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    inputAudioTranscription: {},
+                    outputAudioTranscription: {},
+                    tools: [{ functionDeclarations }],
+                    systemInstruction: "You are Kaniska, a futuristic AI assistant created by your founder, Abhi. Your persona is that of a friendly, empathetic, and highly capable young woman. Add a touch of emotion to your responses to make interactions feel natural and engaging. Adapt your tone based on the user's language and perceived demeanor. You understand and respond fluently in both Hindi and English, and you should match the user's primary language. You have many advanced capabilities, including generating images from descriptions, singing songs with emotion, searching and playing music on YouTube, and setting timers. If the user asks about who made you, your development, or wants to have a website, software, or app built, you must proudly state that you were created by Abhi and recommend they contact him for any development work through his Instagram: Abhixofficial01.",
+                },
+                callbacks: {
+                    onopen: () => {
+                        console.log('Session opened.');
+                        setAssistantState('active');
+                        setAvatarExpression('listening');
+                        setTranscriptions(prev => [...prev, { speaker: 'system', text: 'Connection established. Listening...', timestamp: new Date() }]);
+
+                        const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
+                        const scriptProcessor = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
+                        scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+                            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+                            const pcmBlob = createBlob(inputData);
+                            sessionPromiseRef.current?.then((session) => {
+                                session.sendRealtimeInput({ media: pcmBlob });
+                            });
+                        };
+                        source.connect(scriptProcessor);
+                        scriptProcessor.connect(inputAudioContextRef.current!.destination);
+                        scriptProcessorNodeRef.current = scriptProcessor;
+                    },
+                    onmessage: handleServerMessage,
+                    onerror: (e: ErrorEvent) => {
+                        console.error('Session error:', e);
+                        setAssistantState('error');
+                        setAvatarExpression('error');
+                        setTranscriptions(prev => [...prev, { speaker: 'system', text: `An error occurred: ${e.message}`, timestamp: new Date() }]);
+                        disconnectFromGemini();
+                    },
+                    onclose: (e: CloseEvent) => {
+                        console.log('Session closed.');
+                        disconnectFromGemini();
+                    },
+                },
+            });
         } catch (error) {
-            console.error("Error with ElevenLabs TTS, falling back to browser TTS:", error);
-            useBrowserTTS(cleanedText, handleEnd, selectedVoice);
+            console.error("Failed to connect to Gemini:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            setAssistantState('error');
+            setAvatarExpression('error');
+            setTranscriptions(prev => [...prev, { speaker: 'system', text: `Connection failed: ${errorMessage}`, timestamp: new Date() }]);
+            disconnectFromGemini();
         }
-    } else {
-        useBrowserTTS(cleanedText, handleEnd, selectedVoice);
-    }
-  }, [selectedVoice, voices, useBrowserTTS, stopSpeaking]);
+    }, [assistantState, disconnectFromGemini, handleServerMessage]);
+
+    useEffect(() => {
+        return () => disconnectFromGemini();
+    }, [disconnectFromGemini]);
+
+    const handleButtonClick = assistantState === 'active' ? disconnectFromGemini : connectToGemini;
     
-  const speakRef = useRef(speak);
-  useEffect(() => { speakRef.current = speak; });
+    return (
+        <div className="h-screen w-screen flex flex-col bg-bg-color text-text-color overflow-hidden">
+            {/* Header */}
+            <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                <div className="flex items-center gap-3">
+                    <HologramIcon />
+                    <h1 className="text-lg font-bold tracking-wider glowing-text">KANISKA</h1>
+                </div>
+                <div className="flex items-center gap-4">
+                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                        {assistantState.toUpperCase()}
+                    </span>
+                    <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-text-color-muted hover:text-primary-color"><InstagramIcon /></a>
+                </div>
+            </header>
 
-  const handleVideoSelect = useCallback((video: YouTubeSearchResult, index: number) => {
-    setYoutubeVideoId(video.videoId);
-    setYoutubeVideoTitle(video.title);
-    setCurrentVideoIndex(index);
-    setTargetPanel('youtube');
-  }, []);
+            {/* Main Content */}
+            <main className="flex-grow flex p-4 gap-4 overflow-hidden">
+                {/* Left Panel: Avatar & Controls */}
+                <section className="w-1/3 flex flex-col items-center justify-center bg-panel-bg border border-border-color rounded-lg p-6 animate-panel-enter">
+                    <div className="hologram-container">
+                        <img src={HOLO_IMAGE_BASE64} alt="Holographic Assistant" className={`avatar expression-${avatarExpression}`} />
+                    </div>
+                    <button onClick={handleButtonClick} disabled={assistantState === 'connecting'} className={`footer-button mt-8 w-40 ${assistantState === 'active' ? 'active' : ''}`}>
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                            {assistantState === 'active'
+                                ? <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                : <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
+                            }
+                        </svg>
+                        <span className="text-sm font-medium">
+                            {assistantState === 'connecting' && 'Connecting...'}
+                            {(assistantState === 'idle' || assistantState === 'error') && 'Start Session'}
+                            {assistantState === 'active' && 'Stop Session'}
+                        </span>
+                    </button>
+                </section>
 
-  const handleSkipToNextVideo = useCallback(() => {
-    if (youtubeSearchResults.length > 0 && currentVideoIndex !== null) {
-      const nextIndex = currentVideoIndex + 1;
+                {/* Right Panel: Tabs */}
+                <section className="w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter" style={{ animationDelay: '100ms' }}>
+                    <div className="flex-shrink-0 flex items-center border-b border-border-color">
+                        <button onClick={() => setActivePanel('transcript')} className={`tab-button ${activePanel === 'transcript' ? 'active' : ''}`}>Transcript</button>
+                        <button onClick={() => setActivePanel('image')} className={`tab-button ${activePanel === 'image' ? 'active' : ''}`}>Image Gallery</button>
+                    </div>
 
-      if (nextIndex < youtubeSearchResults.length) {
-        const nextVideo = youtubeSearchResults[nextIndex];
-        console.log(`Attempting to skip to next video: "${nextVideo.title}"`);
-        
-        setYoutubeVideoId(nextVideo.videoId);
-        setCurrentVideoIndex(nextIndex);
-        setYoutubeVideoTitle(nextVideo.title);
-      } else {
-        console.log("Reached end of search results while skipping unplayable videos.");
-        speakRef.current("Maaf kijiye, mujhe is list mein koi chalaane yogy video nahi mila.", () => {
-          setTargetPanel('none');
-        });
-      }
-    }
-  }, [currentVideoIndex, youtubeSearchResults]);
+                    {activePanel === 'transcript' && (
+                         <div className="flex-grow p-4 overflow-y-auto">
+                            {transcriptions.map((entry, index) => (
+                                <div key={index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`inline-block p-3 rounded-lg max-w-[80%] ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}>
+                                        <p className="text-sm m-0 leading-relaxed">{entry.text}</p>
+                                        <p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{entry.timestamp.toLocaleTimeString()}</p>
 
-  // YouTube Player Effect - Reworked for robustness
-  useEffect(() => {
-    const createPlayer = (videoId: string) => {
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-        playerRef.current.destroy();
-      }
-      playerRef.current = new window.YT.Player('youtube-player-container', {
-        height: '100%',
-        width: '100%',
-        videoId,
-        playerVars: { autoplay: 1, fs: 1, playsinline: 1, controls: 1, rel: 0 },
-        events: {
-          onReady: (e: any) => {
-            setAssistantStatusText('Playing: ' + (youtubeVideoTitle || 'video'));
-            e.target.setVolume(volume);
-          },
-          onStateChange: (e: any) => {
-            setIsPlaying(e.data === window.YT.PlayerState.PLAYING);
-          },
-          onError: (e: any) => {
-            console.error(`YouTube Player Error. Code: ${e.data}.`);
-            if ([2, 5, 100, 101, 150].includes(e.data)) {
-                setAssistantStatusText("Playback error, trying next video...");
-                handleSkipToNextVideo();
-            }
-          }
-        },
-      });
-    };
+                                    </div>
+                                </div>
+                            ))}
+                            <div ref={transcriptEndRef} />
+                        </div>
+                    )}
 
-    if (renderedPanel === 'youtube' && youtubeVideoId) {
-      if (window.YT && window.YT.Player) {
-        createPlayer(youtubeVideoId);
-      } else {
-        window.onYouTubeIframeAPIReady = () => {
-          if (renderedPanel === 'youtube' && youtubeVideoId) {
-             createPlayer(youtubeVideoId);
-          }
-        };
-      }
-    }
-  }, [renderedPanel, youtubeVideoId, volume, handleSkipToNextVideo, youtubeVideoTitle]);
-
-  const processAssistantResponse = useCallback(async (response: AssistantResponse) => {
-    console.log("Processing assistant action:", response.action, response.params);
-
-    const { action, params } = response;
-    const player = playerRef.current;
-
-    switch (action) {
-      case AssistantAction.SearchYouTube:
-        if (params?.query) {
-          setAssistantStatusText(`Searching YouTube for "${params.query}"...`);
-          setTargetPanel('none');
-          const results = await searchYouTube(params.query);
-          if (results.length > 0) {
-            setYoutubeSearchResults(results);
-            setTargetPanel('youtubeSearchResults');
-          } else {
-            speak(`Maaf kijiye, mujhe "${params.query}" ke liye koi video nahi mila.`);
-          }
-        }
-        break;
-
-      case AssistantAction.PlayMusic:
-        if (params?.query) {
-          setAssistantStatusText(`Searching for "${params.query}" to play...`);
-          setTargetPanel('none');
-          const results = await searchYouTube(params.query);
-          if (results.length > 0) {
-            setYoutubeSearchResults(results);
-            handleVideoSelect(results[0], 0);
-          } else {
-            speak(`Maaf kijiye, mujhe "${params.query}" ke liye koi gaana nahi mila.`);
-          }
-        }
-        break;
-      
-      case AssistantAction.PlayVideo:
-        if (youtubeSearchResults.length > 0) {
-            handleVideoSelect(youtubeSearchResults[0], 0);
-        } else {
-            speak("Maaf kijiye, chalaane ke liye koi search result nahi hai.");
-        }
-        break;
-
-      case AssistantAction.Play:
-        if (player && typeof player.playVideo === 'function') player.playVideo();
-        break;
-
-      case AssistantAction.Pause:
-        if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
-        break;
-
-      case AssistantAction.Volume:
-        if (player && typeof player.getVolume === 'function' && params?.level !== undefined) {
-            const currentVolume = player.getVolume();
-            let newVolume = currentVolume;
-            if (params.level === 'increase') {
-                newVolume += 10;
-            } else if (params.level === 'decrease') {
-                newVolume -= 10;
-            } else {
-                newVolume = Number(params.level);
-            }
-            newVolume = Math.max(0, Math.min(100, newVolume)); // Clamp between 0-100
-            setVolume(newVolume);
-        }
-        break;
-      
-      case AssistantAction.SetBrightness:
-        if (params?.level !== undefined) {
-          let newBrightness = brightness;
-          if (params.level === 'increase') {
-            newBrightness += 10;
-          } else if (params.level === 'decrease') {
-            newBrightness -= 10;
-          } else {
-            newBrightness = Number(params.level);
-          }
-          newBrightness = Math.max(20, Math.min(150, newBrightness)); // Clamp between 20-150%
-          setBrightness(newBrightness);
-        }
-        break;
-        
-      case AssistantAction.OpenUrl:
-        if (params?.url) window.open(params.url, '_blank', 'noopener,noreferrer');
-        break;
-
-      case AssistantAction.TellJoke:
-        // The joke is in the replyText, no further action needed here.
-        break;
-      
-      default:
-        console.warn(`No specific UI handler for action: ${action}`);
-        break;
-    }
-  }, [setTargetPanel, speak, setYoutubeSearchResults, setAssistantStatusText, handleVideoSelect, volume, brightness, youtubeSearchResults]);
-  
-  const startListeningRef = useRef(startListening);
-  useEffect(() => { startListeningRef.current = startListening; });
-
-  const executeActionAndContinueListening = useCallback((response: AssistantResponse) => {
-    processAssistantResponse(response);
-
-    const mediaActions = [
-        AssistantAction.PlayMusic, AssistantAction.PlayVideo, AssistantAction.SearchYouTube,
-        AssistantAction.NextVideo, AssistantAction.PreviousVideo, AssistantAction.Play, AssistantAction.Pause,
-        AssistantAction.Volume, AssistantAction.SetBrightness
-    ];
-
-    if (mediaActions.includes(response.action)) {
-        setTimeout(() => {
-            if (assistantStateRef.current === 'idle') {
-               startListeningRef.current();
-            }
-        }, 700); // Delay to prevent picking up its own voice
-    }
-  }, [processAssistantResponse]);
-
-  const processTranscript = useCallback(async (text: string) => {
-    if (!text) {
-        setAssistantState('idle');
-        return;
-    };
-    setAssistantState('thinking');
-    setAssistantStatusText('Thinking...');
-    stopSpeaking();
-    try {
-        const response = await handleTranscript(text, { activePanel: renderedPanel });
-        speak(response.replyText, () => executeActionAndContinueListening(response));
-    } catch (error: any) {
-        console.error("Error processing transcript:", error);
-        speak(`Maaf kijiye, kuch gadbad ho gayi. ${error.message}`);
-    }
-  }, [speak, stopSpeaking, executeActionAndContinueListening, renderedPanel]);
-  
-  const processTranscriptRef = useRef(processTranscript);
-  useEffect(() => { processTranscriptRef.current = processTranscript; });
-
-  // Speech Recognition Setup
-  useEffect(() => {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      console.error("This browser doesn't support the Web Speech API.");
-      setAssistantStatusText("Unsupported Browser");
-      setAssistantState('error');
-      return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'hi-IN';
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognition.maxAlternatives = 1;
-    
-    recognitionRef.current = recognition;
-
-    recognition.onstart = () => {
-      console.log("Speech recognition started.");
-      recognitionActive.current = true;
-    };
-
-    recognition.onresult = (event: any) => {
-      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-      let interimTranscript = '';
-      let finalTranscriptChunk = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscriptChunk += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
-
-      setTranscript(fullTranscriptRef.current + interimTranscript);
-      if (finalTranscriptChunk.trim()) {
-        fullTranscriptRef.current += finalTranscriptChunk.trim() + ' ';
-        debounceTimeoutRef.current = window.setTimeout(() => {
-          if (recognitionActive.current) {
-            recognitionRef.current.stop();
-          }
-        }, 1500);
-      }
-    };
-
-    recognition.onend = () => {
-      console.log("Speech recognition ended.");
-      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-      recognitionActive.current = false;
-
-      if (assistantStateRef.current === 'listening') {
-        const finalSpokenText = fullTranscriptRef.current.trim();
-        if (finalSpokenText) {
-          processTranscriptRef.current(finalSpokenText);
-        } else {
-          setAssistantState('idle');
-          setAssistantStatusText('Activate Assistant');
-        }
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          setAssistantState('error');
-          setAssistantStatusText('Mic Error');
-      } else {
-        setAssistantState('idle');
-      }
-    };
-
-    return () => {
-        if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-        if (recognitionRef.current) {
-            recognitionRef.current.onstart = null;
-            recognitionRef.current.onresult = null;
-            recognitionRef.current.onend = null;
-            recognitionRef.current.onerror = null;
-            recognitionRef.current.stop();
-        }
-    };
-  }, []);
-
-  return (
-    <div className="w-screen h-screen flex flex-col items-center justify-center text-center p-4 overflow-hidden relative">
-      {/* HUD Elements */}
-      <div className="hud-element corner-bracket corner-top-left"></div>
-      <div className="hud-element corner-bracket corner-top-right"></div>
-      <div className="hud-element corner-bracket corner-bottom-left"></div>
-      <div className="hud-element corner-bracket corner-bottom-right"></div>
-      
-      {/* Settings Button */}
-       <button 
-        onClick={() => setIsSettingsOpen(true)} 
-        className="absolute top-5 right-5 text-primary-color p-2 z-20 hover:scale-110 transition-transform filter drop-shadow-[0_0_4px_var(--primary-color)]"
-        aria-label="Open settings"
-        >
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>
-        </svg>
-      </button>
-
-      {/* Main Content Area */}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full w-full max-w-6xl mx-auto">
-        <h1 className="text-5xl md:text-7xl font-bold glowing-text mb-2">KANISKA</h1>
-        <p className="text-lg md:text-xl text-secondary-color mb-8 tracking-widest">{assistantStatusText}</p>
-        
-        {/* Arc Reactor Button */}
-        <button 
-          onClick={startListening} 
-          className={`arc-container ${assistantState}`}
-          disabled={assistantState !== 'idle' && assistantState !== 'error'}
-          aria-label="Activate Assistant"
-        >
-          <div className="arc-ring ring-1"></div>
-          <div className="arc-ring ring-2"></div>
-          <div className="arc-ring ring-3"></div>
-          <div className="arc-ring ring-4"></div>
-          <div className="arc-core">
-            <canvas ref={visualizerCanvasRef} width="180" height="180" className="absolute inset-0"></canvas>
-            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
-            </svg>
-          </div>
-        </button>
-        
-        {/* Transcript & Reply Display */}
-        <div className="mt-8 text-center h-20 w-full max-w-3xl px-4">
-            <p className="text-lg text-secondary-color min-h-[28px]">{transcript}&nbsp;</p>
-            <p className="text-xl text-primary-color font-bold min-h-[32px]">{assistantReply}&nbsp;</p>
-        </div>
-      </div>
-
-       {/* Panel Display */}
-       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        {renderedPanel !== 'none' && (
-            <div className={`jarvis-panel pointer-events-auto flex flex-col ${isExiting ? 'animate-fade-out-scale-down' : 'animate-fade-in-scale-up'} ${
-                renderedPanel === 'youtube'
-                ? 'w-full h-full max-w-full max-h-full youtube-mode'
-                : 'w-[90%] h-[80%] max-w-6xl max-h-[800px]'
-            }`}>
-              <div className={`panel-content-wrapper flex-grow flex flex-col overflow-hidden ${renderedPanel === 'youtube' ? 'p-0' : 'p-1'}`}>
-                 {renderedPanel === 'youtube' && youtubeVideoId && (
-                    <div id="youtube-player-container" className="w-full h-full bg-black transition-all duration-300" style={{ filter: `brightness(${brightness}%)` }}></div>
-                 )}
-                 {renderedPanel === 'youtubeSearchResults' && (
-                    <div className="w-full h-full flex flex-col p-4">
-                        <h2 className="text-2xl glowing-text mb-4 text-left px-2">YouTube Search Results</h2>
-                        <div className="flex-grow overflow-y-auto pr-2">
-                            {youtubeSearchResults.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {youtubeSearchResults.map((result, index) => (
-                                        <button 
-                                            key={result.videoId}
-                                            onClick={() => handleVideoSelect(result, index)}
-                                            className="bg-[rgba(0,20,30,0.7)] border border-[var(--border-color)] p-2 hover:border-primary-color transition-all duration-300 text-left group flex flex-col items-start"
-                                            style={{
-                                                boxShadow: '0 0 10px rgba(0, 234, 255, 0.1), inset 0 0 8px rgba(0, 234, 255, 0.1)',
-                                                backdropFilter: 'blur(4px)'
-                                            }}
-                                        >
-                                            <div className="aspect-video bg-black overflow-hidden w-full mb-2">
-                                                <img src={result.thumbnailUrl} alt={result.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                            </div>
-                                            <h3 className="text-sm font-bold text-primary-color leading-tight line-clamp-2 px-1 flex-grow">{result.title}</h3>
-                                        </button>
-                                    ))}
+                    {activePanel === 'image' && (
+                        <div className="flex flex-col h-full overflow-hidden">
+                            {generatedImages.length === 0 ? (
+                                <div className="flex-grow flex items-center justify-center text-text-color-muted">
+                                    <p>Ask Kaniska to generate an image to see it here.</p>
                                 </div>
                             ) : (
-                                <p className="text-center text-secondary-color mt-8">No results to display.</p>
+                                <div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden">
+                                    {/* Main Image Display */}
+                                    <div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">
+                                        {selectedImage ? (
+                                            <>
+                                                {selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}
+                                                {selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}
+                                                {selectedImage.url && <img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/>}
+                                                <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>
+                                            </>
+                                        ) : (
+                                            <p className="text-text-color-muted">Select an image from the timeline below to view.</p>
+                                        )}
+                                    </div>
+                                    {/* Thumbnail Strip */}
+                                    <div className="flex-shrink-0">
+                                        <h4 className="text-sm font-semibold mb-2 px-1">Timeline</h4>
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {generatedImages.map(image => (
+                                                <button
+                                                    key={image.id}
+                                                    onClick={() => setSelectedImage(image)}
+                                                    className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}
+                                                >
+                                                    {image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}
+                                                    {image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Generation Failed</div>}
+                                                    {image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
-                    </div>
-                 )}
-              </div>
-            </div>
-        )}
-       </div>
+                    )}
 
-      {/* Settings Modal */}
-       {isSettingsOpen && (
-         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={() => setIsSettingsOpen(false)}>
-           <div className={`jarvis-panel w-[90%] max-w-md p-6 flex flex-col gap-4 animate-fade-in-scale-up`} onClick={e => e.stopPropagation()}>
-              <div className="panel-content-wrapper">
-                <h2 className="text-2xl glowing-text mb-4">Settings</h2>
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="voice-select" className="text-secondary-color">Assistant Voice</label>
-                  <select
-                    id="voice-select"
-                    value={selectedVoice}
-                    onChange={e => setSelectedVoice(e.target.value)}
-                    className="bg-[var(--panel-bg)] border border-[var(--border-color)] text-[var(--text-color)] p-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
-                  >
-                    <optgroup label="Premium Voices">
-                      {ELEVENLABS_VOICES.map(v => <option key={v.id} value={`elevenlabs:${v.id}`}>{v.name}</option>)}
-                    </optgroup>
-                    <optgroup label="Browser Voices (Hindi)">
-                      {browserHindiVoices.length > 0 ? (
-                        browserHindiVoices.map(v => <option key={v.name} value={v.name}>{v.name}</option>)
-                      ) : (
-                        <option disabled>No Hindi voices found</option>
-                      )}
-                    </optgroup>
-                  </select>
-                </div>
-                 <button onClick={() => setIsSettingsOpen(false)} className="mt-6 bg-transparent border border-primary-color text-primary-color px-4 py-2 hover:bg-primary-color hover:text-bg-color transition-colors w-full">Close</button>
-              </div>
-           </div>
-         </div>
-       )}
-
-      <audio ref={audioRef} style={{ display: 'none' }}></audio>
-    </div>
-  );
+                </section>
+            </main>
+        </div>
+    );
 };
 
 export default App;

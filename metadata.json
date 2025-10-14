@@ -1,6 +1,6 @@
 {
   "name": "Kaniska",
-  "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using ElevenLabs.",
+  "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using the browser's built-in text-to-speech.",
   "requestFramePermissions": [
     "microphone"
   ]
