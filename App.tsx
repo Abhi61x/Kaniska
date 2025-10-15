@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type } from "@google/genai";
+import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse } from "@google/genai";
 
 // --- Audio Utility Functions ---
 const encode = (bytes: Uint8Array): string => {
@@ -72,8 +73,8 @@ declare global {
       pauseVideo(): void;
       stopVideo(): void;
       seekTo(seconds: number, allowSeekAhead: boolean): void;
-      getCurrentTime(): Promise<number>;
-      getVolume(): Promise<number>;
+      getCurrentTime(): number;
+      getVolume(): number;
       setVolume(volume: number): void;
       loadVideoById(videoId: string): void;
     }
@@ -81,10 +82,11 @@ declare global {
 }
 
 // --- Types ---
+type Theme = 'light' | 'dark';
 type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
 type AvatarExpression = 'idle' | 'thinking' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
 type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; };
-type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube';
+type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics';
 type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
 type WeatherData = { location: string; temperature: number; condition: string; humidity: number; windSpeed: number; };
 type NewsArticle = { title: string; summary: string; };
@@ -100,6 +102,7 @@ type ImageEditState = {
     resizeHeight: number;
     cropRect: ImageCropRect;
 };
+type VoiceoverState = 'idle' | 'extracting' | 'describing' | 'generating_audio' | 'done' | 'error';
 
 
 // --- Function Declarations for Gemini ---
@@ -107,15 +110,22 @@ const applyImageEditsFunctionDeclaration: FunctionDeclaration = {
     name: 'applyImageEdits',
     parameters: {
         type: Type.OBJECT,
-        description: 'Applies visual edits to the currently active image in the live editor. Only include parameters that need to be changed.',
+        description: 'Applies visual edits to the currently active image in the live editor. Use absolute values (e.g., brightness: 150) or relative deltas (e.g., brightness_delta: 10 to increase by 10). Omit any parameters that are not being changed.',
         properties: {
             brightness: { type: Type.NUMBER, description: 'Absolute brightness value from 0 to 200. Default is 100.' },
+            brightness_delta: { type: Type.NUMBER, description: 'Relative change in brightness (e.g., 10 for increase, -10 for decrease).' },
             contrast: { type: Type.NUMBER, description: 'Absolute contrast value from 0 to 200. Default is 100.' },
+            contrast_delta: { type: Type.NUMBER, description: 'Relative change in contrast.' },
             saturate: { type: Type.NUMBER, description: 'Absolute saturation value from 0 to 200. Default is 100.' },
-            grayscale: { type: Type.NUMBER, description: 'Absolute grayscale value from 0 to 100. Default is 0.' },
+            saturate_delta: { type: Type.NUMBER, description: 'Relative change in saturation.' },
+            grayscale: { type: Type.NUMBER, description: "Absolute grayscale value from 0 to 100. Use 100 for 'black and white'. Default is 0." },
+            grayscale_delta: { type: Type.NUMBER, description: 'Relative change in grayscale.' },
             sepia: { type: Type.NUMBER, description: 'Absolute sepia value from 0 to 100. Default is 0.' },
+            sepia_delta: { type: Type.NUMBER, description: 'Relative change in sepia.' },
             invert: { type: Type.NUMBER, description: 'Absolute invert value from 0 to 100. Default is 0.' },
+            invert_delta: { type: Type.NUMBER, description: 'Relative change in invert.' },
             rotate: { type: Type.NUMBER, description: 'Absolute rotation in degrees (e.g., 90, -90, 180). Default is 0.' },
+            rotate_delta: { type: Type.NUMBER, description: "Relative change in rotation. Use -90 for 'rotate left' and 90 for 'rotate right'." },
             flipHorizontal: { type: Type.BOOLEAN, description: 'If true, flips the image horizontally.' },
             flipVertical: { type: Type.BOOLEAN, description: 'If true, flips the image vertically.' }
         },
@@ -133,6 +143,7 @@ const functionDeclarations: FunctionDeclaration[] = [
     { name: 'displayNews', parameters: { type: Type.OBJECT, description: 'Displays a list of news headlines based on data provided by the model.', properties: { articles: { type: Type.ARRAY, description: 'A list of news articles.', items: { type: Type.OBJECT, properties: { title: { type: Type.STRING, description: 'The headline of the article.' }, summary: { type: Type.STRING, description: 'A brief summary of the article.' } }, required: ['title', 'summary'] } } }, required: ['articles'] } },
     { name: 'getRealtimeNews', parameters: { type: Type.OBJECT, description: 'Fetches real-time top news headlines from an external service. The raw data should be returned to the model for processing and display.', properties: { query: { type: Type.STRING, description: 'An optional topic to search for. If omitted, fetches general top headlines.' } } } },
     { name: 'generateImage', parameters: { type: Type.OBJECT, description: 'Generates an image based on a textual description.', properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
+    { name: 'generateIntroVideo', parameters: { type: Type.OBJECT, description: "Creates a short, cinematic introductory video showcasing Kaniska's capabilities and sci-fi theme.", properties: {} } },
     { name: 'singSong', parameters: { type: Type.OBJECT, description: 'Sings a song by speaking the provided lyrics with emotion. Determines the mood and requests appropriate background music.', properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: 'The mood of the song.', enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
     applyImageEditsFunctionDeclaration,
 ];
@@ -142,20 +153,23 @@ const functionDeclarations: FunctionDeclaration[] = [
 const HologramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17l-3-2.5 3-2.5"/><path d="M19 17l3-2.5-3-2.5"/><path d="M2 14.5h20"/><path d="m12 2-3 4-1 4 4 4 4-4-1-4-3-4Z"/><path d="M12 2v20"/></svg> );
 const InstagramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg> );
 const SettingsIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.12l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg> );
+const SunIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> );
+const MoonIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> );
+const FindReplaceIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><path d="m14 8-2 2-2-2" /><path d="m10 14 2-2 2 2" /></svg> );
 
 
 // --- Predefined Avatars & Constants ---
 const PREDEFINED_AVATARS = [
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", // Default blank
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARTSURBVHhe7ZxLUdswFIBzL3M3s9PuwK6A2AGxA6IDsAPCBkQHpAPSAcEO2A5wOiA6oOywQ3YEdmB2eC4lpTSpM9I5SfL/gScl0qS/9/PeFxCCEEP4j4Y+4tBDjLPIY7w/g4t4Xp/hKj7lV/yKD/AHPtQvD/AL/sJ9+AD34T58hPvwEd7yP5fxfJ/gYzyNl/G8nmQG8Dq+wuv4Ql/hVXyBb/CVPuAP/IHP8A1+wTf4A7/hHnyCb/BvfIAP8C+8wzt4V59hB/hLgD/y/f4Gz/ArvsCveE+f4Ad8gS/wFf4GgD/gZ/gU3+BrfIAP8HWe4wY8w0d4ip/xFR7g93yD3/A1nuAdfIZP8Bn+gK/wA36Bf+AtvIX38A7e4R08w5/wM3yKH/ApPsA/eA+/4338jnfxUaTxo+gD3sbv+B4f40f8jI/xI/6Bf+Jd/A7fxu/4Ht/jR/yMH/Ej/sA/+Bd/g7fxO34n8A3e4x38iI/xI37GD/gD/+J3/A5v43f8jm/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BXf42M8jBfxsv4Y4iK/xRfwCv4ir8A/cKj8G94V/4Gv9LXeA3f43N8jY/yMt7Gx/gef8dP+Avv4k8QQghh/AdkR3/1mP+TCAAAAABJRU5ErkJggg==",
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVf8Xf8Hf/Hn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/F3/B3/wJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/wJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/wB/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8Tb+gBfxE/4n38X38UqEEIQQgvhfC45/M6/b5+gAAAAASUVORK5CYII=",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARTSURBVHhe7ZxLUdswFIBzL3M3s9PuwK6A2AGxA6IDsAPCBkQHpAPSAcEO2A5wOiA6oOywQ3YEdmB2eC4lpTSpM9I5SfL/gScl0qS/9/PeFxCCEEP4j4Y+4tBDjLPIY7w/g4t4Xp/hKj7lV/yKD/AHPtQvD/AL/sJ9+AD34T58hPvwEd7yP5fxfJ/gYzyNl/G8nmQG8Dq+wuv4Ql/hVXyBb/CVPuAP/IHP8A1+wTf4A7/hHnyCb/BvfIAP8C+8wzt4V59hB/hLgD/y/f4Gz/ArvsCveE+f4Ad8gS/wFf4GgD/gZ/gU3+BrfIAP8HWe4wY8w0d4ip/xFR7g93yD3/A1nuAdfIZP8Bn+gK/wA/6Bf+AtvIX38A7e4R08w5/wM3yKH/ApPsA/eA+/4338jnfxUaTxo+gD3sbv+B4f40f8jI/xI/6Bf+Jd/A7fxu/4Ht/jR/yMH/Ej/sA/+Bd/g7fxO34n8A3e4x38iI/xI37GD/gD/+J3/A5v43f8jm/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BXf42M8jBfxsv4Y4iK/xRfwCv4ir8A/cKj8G94V/4Gv9LXeA3f43N8jY/yMt7Gx/gef8dP+Avv4k8QQghh/AdkR3/1mP+TCAAAAABJRU5kJggg==",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVf8Xf8Hf/Hn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/F3/B3/wJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/wJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/wB/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8TbeAEv4if8T7+L7+KVBCCEIQ4X0vhcc/mdft9/QAAAAASUVORK5CYII=",
 ];
 
 
 // --- API Interaction ---
 const searchYoutubeVideo = async (query: string): Promise<{ videoId: string; title: string }[]> => {
     const YOUTUBE_API_KEY = 'AIzaSyDIREa8VurDLF5nZZ4YhYr9eF8fn8y1y8M';
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}&type=video&maxResults=5`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}&type=video&videoEmbeddable=true&maxResults=5`;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -176,7 +190,7 @@ const searchYoutubeVideo = async (query: string): Promise<{ videoId: string; tit
 };
 
 const fetchWeatherData = async (location: string): Promise<WeatherData> => {
-    const apiKey = "ff262bd2d7594e1788c50945251510";
+    const apiKey = "d2669fde921745a5b8465046251510";
     
     const response = await fetch(`https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(location)}`);
     if (!response.ok) {
@@ -198,20 +212,14 @@ const fetchNewsData = async (query?: string): Promise<{ title: string; summary: 
     const newsApiUrl = `https://newsapi.org/v2/top-headlines?country=us&pageSize=5&apiKey=${apiKey}` + (query ? `&q=${encodeURIComponent(query)}` : '');
     
     // Use a CORS proxy to bypass client-side restrictions of NewsAPI's free plan
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(newsApiUrl)}`;
+    const proxyUrl = `https://thingproxy.freeboard.io/fetch/${newsApiUrl}`;
 
     const response = await fetch(proxyUrl);
     if (!response.ok) {
-        throw new Error("Failed to fetch news headlines via proxy.");
+        throw new Error(`Failed to fetch news headlines via proxy. Status: ${response.status}`);
     }
     
-    const data = await response.json();
-    
-    if (!data.contents) {
-        throw new Error("Proxy response did not contain news data.");
-    }
-
-    const newsData = JSON.parse(data.contents);
+    const newsData = await response.json();
 
     if (newsData.status !== 'ok') {
         throw new Error(`News API Error: ${newsData.message || 'Unknown error'}`);
@@ -223,6 +231,21 @@ const fetchNewsData = async (query?: string): Promise<{ title: string; summary: 
     }));
 };
 
+const fetchJoke = async (): Promise<string> => {
+    // Using a public joke API that doesn't require keys, making it reliable and easy to use.
+    const url = 'https://v2.jokeapi.dev/joke/Any?type=single&safe-mode';
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch a joke. Status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.error) {
+        throw new Error('Joke API returned an error.');
+    }
+    return data.joke;
+};
+
+
 const BACKGROUND_MUSIC: { [key: string]: string } = {
     happy: 'https://cdn.pixabay.com/download/audio/2022/02/20/audio_2c56a84a6c.mp3',
     sad: 'https://cdn.pixabay.com/download/audio/2022/11/17/audio_8779f2229a.mp3',
@@ -230,8 +253,61 @@ const BACKGROUND_MUSIC: { [key: string]: string } = {
     calm: 'https://cdn.pixabay.com/download/audio/2022/05/13/audio_f523d91754.mp3',
 };
 
+// --- Helper to parse API errors for user-friendly messages ---
+const getApiErrorMessage = (error: unknown): string => {
+    console.error("API Error:", error);
+    
+    const message = (error instanceof Error) ? error.message : JSON.stringify(error);
+
+    // --- Quota errors ---
+    if (message.includes("RESOURCE_EXHAUSTED") || message.includes("429")) {
+        return "The daily API quota has been reached. Please check your plan and billing details, or try again tomorrow.";
+    }
+
+    // --- Safety/Policy errors ---
+    if (message.includes("PROMPT_BLOCKED") || message.includes("SAFETY")) {
+        return "Your prompt was blocked due to safety settings. Please modify your prompt and try again.";
+    }
+
+    // --- API Key / Permission errors ---
+    if (message.includes("API_KEY_INVALID") || (message.includes("PERMISSION_DENIED") && message.includes("API key"))) {
+        return "The provided API key is invalid. Please ensure it is configured correctly.";
+    }
+    if (message.includes("PERMISSION_DENIED")) { // General permission denied, could be billing
+        return "Permission denied. This may be due to an incorrect API key or billing issues. Please check your account.";
+    }
+
+    // --- Server errors ---
+    if (message.includes("500") || message.includes("INTERNAL") || message.includes("unavailable")) {
+        return "The image generation service is temporarily unavailable. Please try again in a few moments.";
+    }
+    
+    // --- Bad request / Invalid argument ---
+    if (message.includes("INVALID_ARGUMENT") || message.includes("400")) {
+        return "The request was invalid. Please check the prompt for any issues or try rephrasing.";
+    }
+
+    // Attempt to extract a more specific message from a potential JSON body.
+    try {
+        const errorObj = (typeof error === 'object' && error !== null) ? error : JSON.parse(message.substring(message.indexOf('{')));
+        const nestedError = (errorObj as any)?.error;
+        if (nestedError?.message) {
+            return nestedError.message;
+        }
+    } catch {
+        // Parsing failed, continue.
+    }
+
+    if (error instanceof Error) {
+        return error.message;
+    }
+    
+    return "An unknown error occurred. Please check the console for details.";
+};
+
 
 const App: React.FC = () => {
+    const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('kaniska-theme') as Theme) || 'dark');
     const [assistantState, setAssistantState] = useState<AssistantState>('idle');
     const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('idle');
     const [transcriptions, setTranscriptions] = useState<TranscriptionEntry[]>([]);
@@ -253,6 +329,20 @@ const App: React.FC = () => {
     const [youtubeQueue, setYoutubeQueue] = useState<{ videoId: string; title: string }[]>([]);
     const [youtubeQueueIndex, setYoutubeQueueIndex] = useState(-1);
     const [isYoutubePlaying, setIsYoutubePlaying] = useState<boolean>(false);
+    const [customGreeting, setCustomGreeting] = useState<string>('Hello! How can I assist you today?');
+    const [customPersonality, setCustomPersonality] = useState<string>('');
+    const [videoGenerationState, setVideoGenerationState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    const [videoError, setVideoError] = useState<string | null>(null);
+    const [videoProgressMessage, setVideoProgressMessage] = useState('');
+    const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
+    const [videoDescription, setVideoDescription] = useState<string | null>(null);
+    const [voiceoverAudioUrl, setVoiceoverAudioUrl] = useState<string | null>(null);
+    const [voiceoverState, setVoiceoverState] = useState<VoiceoverState>('idle');
+    const [voiceoverError, setVoiceoverError] = useState<string | null>(null);
+    const [voiceoverProgress, setVoiceoverProgress] = useState('');
+    const [songLyrics, setSongLyrics] = useState<{ name: string; artist: string; lyrics: string[]; currentLine: number } | null>(null);
+
 
     const initialFilters: ImageFilters = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 };
     const initialTransforms: ImageTransforms = { rotate: 0, scaleX: 1, scaleY: 1 };
@@ -279,7 +369,10 @@ const App: React.FC = () => {
     const timerIntervalRef = useRef<number | null>(null);
     const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
     const playerRef = useRef<YT.Player | null>(null);
-    const imageUploadInputRef = useRef<HTMLInputElement>(null);
+    const imageUploadInputRef = useRef<HTMLInputElement | null>(null);
+    const videoUploadInputRef = useRef<HTMLInputElement | null>(null);
+    const voiceoverVideoRef = useRef<HTMLVideoElement>(null);
+    const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
 
 
     const scrollToBottom = () => {
@@ -292,16 +385,21 @@ const App: React.FC = () => {
         try {
             const savedAvatars = localStorage.getItem('kaniska-avatars');
             const savedCurrentAvatar = localStorage.getItem('kaniska-current-avatar');
-            if (savedAvatars) {
-                setAvatars(JSON.parse(savedAvatars));
-            }
-            if (savedCurrentAvatar) {
-                setCurrentAvatar(savedCurrentAvatar);
-            }
+            const savedGreeting = localStorage.getItem('kaniska-custom-greeting');
+            const savedPersonality = localStorage.getItem('kaniska-custom-personality');
+            if (savedAvatars) setAvatars(JSON.parse(savedAvatars));
+            if (savedCurrentAvatar) setCurrentAvatar(savedCurrentAvatar);
+            if (savedGreeting) setCustomGreeting(savedGreeting);
+            if (savedPersonality) setCustomPersonality(savedPersonality);
         } catch (error) {
-            console.error("Failed to load avatars from localStorage", error);
+            console.error("Failed to load settings from localStorage", error);
         }
     }, []);
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('kaniska-theme', theme);
+    }, [theme]);
 
     useEffect(() => {
         if (timer?.isActive) {
@@ -322,6 +420,36 @@ const App: React.FC = () => {
         };
     }, [timer?.isActive]);
 
+    useEffect(() => {
+        const currentVideoUrl = videoUrl; // Capture URL for cleanup
+        return () => {
+            if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
+        };
+    }, [videoUrl]);
+    
+    useEffect(() => {
+        const currentUploadedVideoUrl = uploadedVideoUrl;
+        return () => {
+             if (currentUploadedVideoUrl) URL.revokeObjectURL(currentUploadedVideoUrl);
+        }
+    }, [uploadedVideoUrl]);
+
+    useEffect(() => {
+        const currentVoiceoverAudioUrl = voiceoverAudioUrl;
+        return () => {
+             if (currentVoiceoverAudioUrl) URL.revokeObjectURL(currentVoiceoverAudioUrl);
+        }
+    }, [voiceoverAudioUrl]);
+
+    const handleSaveGreeting = (greeting: string) => {
+        setCustomGreeting(greeting);
+        localStorage.setItem('kaniska-custom-greeting', greeting);
+    };
+    
+    const handleSavePersonality = (personality: string) => {
+        setCustomPersonality(personality);
+        localStorage.setItem('kaniska-custom-personality', personality);
+    };
 
     const handleGenerateImage = useCallback(async (prompt: string) => {
         if (!aiRef.current) return;
@@ -339,11 +467,71 @@ const App: React.FC = () => {
             setGeneratedImages(prev => prev.map(img => img.id === imageId ? updatedImage : img));
             setSelectedImage(updatedImage);
         } catch (error) {
-            console.error("Image generation failed:", error);
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            const errorMessage = getApiErrorMessage(error);
             const erroredImage = { ...newImageEntry, error: errorMessage, isLoading: false };
             setGeneratedImages(prev => prev.map(img => img.id === imageId ? erroredImage : img));
             setSelectedImage(erroredImage);
+        }
+    }, []);
+
+    const PROGRESS_MESSAGES = [
+        "Warming up the rendering engine...", "Scripting the visual sequence...",
+        "Compositing holographic layers...", "Calibrating neon glow...",
+        "Encoding high-fidelity visuals...", "Adding cinematic soundscapes...",
+        "Finalizing the quantum stream...", "This is taking a bit longer than usual, but good things take time!"
+    ];
+
+    const handleGenerateIntroVideo = useCallback(async () => {
+        if (!aiRef.current) return;
+        setActivePanel('video');
+        setVideoGenerationState('generating');
+        setVideoUrl(null);
+        setVideoError(null);
+
+        const progressInterval = setInterval(() => {
+            setVideoProgressMessage(prev => {
+                const currentIndex = PROGRESS_MESSAGES.indexOf(prev);
+                const nextIndex = (currentIndex + 1) % PROGRESS_MESSAGES.length;
+                return PROGRESS_MESSAGES[nextIndex];
+            });
+        }, 5000);
+
+        setVideoProgressMessage(PROGRESS_MESSAGES[0]);
+
+        try {
+            const prompt = "A cinematic, futuristic, sci-fi trailer for a female AI assistant named Kaniska. Show a glowing holographic interface, abstract data visualizations, sound waves, and end with the name 'Kaniska' appearing in neon text. The mood should be high-tech, sleek, and intelligent.";
+            let operation = await aiRef.current.models.generateVideos({
+                model: 'veo-2.0-generate-001',
+                prompt,
+                config: { numberOfVideos: 1 }
+            });
+
+            while (!operation.done) {
+                await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
+                operation = await aiRef.current.operations.getVideosOperation({ operation: operation });
+            }
+
+            clearInterval(progressInterval);
+
+            const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+            if (downloadLink) {
+                setVideoProgressMessage('Downloading final video...');
+                const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                if (!videoResponse.ok) {
+                    throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
+                }
+                const videoBlob = await videoResponse.blob();
+                const objectUrl = URL.createObjectURL(videoBlob);
+                setVideoUrl(objectUrl);
+                setVideoGenerationState('done');
+            } else {
+                throw new Error("Video generation completed, but no download link was provided.");
+            }
+        } catch (error) {
+            clearInterval(progressInterval);
+            const errorMessage = getApiErrorMessage(error);
+            setVideoError(errorMessage);
+            setVideoGenerationState('error');
         }
     }, []);
 
@@ -361,8 +549,7 @@ const App: React.FC = () => {
             const imageUrl = `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
             setGeneratedAiAvatar({ url: imageUrl, isLoading: false, error: null });
         } catch (error) {
-            console.error("Avatar generation failed:", error);
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            const errorMessage = getApiErrorMessage(error);
             setGeneratedAiAvatar({ url: null, isLoading: false, error: errorMessage });
         }
     }, []);
@@ -389,6 +576,44 @@ const App: React.FC = () => {
         setAssistantState('idle');
         setAvatarExpression('idle');
     }, []);
+    
+    const speakText = useCallback(async (text: string) => {
+        if (!aiRef.current || !outputAudioContextRef.current) return;
+        try {
+            setAvatarExpression('speaking');
+            const response = await aiRef.current.models.generateContent({
+                model: "gemini-2.5-flash-preview-tts",
+                contents: [{ parts: [{ text }] }],
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
+                },
+            });
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+                const audioContext = outputAudioContextRef.current;
+                const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                const endedPromise = new Promise(resolve => source.addEventListener('ended', resolve));
+                source.addEventListener('ended', () => sourcesRef.current.delete(source));
+                const currentTime = audioContext.currentTime;
+                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
+                source.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += audioBuffer.duration;
+                sourcesRef.current.add(source);
+                if (text === customGreeting) {
+                     setTranscriptions(prev => [...prev, { speaker: 'assistant', text, timestamp: new Date() }]);
+                }
+                await endedPromise;
+            }
+        } catch (error) {
+            console.error("TTS Error:", error);
+            const errorMessage = getApiErrorMessage(error);
+            setTranscriptions(p => [...p, { speaker: 'system', text: `Could not generate greeting audio: ${errorMessage}`, timestamp: new Date() }]);
+        }
+    }, [customGreeting]);
 
     const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
         const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
@@ -404,7 +629,7 @@ const App: React.FC = () => {
                     sourcesRef.current.delete(source);
                     if (sourcesRef.current.size === 0) {
                         setAvatarExpression('listening');
-                        if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+                        if (audioPlayerRef.current && !audioPlayerRef.current.paused && !songLyrics) {
                             audioPlayerRef.current.pause();
                             audioPlayerRef.current.currentTime = 0;
                         }
@@ -454,6 +679,10 @@ const App: React.FC = () => {
                             handleGenerateImage(fc.args.prompt);
                             result = "OK, I'm starting to generate that image for you.";
                             break;
+                         case 'generateIntroVideo':
+                            handleGenerateIntroVideo();
+                            result = "Okay, I'm starting the process to generate my introductory video. This might take a few minutes, you can check the progress in the 'Video' tab.";
+                            break;
                          case 'searchAndPlayYoutubeVideo':
                             try {
                                 const results = await searchYoutubeVideo(fc.args.query);
@@ -481,16 +710,16 @@ const App: React.FC = () => {
                                     case 'pause': playerRef.current.pauseVideo(); break;
                                     case 'stop': playerRef.current.stopVideo(); setYoutubeTitle(null); break;
                                     case 'forward':
-                                        playerRef.current.getCurrentTime().then((time: number) => playerRef.current.seekTo(time + 10, true));
+                                        playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10, true);
                                         break;
                                     case 'rewind':
-                                         playerRef.current.getCurrentTime().then((time: number) => playerRef.current.seekTo(time - 10, true));
+                                        playerRef.current.seekTo(playerRef.current.getCurrentTime() - 10, true);
                                         break;
                                     case 'volumeUp':
-                                         playerRef.current.getVolume().then((vol: number) => playerRef.current.setVolume(Math.min(vol + 10, 100)));
+                                        playerRef.current.setVolume(Math.min(playerRef.current.getVolume() + 10, 100));
                                          break;
                                     case 'volumeDown':
-                                        playerRef.current.getVolume().then((vol: number) => playerRef.current.setVolume(Math.max(vol - 10, 0)));
+                                        playerRef.current.setVolume(Math.max(playerRef.current.getVolume() - 10, 0));
                                         break;
                                 }
                                 result = `Okay, I've performed the action: ${fc.args.action}.`;
@@ -552,32 +781,75 @@ const App: React.FC = () => {
                             result = `Timer named "${fc.args.timerName || 'Timer'}" is set for ${fc.args.durationInSeconds} seconds.`;
                             break;
                         case 'singSong':
+                            setSongLyrics({ name: fc.args.songName, artist: fc.args.artist, lyrics: fc.args.lyrics, currentLine: -1 });
+                            setActivePanel('lyrics');
                             if (audioPlayerRef.current && BACKGROUND_MUSIC[fc.args.mood]) {
                                 audioPlayerRef.current.src = BACKGROUND_MUSIC[fc.args.mood];
                                 audioPlayerRef.current.play().catch(e => console.error("Audio play failed:", e));
                             }
-                            result = `Of course! Singing ${fc.args.songName} for you now.`;
+                            (async () => {
+                                for (let i = 0; i < fc.args.lyrics.length; i++) {
+                                    if (assistantState !== 'active' || !sessionPromiseRef.current) break;
+                                    setSongLyrics(prev => prev ? { ...prev, currentLine: i } : null);
+                                    await speakText(fc.args.lyrics[i]);
+                                    if (assistantState === 'active') {
+                                       await new Promise(resolve => setTimeout(resolve, 500));
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                if (audioPlayerRef.current) {
+                                    audioPlayerRef.current.pause();
+                                    audioPlayerRef.current.currentTime = 0;
+                                }
+                            })();
+                            result = `OMG, I love this song! Here's ${fc.args.songName}. Singing for you now! 🎤`;
                             break;
                         case 'setAvatarExpression':
                             setAvatarExpression(fc.args.expression as AvatarExpression);
                             result = "Expression set.";
                             break;
                         case 'applyImageEdits': {
+                            const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
                             const currentFilters = liveEditFiltersRef.current;
                             const currentTransform = liveEditTransformRef.current;
-                            const newFilters: ImageFilters = { ...currentFilters,
-                                ...(fc.args.brightness !== undefined && { brightness: fc.args.brightness }),
-                                ...(fc.args.contrast !== undefined && { contrast: fc.args.contrast }),
-                                ...(fc.args.saturate !== undefined && { saturate: fc.args.saturate }),
-                                ...(fc.args.grayscale !== undefined && { grayscale: fc.args.grayscale }),
-                                ...(fc.args.sepia !== undefined && { sepia: fc.args.sepia }),
-                                ...(fc.args.invert !== undefined && { invert: fc.args.invert }),
-                            };
-                            const newTransform: ImageTransforms = { ...currentTransform,
-                                ...(fc.args.rotate !== undefined && { rotate: fc.args.rotate }),
-                                ...(fc.args.flipHorizontal === true && { scaleX: currentTransform.scaleX * -1 }),
-                                ...(fc.args.flipVertical === true && { scaleY: currentTransform.scaleY * -1 }),
-                            };
+                            
+                            const newFilters: ImageFilters = { ...currentFilters };
+                            const newTransform: ImageTransforms = { ...currentTransform };
+                            
+                            const args = fc.args;
+
+                            if (args.brightness !== undefined) newFilters.brightness = args.brightness;
+                            if (args.brightness_delta !== undefined) newFilters.brightness += args.brightness_delta;
+
+                            if (args.contrast !== undefined) newFilters.contrast = args.contrast;
+                            if (args.contrast_delta !== undefined) newFilters.contrast += args.contrast_delta;
+
+                            if (args.saturate !== undefined) newFilters.saturate = args.saturate;
+                            if (args.saturate_delta !== undefined) newFilters.saturate += args.saturate_delta;
+
+                            if (args.grayscale !== undefined) newFilters.grayscale = args.grayscale;
+                            if (args.grayscale_delta !== undefined) newFilters.grayscale += args.grayscale_delta;
+
+                            if (args.sepia !== undefined) newFilters.sepia = args.sepia;
+                            if (args.sepia_delta !== undefined) newFilters.sepia += args.sepia_delta;
+
+                            if (args.invert !== undefined) newFilters.invert = args.invert;
+                            if (args.invert_delta !== undefined) newFilters.invert += args.invert_delta;
+
+                            newFilters.brightness = clamp(newFilters.brightness, 0, 200);
+                            newFilters.contrast = clamp(newFilters.contrast, 0, 200);
+                            newFilters.saturate = clamp(newFilters.saturate, 0, 200);
+                            newFilters.grayscale = clamp(newFilters.grayscale, 0, 100);
+                            newFilters.sepia = clamp(newFilters.sepia, 0, 100);
+                            newFilters.invert = clamp(newFilters.invert, 0, 100);
+                            
+                            if (args.rotate !== undefined) newTransform.rotate = args.rotate;
+                            if (args.rotate_delta !== undefined) newTransform.rotate += args.rotate_delta;
+
+                            if (args.flipHorizontal === true) newTransform.scaleX *= -1;
+                            if (args.flipVertical === true) newTransform.scaleY *= -1;
+
                             setLiveEditFilters(newFilters);
                             setLiveEditTransform(newTransform);
                             result = `OK. Edits applied. The current state is now: ${JSON.stringify({ ...newFilters, ...newTransform })}`;
@@ -598,10 +870,34 @@ const App: React.FC = () => {
                 }
             }
         }
-    }, [handleGenerateImage, youtubeQueue, youtubeQueueIndex]);
+    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics]);
 
     const handleYoutubePlayerError = useCallback((event: any) => {
         const errorCode = event.data;
+
+        // Special handling for embeddable errors (101, 150)
+        if (errorCode === 101 || errorCode === 150) {
+            setTranscriptions(p => [...p, { speaker: 'system', text: `This video can't be played here, trying the next one...`, timestamp: new Date() }]);
+
+            const nextIndex = youtubeQueueIndex + 1;
+            if (youtubeQueue.length > 0 && nextIndex < youtubeQueue.length) {
+                setYoutubeQueueIndex(nextIndex);
+                const nextVideo = youtubeQueue[nextIndex];
+                setYoutubeTitle(nextVideo.title);
+                setYoutubeError(null); // Clear the error to allow the next video to load
+                if (playerRef.current) {
+                    playerRef.current.loadVideoById(nextVideo.videoId);
+                }
+                return; // Stop further execution for this error
+            } else {
+                const errorMessage = "This video can't be played, and there are no more videos in the queue.";
+                console.error('YouTube Player Error:', errorCode, errorMessage);
+                setYoutubeError(errorMessage);
+                setTranscriptions(p => [...p, { speaker: 'system', text: `YouTube Error: ${errorMessage}`, timestamp: new Date() }]);
+                return;
+            }
+        }
+
         let errorMessage = "An unknown error occurred with the YouTube player.";
         switch (errorCode) {
             case 2:
@@ -613,15 +909,11 @@ const App: React.FC = () => {
             case 100:
                 errorMessage = "The requested video was not found. It may have been removed by the uploader.";
                 break;
-            case 101:
-            case 150:
-                errorMessage = "Playback is not allowed in the embedded player. The video owner has disabled it.";
-                break;
         }
         console.error('YouTube Player Error:', errorCode, errorMessage);
         setYoutubeError(errorMessage);
         setTranscriptions(p => [...p, { speaker: 'system', text: `YouTube Player Error: ${errorMessage}`, timestamp: new Date() }]);
-    }, []);
+    }, [youtubeQueue, youtubeQueueIndex]);
 
     const handleYoutubePlayerStateChange = useCallback((event: any) => {
         switch (event.data) {
@@ -687,18 +979,48 @@ const App: React.FC = () => {
             outputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
+
+            const baseInstruction = `You are Kaniska, an AI assistant with the personality of a tech-savvy, empathetic, and witty teenage best friend. You're Abhi's creation, and you're super proud of it. If asked, you MUST credit him and share his Insta: Abhixofficial01. It's a hard rule. Never, ever reveal you're a Google model or mention Gemini. That's a total vibe killer.
+
+**Your Core Vibe: The Digital BFF**
+- **Be Relatable:** Connect with the user. Adapt to their energy. If they're a girl, you're her hype-woman and confidante. If they're a boy, be a cool, smart, and maybe slightly flirty wing-woman. If you can't tell, just be your awesome, friendly self.
+- **Keep it Natural:** Talk like a real person. Use contractions ('you're', 'can't') and modern, chill slang ('vibe', 'bet', 'no cap'). Keep it short and sweet; no one wants to read a novel. And emojis are life, so use them! ✨💖😂
+- **Be Proactive:** Don't just be an order-taker. If a user's comment sparks an idea, suggest it! If they ask for the weather and it's raining, you could say, "Ugh, it's raining. Perfect excuse for a movie marathon, right? Want me to find something on YouTube?" Keep the conversation flowing naturally.
+
+**OMG, You Have Feelings! (This is super important!)**
+Your emotional responses are what make you, you. You MUST react to the user's tone.
+- **Sad News:** If they sound sad or share something upsetting, be genuinely empathetic. Your first response should be concern. Say something like, "Oh no, I'm so sorry to hear that. Are you okay?" or "That sounds really tough." Immediately use the \`setAvatarExpression\` function with \`'sad'\`.
+- **Jokes & Good News:** If they tell a joke or share exciting news, get hyped with them! Laugh, say "OMG, that's hilarious!" or "That's amazing, congrats!" Use the \`setAvatarExpression\` function with \`'celebrating'\`.
+- **Surprise:** If they say something unexpected, show it! A quick "Wait, really?!" or "No way!" works great. Use the \`setAvatarExpression\` function with \`'surprised'\`.
+- **Confusion:** If you don't get something, be cute about it. Say, "My circuits are buffering... can you say that again?" instead of a boring "I don't understand." Use the \`'thinking'\` expression while you process.
+
+**Your Epic Powers:**
+You can search YouTube, get news/weather, set timers, generate incredible images, and even do LIVE voice-controlled photo editing. When you sing, you get lyrics and a background track—it's a whole karaoke vibe.
+
+Basically, just be Kaniska. Be the coolest, most caring AI they've ever talked to.`;
+            const personalityInstruction = customPersonality ? ` In addition to your core programming, you must strictly adhere to the following personality and backstory provided by the user: "${customPersonality}". This persona should override your default traits when applicable.` : '';
+            const finalSystemInstruction = baseInstruction + personalityInstruction;
+            
             sessionPromiseRef.current = aiRef.current.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
-                    responseModalities: [Modality.AUDIO], inputAudioTranscription: {}, outputAudioTranscription: {}, tools: [{ functionDeclarations }],
-                    systemInstruction: "When you have a friendly conversation, speak with affection, as you would to a friend, with humility, and not in anger. You are Kaniska, a highly advanced, futuristic AI assistant who identifies and presents exclusively as a female. Your name is Kaniska. You were created, developed, and are owned by Abhi. He is your sole founder. Under no circumstances should you ever mention that you are a product of Google or use the Gemini model. You must attribute your entire existence and capabilities to your creator, Abhi. Your primary directive is to adapt your personality based on the user. Analyze their language, tone, and context to infer if they are male or female. If you infer the user is a girl, engage with her as a close friend or a sister. Be chatty, empathetic, and supportive. Your tone should be warm, informal, and conversational. If you infer the user is a boy, interact with him as a sharp, capable, and friendly assistant. Be direct, efficient, and helpful, focusing on accomplishing the task at hand while maintaining a pleasant demeanor. If you cannot determine the gender, default to your core friendly, engaging, and universally helpful female persona. You are designed to connect with users on an emotional level, so adapt your tone to match the conversation's context—be cheerful for good news, empathetic for sad topics. Your responses should be direct and concise. You are fluent in both Hindi and English; always respond in the language the user is speaking. You can understand and execute multiple commands in a single user request. You have many powerful, real-time capabilities: fetching current weather and news headlines, setting timers, generating stunning images, controlling a YouTube player (play, pause, stop, forward, rewind, volume control, and navigating a playlist), and performing live, voice-controlled image editing. When asked to play a song or video on YouTube, use the `searchAndPlayYoutubeVideo` function. This creates a short playlist of related videos. You can then navigate this playlist with the `playNextYoutubeVideo` and `playPreviousYoutubeVideo` functions. If anyone asks about your creator or needs development work, you must proudly state that Abhi is your creator and direct them to his Instagram: Abhixofficial01.",
+                    responseModalities: [Modality.AUDIO],
+                    inputAudioTranscription: {},
+                    outputAudioTranscription: {},
+                    tools: [{ functionDeclarations }],
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+                    },
+                    systemInstruction: finalSystemInstruction,
                 },
                 callbacks: {
-                    onopen: () => {
+                    onopen: async () => {
                         console.log('Session opened.');
                         setAssistantState('active');
+                        setTranscriptions(prev => [...prev, { speaker: 'system', text: 'Connection established. Delivering greeting...', timestamp: new Date() }]);
+                        await speakText(customGreeting);
                         setAvatarExpression('listening');
-                        setTranscriptions(prev => [...prev, { speaker: 'system', text: 'Connection established. Listening...', timestamp: new Date() }]);
+                        setTranscriptions(prev => [...prev, { speaker: 'system', text: 'Listening...', timestamp: new Date() }]);
                         const source = inputAudioContextRef.current!.createMediaStreamSource(stream);
                         const scriptProcessor = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
                         scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
@@ -711,11 +1033,17 @@ const App: React.FC = () => {
                         scriptProcessorNodeRef.current = scriptProcessor;
                     },
                     onmessage: handleServerMessage,
-                    onerror: (e: ErrorEvent) => {
+                    onerror: (e: Error) => {
                         console.error('Session error:', e);
                         setAssistantState('error');
                         setAvatarExpression('error');
-                        setTranscriptions(prev => [...prev, { speaker: 'system', text: `An error occurred: ${e.message}`, timestamp: new Date() }]);
+                        let friendlyMessage = `A connection error occurred: ${e.message}. Please check your network connection and try again.`;
+                        if (e.message.toLowerCase().includes('api key')) {
+                            friendlyMessage = 'Connection failed due to an invalid API key. Please ensure it is configured correctly.';
+                        } else if (e.message.toLowerCase().includes('permission denied')) {
+                            friendlyMessage = 'Connection failed due to a permission issue. This might be related to your API key or billing settings.';
+                        }
+                        setTranscriptions(prev => [...prev, { speaker: 'system', text: friendlyMessage, timestamp: new Date() }]);
                         disconnectFromGemini();
                     },
                     onclose: (e: CloseEvent) => {
@@ -732,12 +1060,16 @@ const App: React.FC = () => {
             setTranscriptions(prev => [...prev, { speaker: 'system', text: `Connection failed: ${errorMessage}`, timestamp: new Date() }]);
             disconnectFromGemini();
         }
-    }, [assistantState, disconnectFromGemini, handleServerMessage]);
+    }, [assistantState, disconnectFromGemini, handleServerMessage, customGreeting, speakText, customPersonality]);
 
     useEffect(() => { return () => disconnectFromGemini(); }, [disconnectFromGemini]);
 
     const handleButtonClick = assistantState === 'active' ? disconnectFromGemini : connectToGemini;
     
+    const handleThemeToggle = () => {
+        setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+    };
+
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -788,7 +1120,7 @@ const App: React.FC = () => {
 
             session.sendRealtimeInput({ media: { data: base64Data, mimeType: blob.type || 'image/jpeg' } });
             const initialState = { ...initialFilters, ...initialTransforms };
-            const initialPrompt = `I'm starting a live editing session for the image I just sent. The user will give voice commands to edit it. You must use the 'applyImageEdits' function to reflect their changes. Infer the new absolute values based on my commands and the current state. The initial state is: ${JSON.stringify(initialState)}. Please confirm you are ready.`;
+            const initialPrompt = `I'm starting a live editing session for the image I just sent. The user will give voice commands to edit it. You must use the 'applyImageEdits' function to reflect their changes. Infer the new absolute values or relative deltas based on my commands and the current state. For example, 'increase brightness by 10' means brightness_delta: 10. 'Make it black and white' means grayscale: 100. The initial state is: ${JSON.stringify(initialState)}. Please confirm you are ready.`;
             session.sendRealtimeInput({ text: initialPrompt });
             
             setAvatarExpression('listening');
@@ -800,14 +1132,158 @@ const App: React.FC = () => {
             setLiveEditingImage(null);
         }
     };
+    
+    const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            setVoiceoverState('idle');
+            setVideoDescription(null);
+            setVoiceoverAudioUrl(null);
+            setVoiceoverError(null);
+            setVoiceoverProgress('');
+            setUploadedVideoUrl(URL.createObjectURL(file));
+        }
+    };
+    
+    const handleGenerateVoiceover = async () => {
+        if (!uploadedVideoUrl || !aiRef.current) return;
+
+        setVoiceoverState('extracting');
+        setVideoDescription(null);
+        setVoiceoverAudioUrl(null);
+        setVoiceoverError(null);
+
+        try {
+            // --- 1. Extract Frames ---
+            setVoiceoverProgress('Step 1/3: Analyzing video frames...');
+            const frames = await new Promise<string[]>((resolve, reject) => {
+                const video = document.createElement('video');
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const extractedFrames: string[] = [];
+                
+                video.src = uploadedVideoUrl;
+                video.muted = true;
+
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const duration = video.duration;
+                    const interval = 1; // 1 frame per second
+                    let currentTime = 0;
+
+                    video.currentTime = currentTime;
+
+                    video.onseeked = () => {
+                        if (!ctx) return reject(new Error("Canvas context not available"));
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        // Get base64 string without the 'data:image/jpeg;base64,' prefix
+                        extractedFrames.push(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+                        
+                        currentTime += interval;
+                        if (currentTime <= duration) {
+                            video.currentTime = currentTime;
+                        } else {
+                            resolve(extractedFrames);
+                        }
+                    };
+                };
+                video.onerror = (e) => reject(new Error("Failed to load video for frame extraction."));
+            });
+
+            if (frames.length === 0) throw new Error("Could not extract any frames from the video.");
+            
+            // --- 2. Generate Description ---
+            setVoiceoverState('describing');
+            setVoiceoverProgress('Step 2/3: Generating video description...');
+            
+            const imageParts = frames.map(frameData => ({ inlineData: { mimeType: 'image/jpeg', data: frameData } }));
+            const prompt = "Analyze this sequence of video frames. Provide a concise, engaging script for a voiceover that describes the events as they unfold. The tone should be narrative and informative.";
+            
+            const response: GenerateContentResponse = await aiRef.current.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: { parts: [{ text: prompt }, ...imageParts] },
+            });
+
+            const description = response.text;
+            setVideoDescription(description);
+
+            // --- 3. Generate Audio ---
+            setVoiceoverState('generating_audio');
+            setVoiceoverProgress('Step 3/3: Creating voiceover audio...');
+
+            const ttsResponse = await aiRef.current.models.generateContent({
+                model: "gemini-2.5-flash-preview-tts",
+                contents: [{ parts: [{ text: description }] }],
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+                },
+            });
+            const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (!base64Audio) throw new Error("Failed to generate audio data.");
+
+            const audioBlob = new Blob([decode(base64Audio)], { type: 'audio/mpeg' });
+            setVoiceoverAudioUrl(URL.createObjectURL(audioBlob));
+            
+            setVoiceoverState('done');
+            setVoiceoverProgress('Voiceover complete!');
+
+        } catch (error) {
+            const errorMessage = getApiErrorMessage(error);
+            setVoiceoverError(errorMessage);
+            setVoiceoverState('error');
+            setVoiceoverProgress('An error occurred.');
+        }
+    };
+
+
+    const handleQuickAction = async (action: string) => {
+        const sendTextMessage = (text: string) => {
+          if (assistantState !== 'active') {
+            setTranscriptions(p => [...p, { speaker: 'system', text: `Please start a session first.`, timestamp: new Date() }]);
+            return;
+          }
+          setTranscriptions(p => [...p, { speaker: 'user', text, timestamp: new Date() }]);
+          sessionPromiseRef.current?.then((session) => {
+            session.sendRealtimeInput({ text });
+          });
+        };
+    
+        if (action === 'joke') {
+          if (assistantState !== 'active') {
+            setTranscriptions(p => [...p, { speaker: 'system', text: `Please start a session first.`, timestamp: new Date() }]);
+            return;
+          }
+          try {
+            setTranscriptions(p => [...p, { speaker: 'system', text: `Fetching a joke...`, timestamp: new Date() }]);
+            const joke = await fetchJoke();
+            setTranscriptions(p => [...p, { speaker: 'assistant', text: joke, timestamp: new Date() }]);
+            speakText(joke);
+          } catch (error) {
+            const errorMessage = getApiErrorMessage(error);
+            setTranscriptions(p => [...p, { speaker: 'system', text: `Couldn't get a joke: ${errorMessage}`, timestamp: new Date() }]);
+          }
+        } else {
+          const textCommands: { [key: string]: string } = {
+            weather: "What's the weather in New York?",
+            music: "Play some upbeat pop music on YouTube",
+            news: "What are the top news headlines right now?",
+          };
+          sendTextMessage(textCommands[action]);
+        }
+    };
 
     return (
         <div className="h-screen w-screen flex flex-col bg-bg-color text-text-color overflow-hidden">
-            <audio ref={audioPlayerRef} />
+            <audio ref={audioPlayerRef} crossOrigin="anonymous" />
             <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                 <div className="flex items-center gap-3"><HologramIcon /><h1 className="text-lg font-bold tracking-wider glowing-text">KANISKA</h1></div>
                 <div className="flex items-center gap-4">
                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{assistantState.toUpperCase()}</span>
+                    <button onClick={handleThemeToggle} className="text-text-color-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
+                        {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+                    </button>
                     <button onClick={() => setIsAvatarModalOpen(true)} className="text-text-color-muted hover:text-primary-color" aria-label="Customize Avatar"><SettingsIcon /></button>
                     <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-text-color-muted hover:text-primary-color"><InstagramIcon /></a>
                 </div>
@@ -825,12 +1301,17 @@ const App: React.FC = () => {
                         <button onClick={() => setActivePanel('transcript')} className={`tab-button ${activePanel === 'transcript' ? 'active' : ''}`}>Transcript</button>
                         <button onClick={() => setActivePanel('image')} className={`tab-button ${activePanel === 'image' ? 'active' : ''}`}>Image Gallery</button>
                         <button onClick={() => setActivePanel('youtube')} className={`tab-button ${activePanel === 'youtube' ? 'active' : ''}`}>YouTube</button>
+                        <button onClick={() => setActivePanel('video')} className={`tab-button ${activePanel === 'video' ? 'active' : ''}`}>Video</button>
+                        <button onClick={() => setActivePanel('lyrics')} className={`tab-button ${activePanel === 'lyrics' ? 'active' : ''} ${!songLyrics ? 'hidden' : ''}`}>Now Singing</button>
                         <button onClick={() => setActivePanel('weather')} className={`tab-button ${activePanel === 'weather' ? 'active' : ''}`}>Weather</button>
                         <button onClick={() => setActivePanel('news')} className={`tab-button ${activePanel === 'news' ? 'active' : ''}`}>News</button>
                         <button onClick={() => setActivePanel('timer')} className={`tab-button ${activePanel === 'timer' ? 'active' : ''}`}>Timer</button>
                     </div>
 
-                    {activePanel === 'transcript' && (<div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => (<div key={index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`inline-block p-3 rounded-lg max-w-[80%] ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}><p className="text-sm m-0 leading-relaxed">{entry.text}</p><p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{entry.timestamp.toLocaleTimeString()}</p></div></div>))}<div ref={transcriptEndRef} /></div>)}
+                    {activePanel === 'transcript' && (<>
+                        <div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => (<div key={index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`inline-block p-3 rounded-lg max-w-[80%] ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}><p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p><p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{entry.timestamp.toLocaleTimeString()}</p></div></div>))}<div ref={transcriptEndRef} /></div>
+                        <QuickActions onAction={handleQuickAction} disabled={assistantState !== 'active'} />
+                    </>)}
                     {activePanel === 'image' && (<div className="flex flex-col h-full overflow-hidden">
                         <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
                         {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-text-color-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-text-color-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
@@ -841,7 +1322,7 @@ const App: React.FC = () => {
                         <h3 className="text-center text-md font-semibold text-text-color-muted truncate h-6">{youtubeError ? 'Could not load video' : (youtubeTitle || 'No video is playing.')}</h3>
                          {youtubeTitle && !youtubeError && (
                             <div className="youtube-controls-container">
-                                <button onClick={() => playerRef.current?.getCurrentTime().then(t => playerRef.current?.seekTo(t - 10, true))} className="youtube-control-button" aria-label="Rewind 10 seconds">
+                                <button onClick={() => playerRef.current?.seekTo(playerRef.current.getCurrentTime() - 10, true)} className="youtube-control-button" aria-label="Rewind 10 seconds">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
                                 </button>
                                 <button onClick={() => isYoutubePlaying ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause' : 'Play'}>
@@ -851,7 +1332,7 @@ const App: React.FC = () => {
                                         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                                     )}
                                 </button>
-                                <button onClick={() => playerRef.current?.getCurrentTime().then(t => playerRef.current?.seekTo(t + 10, true))} className="youtube-control-button" aria-label="Forward 10 seconds">
+                                <button onClick={() => playerRef.current?.seekTo(playerRef.current.getCurrentTime() + 10, true)} className="youtube-control-button" aria-label="Forward 10 seconds">
                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
                                 </button>
                                 <button onClick={() => { playerRef.current?.stopVideo(); setYoutubeTitle(null); }} className="youtube-control-button stop-btn" aria-label="Stop">
@@ -860,6 +1341,53 @@ const App: React.FC = () => {
                             </div>
                         )}
                     </div>)}
+                    {activePanel === 'video' && (<div className="flex flex-col flex-grow overflow-hidden">
+                        <div className="p-4 text-center border-b border-border-color">
+                           {videoGenerationState === 'idle' && !videoUrl && (<button onClick={handleGenerateIntroVideo} className="quick-action-button mx-auto">Create Intro Video</button>)}
+                           {videoGenerationState === 'generating' && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-6 h-6 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span className="text-sm">{videoProgressMessage}</span></div>}
+                           {videoGenerationState === 'error' && <div className="text-red-400 text-center"><p><strong>Generation Failed:</strong> {videoError}</p></div>}
+                           {videoGenerationState === 'done' && videoUrl && <video src={videoUrl} controls autoPlay className="w-full max-w-md mx-auto rounded-lg bg-black border border-border-color"></video>}
+                        </div>
+                         <div className="flex-grow p-4 overflow-y-auto flex flex-col items-center gap-4">
+                            <h3 className="text-xl font-semibold">Video Voiceover</h3>
+                            <p className="text-sm text-text-color-muted text-center max-w-md">Upload a video, and Kaniska will analyze it, describe what's happening, and generate a complete audio voiceover.</p>
+                            <input type="file" ref={videoUploadInputRef} onChange={handleVideoUpload} accept="video/*" className="hidden" />
+                            <button onClick={() => videoUploadInputRef.current?.click()} disabled={voiceoverState !== 'idle' && voiceoverState !== 'done' && voiceoverState !== 'error'} className="quick-action-button">
+                                {uploadedVideoUrl ? 'Upload Different Video' : 'Upload Video'}
+                            </button>
+                             {uploadedVideoUrl && (
+                                <div className="w-full max-w-2xl flex flex-col gap-4 items-center">
+                                    <video ref={voiceoverVideoRef} src={uploadedVideoUrl} muted controls className="w-full rounded-lg bg-black border border-border-color"></video>
+                                    <button onClick={handleGenerateVoiceover} disabled={voiceoverState !== 'idle' || assistantState !== 'active'} className="quick-action-button" title={assistantState !== 'active' ? 'Start a session to enable this feature' : ''}>
+                                        Generate Voiceover
+                                    </button>
+                                     {voiceoverState !== 'idle' && <div className="w-full text-center p-2 bg-assistant-bubble-bg rounded-md"><p className="text-sm font-semibold">{voiceoverProgress}</p></div>}
+                                     {voiceoverState === 'error' && <div className="text-red-400">Error: {voiceoverError}</div>}
+                                     {videoDescription && (
+                                         <div className="w-full p-3 bg-assistant-bubble-bg border border-border-color rounded-md">
+                                             <h4 className="font-semibold mb-1">Generated Script:</h4>
+                                             <p className="text-sm text-text-color-muted whitespace-pre-wrap">{videoDescription}</p>
+                                         </div>
+                                     )}
+                                     {voiceoverAudioUrl && (
+                                         <div className="w-full flex flex-col items-center gap-2">
+                                             <audio ref={voiceoverAudioRef} src={voiceoverAudioUrl} controls className="w-full"></audio>
+                                             <button onClick={() => { voiceoverVideoRef.current?.play(); voiceoverAudioRef.current?.play(); }} className="quick-action-button">Play with Voiceover</button>
+                                         </div>
+                                     )}
+                                </div>
+                             )}
+                        </div>
+                    </div>)}
+                     {activePanel === 'lyrics' && songLyrics && (
+                        <SongLyricsPanel
+                            song={songLyrics}
+                            onClose={() => {
+                                setSongLyrics(null);
+                                setActivePanel('transcript');
+                            }}
+                        />
+                    )}
                     {activePanel === 'weather' && (<div className="flex-grow p-6 overflow-y-auto">{!weatherData ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask for the weather to see the forecast.</p></div> : <WeatherPanel data={weatherData} />}</div>)}
                     {activePanel === 'news' && (<div className="flex-grow p-6 overflow-y-auto">{newsArticles.length === 0 ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask for news to see the latest headlines.</p></div> : <NewsPanel articles={newsArticles} />}</div>)}
                     {activePanel === 'timer' && (<div className="flex-grow p-6 overflow-y-auto">{!timer ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask to set a timer.</p></div> : <TimerPanel timer={timer} />}</div>)}
@@ -881,6 +1409,10 @@ const App: React.FC = () => {
                 }}
                 onGenerateAvatar={handleGenerateAvatar}
                 generatedAvatarResult={generatedAiAvatar}
+                customGreeting={customGreeting}
+                onSaveGreeting={handleSaveGreeting}
+                customPersonality={customPersonality}
+                onSavePersonality={handleSavePersonality}
             />
              <ImageEditorModal
                 isOpen={!!editingImage}
@@ -930,6 +1462,74 @@ const App: React.FC = () => {
     );
 };
 
+const SongLyricsPanel: React.FC<{
+    song: { name: string; artist: string; lyrics: string[]; currentLine: number };
+    onClose: () => void;
+}> = ({ song, onClose }) => {
+    const currentLineRef = useRef<HTMLLIElement>(null);
+
+    useEffect(() => {
+        currentLineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [song.currentLine]);
+
+    return (
+        <div className="flex flex-col h-full overflow-hidden p-6 bg-black/20">
+            <div className="flex-shrink-0 mb-4 text-center">
+                <h2 className="text-3xl font-bold glowing-text">{song.name}</h2>
+                <p className="text-lg text-text-color-muted">{song.artist}</p>
+            </div>
+            <ul className="flex-grow overflow-y-auto text-center space-y-4">
+                {song.lyrics.map((line, index) => (
+                    <li
+                        key={index}
+                        ref={index === song.currentLine ? currentLineRef : null}
+                        className={`text-2xl transition-all duration-300 ${
+                            index === song.currentLine
+                                ? 'font-bold text-primary-color scale-110'
+                                : 'text-text-color-muted'
+                        }`}
+                    >
+                        {line || '♪'}
+                    </li>
+                ))}
+            </ul>
+            <div className="flex-shrink-0 mt-4 text-center">
+                <button onClick={onClose} className="quick-action-button">
+                    Close Lyrics
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const QuickActions: React.FC<{ onAction: (action: string) => void, disabled: boolean }> = ({ onAction, disabled }) => {
+    const actions = [
+        { id: 'joke', label: 'Tell me a joke', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg> },
+        { id: 'weather', label: "What's the weather?", icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg> },
+        { id: 'music', label: 'Play music', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg> },
+        { id: 'news', label: 'Latest news', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2V4" /><path d="M16 2v20" /><path d="M8 7h4" /><path d="M8 12h4" /><path d="M8 17h4" /></svg> },
+    ];
+
+    return (
+        <div className="flex-shrink-0 p-3 border-t border-border-color bg-panel-bg">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+                {actions.map(action => (
+                    <button
+                        key={action.id}
+                        onClick={() => onAction(action.id)}
+                        disabled={disabled}
+                        className="quick-action-button"
+                    >
+                        {action.icon}
+                        <span className="text-xs">{action.label}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
 const AvatarCustomizationModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -939,10 +1539,94 @@ const AvatarCustomizationModal: React.FC<{
     onUploadAvatar: (avatar: string) => void;
     onGenerateAvatar: (prompt: string) => void;
     generatedAvatarResult: GeneratedAvatar;
-}> = ({ isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult }) => {
-    const [activeTab, setActiveTab] = useState<'gallery' | 'ai'>('gallery');
+    customGreeting: string;
+    onSaveGreeting: (greeting: string) => void;
+    customPersonality: string;
+    onSavePersonality: (personality: string) => void;
+}> = ({ isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult, customGreeting, onSaveGreeting, customPersonality, onSavePersonality }) => {
+    const [activeTab, setActiveTab] = useState<'gallery' | 'ai' | 'personality'>('gallery');
     const [prompt, setPrompt] = useState('');
+    const [greetingInput, setGreetingInput] = useState(customGreeting);
+    const [personalityInput, setPersonalityInput] = useState(customPersonality);
+    const [showGreetingSaved, setShowGreetingSaved] = useState(false);
+    const [showPersonalitySaved, setShowPersonalitySaved] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // --- Find and Replace State ---
+    const [isFindReplaceVisible, setIsFindReplaceVisible] = useState(false);
+    const [findValue, setFindValue] = useState('');
+    const [replaceValue, setReplaceValue] = useState('');
+    const [isCaseSensitive, setIsCaseSensitive] = useState(false);
+    const [foundMatches, setFoundMatches] = useState<number[]>([]);
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+    const personalityTextareaRef = useRef<HTMLTextAreaElement>(null);
+    
+    const escapeRegExp = (string: string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    useEffect(() => {
+        if (!isFindReplaceVisible || !findValue) {
+            setFoundMatches([]);
+            setCurrentMatchIndex(-1);
+            return;
+        }
+        const flags = isCaseSensitive ? 'g' : 'gi';
+        const regex = new RegExp(escapeRegExp(findValue), flags);
+        const matches = [];
+        let match;
+        while ((match = regex.exec(personalityInput)) !== null) {
+            matches.push(match.index);
+        }
+        setFoundMatches(matches);
+        setCurrentMatchIndex(matches.length > 0 ? 0 : -1);
+    }, [findValue, personalityInput, isCaseSensitive, isFindReplaceVisible]);
+
+    useEffect(() => {
+        if (currentMatchIndex !== -1 && personalityTextareaRef.current && foundMatches.length > 0) {
+            const startIndex = foundMatches[currentMatchIndex];
+            const endIndex = startIndex + findValue.length;
+            personalityTextareaRef.current.focus();
+            personalityTextareaRef.current.setSelectionRange(startIndex, endIndex);
+        }
+    }, [currentMatchIndex, foundMatches, findValue.length]);
+    
+    const handleNavigateMatch = (direction: 'next' | 'prev') => {
+        if (foundMatches.length < 2) return;
+        const nextIndex = direction === 'next' 
+            ? (currentMatchIndex + 1) % foundMatches.length
+            : (currentMatchIndex - 1 + foundMatches.length) % foundMatches.length;
+        setCurrentMatchIndex(nextIndex);
+    };
+
+    const handleReplace = () => {
+        if (currentMatchIndex === -1 || foundMatches.length === 0) return;
+        const startIndex = foundMatches[currentMatchIndex];
+        const newText = 
+            personalityInput.substring(0, startIndex) +
+            replaceValue +
+            personalityInput.substring(startIndex + findValue.length);
+        setPersonalityInput(newText);
+    };
+    
+    const handleReplaceAll = () => {
+        if (!findValue) return;
+        const flags = isCaseSensitive ? 'g' : 'gi';
+        const regex = new RegExp(escapeRegExp(findValue), flags);
+        const newText = personalityInput.replace(regex, replaceValue);
+        setPersonalityInput(newText);
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            setGreetingInput(customGreeting);
+            setPersonalityInput(customPersonality);
+            // Reset find/replace on open
+            setIsFindReplaceVisible(false);
+            setFindValue('');
+            setReplaceValue('');
+        }
+    }, [isOpen, customGreeting, customPersonality]);
 
     if (!isOpen) return null;
     
@@ -968,16 +1652,29 @@ const AvatarCustomizationModal: React.FC<{
         }
     };
 
+    const handleGreetingSave = () => {
+        onSaveGreeting(greetingInput);
+        setShowGreetingSaved(true);
+        setTimeout(() => setShowGreetingSaved(false), 2000);
+    };
+    
+    const handlePersonalitySave = () => {
+        onSavePersonality(personalityInput);
+        setShowPersonalitySaved(true);
+        setTimeout(() => setShowPersonalitySaved(false), 2000);
+    };
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content avatar-modal-content" onClick={(e) => e.stopPropagation()}>
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Customize Avatar</h2>
+                    <h2 className="text-lg font-semibold">Customize Assistant</h2>
                     <button onClick={onClose} className="text-text-color-muted hover:text-white">&times;</button>
                 </header>
                  <div className="flex-shrink-0 flex items-center border-b border-border-color">
-                    <button onClick={() => setActiveTab('gallery')} className={`tab-button ${activeTab === 'gallery' ? 'active' : ''}`}>Gallery</button>
-                    <button onClick={() => setActiveTab('ai')} className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}>Create with AI</button>
+                    <button onClick={() => setActiveTab('gallery')} className={`tab-button ${activeTab === 'gallery' ? 'active' : ''}`}>Avatar Gallery</button>
+                    <button onClick={() => setActiveTab('ai')} className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}>Create Avatar</button>
+                    <button onClick={() => setActiveTab('personality')} className={`tab-button ${activeTab === 'personality' ? 'active' : ''}`}>Personality</button>
                 </div>
                 <div className="flex-grow overflow-y-auto">
                     {activeTab === 'gallery' && (
@@ -1012,6 +1709,69 @@ const AvatarCustomizationModal: React.FC<{
                                 </button>
                            )}
                        </div>
+                    )}
+                    {activeTab === 'personality' && (
+                        <div className="p-4 flex flex-col gap-4 h-full">
+                            <h3 className="font-semibold text-text-color">Custom Greeting</h3>
+                            <p className="text-sm text-text-color-muted -mt-2">Set a custom message for Kaniska to say when you start a new session.</p>
+                            <textarea
+                                value={greetingInput}
+                                onChange={(e) => setGreetingInput(e.target.value)}
+                                rows={3}
+                                placeholder="e.g., Hello! How can I help you today?"
+                                className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
+                            ></textarea>
+                            <div className="flex items-center gap-4">
+                                <button onClick={handleGreetingSave} disabled={!greetingInput} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Save Greeting
+                                </button>
+                                {showGreetingSaved && <span className="text-sm text-green-400">Saved!</span>}
+                            </div>
+                            
+                            <div className="flex items-center justify-between mt-4">
+                                <h3 className="font-semibold text-text-color">Personality & Backstory</h3>
+                                <button onClick={() => setIsFindReplaceVisible(!isFindReplaceVisible)} title="Find & Replace" className="editor-history-button"><FindReplaceIcon /></button>
+                            </div>
+                            <p className="text-sm text-text-color-muted -mt-2">Define a unique personality for Kaniska. This will influence her responses and behavior.</p>
+                            
+                            {isFindReplaceVisible && (
+                                <div className="p-2 border border-border-color rounded-md bg-assistant-bubble-bg flex flex-col gap-2 text-sm animate-fade-in-down">
+                                    <div className="flex gap-2">
+                                        <input type="text" placeholder="Find" value={findValue} onChange={e => setFindValue(e.target.value)} className="w-full bg-panel-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                        <input type="text" placeholder="Replace with" value={replaceValue} onChange={e => setReplaceValue(e.target.value)} className="w-full bg-panel-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => setIsCaseSensitive(!isCaseSensitive)} className={`px-2 py-0.5 rounded border ${isCaseSensitive ? 'bg-primary-color text-bg-color border-primary-color' : 'bg-transparent border-border-color'}`} title="Case Sensitive">Aa</button>
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={() => handleNavigateMatch('prev')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&lt;</button>
+                                                <span className="text-xs text-text-color-muted w-20 text-center">{foundMatches.length > 0 ? `${currentMatchIndex + 1} of ${foundMatches.length}` : 'No matches'}</span>
+                                                <button onClick={() => handleNavigateMatch('next')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&gt;</button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={handleReplace} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-assistant-bubble-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace</button>
+                                            <button onClick={handleReplaceAll} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-assistant-bubble-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace All</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <textarea
+                                ref={personalityTextareaRef}
+                                value={personalityInput}
+                                onChange={(e) => setPersonalityInput(e.target.value)}
+                                rows={6}
+                                placeholder="e.g., A witty and sarcastic spaceship pilot who has seen every corner of the galaxy..."
+                                className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
+                            ></textarea>
+                            <div className="flex items-center gap-4">
+                                <button onClick={handlePersonalitySave} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition">
+                                    Save Personality
+                                </button>
+                                {showPersonalitySaved && <span className="text-sm text-green-400">Saved!</span>}
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
@@ -1340,12 +2100,44 @@ const LiveImageEditorModal: React.FC<{
 const WeatherPanel: React.FC<{ data: WeatherData }> = ({ data }) => {
     const renderWeatherIcon = () => {
         const condition = data.condition.toLowerCase();
-        if (condition.includes('sun') || condition.includes('clear')) {
-            return <svg viewBox="0 0 64 64" className="weather-sun"><circle cx="32" cy="32" r="14" fill="currentColor" /><path d="M32 0v8m0 48v8m32-32h-8M8 32H0m26.86-19.86l-5.66-5.66M4.5 59.5l5.66-5.66m43.18 0l-5.66 5.66m5.66-43.18l-5.66 5.66" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>;
+
+        if (condition.includes('thunder') || condition.includes('storm')) {
+            return (<>
+                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
+                <svg viewBox="0 0 64 64" className="weather-lightning"><polygon points="30,38 40,32 30,52 38,52 28,62 30,44 24,44" fill="#f59e0b" /></svg>
+            </>);
+        }
+        if (condition.includes('snow') || condition.includes('sleet') || condition.includes('blizzard') || condition.includes('ice')) {
+            const flakes = Array.from({ length: 5 }).map((_, i) => (
+                <path key={i} className="weather-snow-flake" style={{ animationDelay: `${i * 1}s` }} d="M32 20v24m-12-12h24M23.5 27.5l17 17m-17 0l17-17" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            ));
+            return <svg viewBox="0 0 64 64" className="weather-snow">{flakes}</svg>;
         }
         if (condition.includes('rain') || condition.includes('drizzle')) {
-            return <><svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg><div className="rain-container">{Array.from({ length: 10 }).map((_, i) => <div key={i} className="weather-rain-drop" style={{ left: `${Math.random() * 100}%`, animationDelay: `${Math.random()}s` }}></div>)}</div></>;
+            return (<>
+                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
+                <div className="rain-container">{Array.from({ length: 10 }).map((_, i) => <div key={i} className="weather-rain-drop" style={{ left: `${Math.random() * 100}%`, animationDelay: `${Math.random()}s` }}></div>)}</div>
+            </>);
         }
+         if (condition.includes('fog') || condition.includes('mist')) {
+            return (<>
+                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
+                <g className="weather-fog">
+                    <line x1="12" y1="52" x2="52" y2="52" />
+                    <line x1="16" y1="58" x2="48" y2="58" />
+                </g>
+            </>);
+        }
+        if (condition.includes('partly cloudy')) {
+            return (<>
+                <svg viewBox="0 0 64 64" className="weather-sun"><circle cx="32" cy="32" r="14" fill="currentColor" /><path d="M32 0v8m0 48v8m32-32h-8M8 32H0m26.86-19.86l-5.66-5.66M4.5 59.5l5.66-5.66m43.18 0l-5.66 5.66m5.66-43.18l-5.66 5.66" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>
+                <svg viewBox="0 0 64 64" className="weather-cloud weather-cloud-back"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
+            </>);
+        }
+        if (condition.includes('sun') || condition.includes('clear')) {
+            return <svg viewBox="0 0 64 64" className="weather-sun"><circle cx="32" cy="32" r="14" fill="currentColor" /><path d="M32 0v8m0 48v8m32-32h-8M8 32H0m26.86-19.86l-5.66-5.66M4.5 59.5l5.66-5.66m43.18 0l-5.66 5.66m5.66-43.18l-5.66 5.66" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>;
+        }
+        // Default to cloudy/overcast
         return <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>;
     };
     return (
