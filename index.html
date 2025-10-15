@@ -59,7 +59,7 @@
         /* Animation is now handled by expression classes */
         position: relative; /* Keep avatar on top */
         z-index: 1;
-        transition: filter 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+        transition: filter 0.5s ease-out, transform 0.5s ease-out, border-color 0.5s ease-out;
       }
 
       .hologram-container::before, .hologram-container::after {
@@ -109,8 +109,13 @@
       }
       
       /* --- Expression Animations --- */
+      @keyframes breathing {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+      }
+
       .avatar.expression-idle {
-        animation: glow 2.5s infinite alternate ease-in-out;
+        animation: glow 2.5s infinite alternate ease-in-out, breathing 6s infinite ease-in-out;
       }
 
       @keyframes listen-glow {
@@ -347,7 +352,7 @@
         animation-duration: 1s;
       }
 
-      /* --- Avatar Customization Modal --- */
+      /* --- Modals (General) --- */
       .modal-overlay {
         position: fixed;
         inset: 0;
@@ -364,14 +369,18 @@
         background-color: var(--panel-bg);
         border: 1px solid var(--border-color);
         border-radius: 12px;
-        width: 90vw;
-        max-width: 600px;
-        height: 80vh;
-        max-height: 700px;
         overflow: hidden;
         display: flex;
         flex-direction: column;
         animation: panel-enter 0.4s ease-out forwards;
+      }
+
+      /* --- Avatar Customization Modal --- */
+      .avatar-modal-content {
+        width: 90vw;
+        max-width: 600px;
+        height: 80vh;
+        max-height: 700px;
       }
       .avatar-gallery-grid {
         display: grid;
@@ -415,6 +424,209 @@
        .upload-avatar-item:hover {
         color: var(--primary-color);
         border-color: var(--primary-color);
+      }
+
+      /* --- Image Editor Modal --- */
+      .editor-modal-content {
+        width: 95vw;
+        max-width: 1200px;
+        height: 90vh;
+        max-height: 800px;
+      }
+      .editor-layout {
+        display: flex;
+        flex-grow: 1;
+        min-height: 0;
+      }
+      .editor-preview-pane {
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0,0,0,0.3);
+        padding: 1rem;
+        min-width: 0;
+      }
+      .editor-preview-pane img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: transform 0.2s ease-out, filter 0.2s ease-out;
+        border-radius: 4px;
+      }
+      .editor-controls-pane {
+        width: 300px;
+        flex-shrink: 0;
+        border-left: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+      }
+      .editor-control-group {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .editor-control-group h3 {
+        font-weight: 600;
+        color: var(--text-color);
+        margin-bottom: 0.75rem;
+      }
+      .editor-slider-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-bottom: 0.5rem;
+      }
+      .editor-slider-group label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.875rem;
+        color: var(--text-color-muted);
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        background: var(--border-color);
+        outline: none;
+        border-radius: 2px;
+        opacity: 0.7;
+        transition: opacity .2s;
+      }
+      input[type="range"]:hover { opacity: 1; }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 16px; height: 16px;
+        background: var(--primary-color);
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid var(--panel-bg);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 16px; height: 16px;
+        background: var(--primary-color);
+        cursor: pointer;
+        border-radius: 50%;
+        border: 2px solid var(--panel-bg);
+      }
+      .editor-button-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+      .editor-button {
+        background-color: var(--assistant-bubble-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-color-muted);
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+      .editor-button:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background-color: rgba(34, 211, 238, 0.1);
+      }
+      .editor-resize-inputs {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+      .editor-resize-inputs input {
+        width: 100%;
+        background: var(--assistant-bubble-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        text-align: center;
+      }
+       .editor-resize-inputs input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+       }
+      .editor-aspect-lock {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-color-muted);
+        cursor: pointer;
+      }
+      .editor-history-button {
+        background: none;
+        border: none;
+        color: var(--text-color-muted);
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+      }
+      .editor-history-button:hover:not(:disabled) {
+        color: var(--primary-color);
+        background-color: rgba(34, 211, 238, 0.1);
+      }
+      .editor-history-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* --- Live Image Editor --- */
+      .live-editor-modal-content {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        background-color: rgba(0,0,0,0.8);
+      }
+      @keyframes live-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+      }
+      .live-editor-preview-image {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+        transition: transform 0.3s ease-out, filter 0.3s ease-out;
+        border-radius: 8px;
+        box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        animation: live-pulse 2s infinite;
+        border: 2px solid var(--primary-color);
+      }
+      .live-editor-status {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(13, 17, 23, 0.8);
+        backdrop-filter: blur(5px);
+        padding: 0.5rem 1.5rem;
+        border-radius: 9999px;
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .live-editor-status-dot {
+        width: 10px;
+        height: 10px;
+        background-color: #f87171; /* red */
+        border-radius: 50%;
+        animation: pulse-red 2s infinite;
+      }
+      @keyframes pulse-red {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
       }
 
     </style>
