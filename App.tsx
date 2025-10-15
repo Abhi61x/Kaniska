@@ -212,7 +212,7 @@ const fetchNewsData = async (query?: string): Promise<{ title: string; summary: 
     const newsApiUrl = `https://newsapi.org/v2/top-headlines?country=us&pageSize=5&apiKey=${apiKey}` + (query ? `&q=${encodeURIComponent(query)}` : '');
     
     // Use a CORS proxy to bypass client-side restrictions of NewsAPI's free plan
-    const proxyUrl = `https://thingproxy.freeboard.io/fetch/${newsApiUrl}`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(newsApiUrl)}`;
 
     const response = await fetch(proxyUrl);
     if (!response.ok) {
