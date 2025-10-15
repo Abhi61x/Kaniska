@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type } from "@google/genai";
 
@@ -49,8 +48,15 @@ declare global {
     YT: any;
     onYouTubeIframeAPIReady: () => void;
   }
-  // FIX: Add YT namespace to provide type definitions for the YouTube Iframe Player API.
   namespace YT {
+    enum PlayerState {
+        UNSTARTED = -1,
+        ENDED = 0,
+        PLAYING = 1,
+        PAUSED = 2,
+        BUFFERING = 3,
+        CUED = 5,
+    }
     class Player {
       constructor(
         elementId: string,
@@ -135,14 +141,14 @@ const functionDeclarations: FunctionDeclaration[] = [
 // --- SVG Icons & Helper Components ---
 const HologramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17l-3-2.5 3-2.5"/><path d="M19 17l3-2.5-3-2.5"/><path d="M2 14.5h20"/><path d="m12 2-3 4-1 4 4 4 4-4-1-4-3-4Z"/><path d="M12 2v20"/></svg> );
 const InstagramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg> );
-const SettingsIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.12l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg> );
+const SettingsIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.12l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg> );
 
 
 // --- Predefined Avatars & Constants ---
 const PREDEFINED_AVATARS = [
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", // Default blank
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARTSURBVHhe7ZxLUdswFIBzL3M3s9PuwK6A2AGxA6IDsAPCBkQHpAPSAcEO2A5wOiA6oOywQ3YEdmB2eC4lpTSpM9I5SfL/gScl0qS/9/PeFxCCEEP4j4Y+4tBDjLPIY7w/g4t4Xp/hKj7lV/yKD/AHPtQvD/AL/sJ9+AD34T58hPvwEd7yP5fxfJ/gYzyNl/G8nmQG8Dq+wuv4Ql/hVXyBb/CVPuAP/IHP8A1+wTf4A7/hHnyCb/BvfIAP8C+8wzt4V59hB/hLgD/y/f4Gz/ArvsCveE+f4Ad8gS/wFf4GgD/gZ/gU3+BrfIAP8HWe4wY8w0d4ip/xFR7g93yD3/A1nuAdfIZP8Bn+gK/wA36Bf+AtvIX38A7e4R08w5/wM3yKH/ApPsA/eA+/4338jnfxUaTxo+gD3sbv+B4f40f8jI/xI/6Bf+Jd/A7fxu/4Ht/jR/yMH/Ej/sA/+Bd/g7fxO34n8A3e4x38iI/xI37GD/gD/+J3/A5v43f8jm/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BXf42M8jBfxsv4Y4iK/xRfwCv4ir8A/cKj8G94V/4Gv9LXeA3f43N8jY/yMt7Gx/gef8dP+Avv4k8QQghh/AdkR3/1mP+TCAAAAABJRU5ErkJggg==",
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A1/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVf8Xf8Hf/Hn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/F3/B3/wJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/wJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/wB/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8Tb+gBfxE/4n38X38UqEEIQQgvhfC45/M6/b5+gAAAAASUVORK5CYII=",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVf8Xf8Hf/Hn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/F3/B3/wJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/wJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/wB/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8Tb+gBfxE/4n38X38UqEEIQQgvhfC45/M6/b5+gAAAAASUVORK5CYII=",
 ];
 
 
@@ -246,6 +252,7 @@ const App: React.FC = () => {
     const [liveEditingImage, setLiveEditingImage] = useState<GeneratedImage | null>(null);
     const [youtubeQueue, setYoutubeQueue] = useState<{ videoId: string; title: string }[]>([]);
     const [youtubeQueueIndex, setYoutubeQueueIndex] = useState(-1);
+    const [isYoutubePlaying, setIsYoutubePlaying] = useState<boolean>(false);
 
     const initialFilters: ImageFilters = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 };
     const initialTransforms: ImageTransforms = { rotate: 0, scaleX: 1, scaleY: 1 };
@@ -616,6 +623,20 @@ const App: React.FC = () => {
         setTranscriptions(p => [...p, { speaker: 'system', text: `YouTube Player Error: ${errorMessage}`, timestamp: new Date() }]);
     }, []);
 
+    const handleYoutubePlayerStateChange = useCallback((event: any) => {
+        switch (event.data) {
+            case window.YT.PlayerState.PLAYING:
+                setIsYoutubePlaying(true);
+                break;
+            case window.YT.PlayerState.PAUSED:
+            case window.YT.PlayerState.ENDED:
+            case window.YT.PlayerState.CUED:
+            case window.YT.PlayerState.UNSTARTED:
+                setIsYoutubePlaying(false);
+                break;
+        }
+    }, []);
+
     const initYoutubePlayer = useCallback((videoId: string) => {
         if (document.getElementById('youtube-player') && !playerRef.current) {
             playerRef.current = new window.YT.Player('youtube-player', {
@@ -628,13 +649,14 @@ const App: React.FC = () => {
                         console.log('YouTube Player is ready.');
                         event.target.playVideo();
                     },
+                    'onStateChange': handleYoutubePlayerStateChange,
                     'onError': handleYoutubePlayerError,
                 }
             });
         } else if (playerRef.current && videoId) {
             playerRef.current.loadVideoById(videoId);
         }
-    }, [handleYoutubePlayerError]);
+    }, [handleYoutubePlayerError, handleYoutubePlayerStateChange]);
 
     useEffect(() => {
         const setupYT = () => {
@@ -812,7 +834,32 @@ const App: React.FC = () => {
                     {activePanel === 'image' && (<div className="flex flex-col h-full overflow-hidden">
                         <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
                         {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-text-color-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-text-color-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
-                    {activePanel === 'youtube' && (<div className="flex-grow p-4 flex flex-col gap-4 overflow-hidden"><div className="youtube-container">{youtubeError ? (<div className="w-full h-full flex flex-col items-center justify-center bg-black text-red-400 p-4 text-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><h3 className="text-lg font-semibold">Playback Error</h3><p className="text-sm">{youtubeError}</p></div>) : (<div id="youtube-player" />)}</div><h3 className="text-center text-lg font-semibold text-text-color-muted truncate">{youtubeError ? 'Could not load video' : (youtubeTitle || 'No video is playing.')}</h3></div>)}
+                    {activePanel === 'youtube' && (<div className="flex-grow p-4 flex flex-col gap-2 overflow-hidden">
+                        <div className="youtube-container">
+                            {youtubeError ? (<div className="w-full h-full flex flex-col items-center justify-center bg-black text-red-400 p-4 text-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><h3 className="text-lg font-semibold">Playback Error</h3><p className="text-sm">{youtubeError}</p></div>) : (<div id="youtube-player" />)}
+                        </div>
+                        <h3 className="text-center text-md font-semibold text-text-color-muted truncate h-6">{youtubeError ? 'Could not load video' : (youtubeTitle || 'No video is playing.')}</h3>
+                         {youtubeTitle && !youtubeError && (
+                            <div className="youtube-controls-container">
+                                <button onClick={() => playerRef.current?.getCurrentTime().then(t => playerRef.current?.seekTo(t - 10, true))} className="youtube-control-button" aria-label="Rewind 10 seconds">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+                                </button>
+                                <button onClick={() => isYoutubePlaying ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause' : 'Play'}>
+                                    {isYoutubePlaying ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                    )}
+                                </button>
+                                <button onClick={() => playerRef.current?.getCurrentTime().then(t => playerRef.current?.seekTo(t + 10, true))} className="youtube-control-button" aria-label="Forward 10 seconds">
+                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                                </button>
+                                <button onClick={() => { playerRef.current?.stopVideo(); setYoutubeTitle(null); }} className="youtube-control-button stop-btn" aria-label="Stop">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                                </button>
+                            </div>
+                        )}
+                    </div>)}
                     {activePanel === 'weather' && (<div className="flex-grow p-6 overflow-y-auto">{!weatherData ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask for the weather to see the forecast.</p></div> : <WeatherPanel data={weatherData} />}</div>)}
                     {activePanel === 'news' && (<div className="flex-grow p-6 overflow-y-auto">{newsArticles.length === 0 ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask for news to see the latest headlines.</p></div> : <NewsPanel articles={newsArticles} />}</div>)}
                     {activePanel === 'timer' && (<div className="flex-grow p-6 overflow-y-auto">{!timer ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask to set a timer.</p></div> : <TimerPanel timer={timer} />}</div>)}
@@ -869,6 +916,14 @@ const App: React.FC = () => {
                     }
                     setLiveEditingImage(null);
                     sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "Live editing session finished and changes saved." }));
+                }}
+                onReset={() => {
+                    setLiveEditFilters(initialFilters);
+                    setLiveEditTransform(initialTransforms);
+                    const resetState = { ...initialFilters, ...initialTransforms };
+                    const resetMessage = `The image edits have been reset. The current state is now back to default: ${JSON.stringify(resetState)}.`;
+                    sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: resetMessage }));
+                     setTranscriptions(p => [...p, { speaker: 'system', text: 'Live image edits have been reset.', timestamp: new Date() }]);
                 }}
             />
         </div>
@@ -1004,16 +1059,12 @@ const ImageEditorModal: React.FC<{
     const canRedo = historyIndex < history.length - 1;
     const currentState = history[historyIndex] || getInitialState();
 
-    const updateState = (newState: Partial<ImageEditState>) => {
-        // FIX: This function was buggy. The spread of `newState.filters` or `newState.transform` would cause a runtime error
-        // if they were not present in `newState`. Using `...(newState.filters || {})` provides a safe fallback.
-        // Also, the `...newState` spread was redundant with the explicit property definitions that followed.
-        // This has been corrected to merge properties correctly.
+    const updateState = (updates: Partial<ImageEditState>) => {
         const nextState: ImageEditState = {
             ...currentState,
-            ...newState,
-            filters: { ...currentState.filters, ...(newState.filters || {}) },
-            transform: { ...currentState.transform, ...(newState.transform || {}) },
+            ...updates,
+            filters: { ...currentState.filters, ...(updates.filters || {}) },
+            transform: { ...currentState.transform, ...(updates.transform || {}) },
         };
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(nextState);
@@ -1126,41 +1177,31 @@ const ImageEditorModal: React.FC<{
                             <h3>Adjustments</h3>
                             <div className="editor-slider-group">
                                 <label><span>Brightness</span><span>{currentState.filters.brightness}%</span></label>
-                                {/* FIX: Spread currentState.filters to provide a complete ImageFilters object, satisfying the type requirements. */}
                                 <input type="range" min="0" max="200" value={currentState.filters.brightness} onChange={e => updateState({ filters: { ...currentState.filters, brightness: +e.target.value }})} />
                             </div>
                             <div className="editor-slider-group">
                                 <label><span>Contrast</span><span>{currentState.filters.contrast}%</span></label>
-                                {/* FIX: Spread currentState.filters to provide a complete ImageFilters object, satisfying the type requirements. */}
                                 <input type="range" min="0" max="200" value={currentState.filters.contrast} onChange={e => updateState({ filters: { ...currentState.filters, contrast: +e.target.value }})} />
                             </div>
                             <div className="editor-slider-group">
                                 <label><span>Saturation</span><span>{currentState.filters.saturate}%</span></label>
-                                {/* FIX: Spread currentState.filters to provide a complete ImageFilters object, satisfying the type requirements. */}
                                 <input type="range" min="0" max="200" value={currentState.filters.saturate} onChange={e => updateState({ filters: { ...currentState.filters, saturate: +e.target.value }})} />
                             </div>
                         </div>
                          <div className="editor-control-group">
                             <h3>Filters</h3>
                             <div className="editor-button-grid">
-                               {/* FIX: Spread currentState.filters to provide a complete ImageFilters object, satisfying the type requirements. */}
                                <button className="editor-button" onClick={() => updateState({ filters: { ...currentState.filters, grayscale: currentState.filters.grayscale === 0 ? 100 : 0 }})}>Grayscale</button>
-                               {/* FIX: Spread currentState.filters to provide a complete ImageFilters object, satisfying the type requirements. */}
                                <button className="editor-button" onClick={() => updateState({ filters: { ...currentState.filters, sepia: currentState.filters.sepia === 0 ? 100 : 0 }})}>Sepia</button>
-                               {/* FIX: Spread currentState.filters to provide a complete ImageFilters object, satisfying the type requirements. */}
                                <button className="editor-button" onClick={() => updateState({ filters: { ...currentState.filters, invert: currentState.filters.invert === 0 ? 100 : 0 }})}>Invert</button>
                             </div>
                         </div>
                         <div className="editor-control-group">
                             <h3>Transform</h3>
                             <div className="editor-button-grid">
-                                {/* FIX: Spread currentState.transform to provide a complete ImageTransforms object, satisfying the type requirements. */}
                                 <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, rotate: (currentState.transform.rotate - 90) % 360 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg> Rotate Left</button>
-                                {/* FIX: Spread currentState.transform to provide a complete ImageTransforms object, satisfying the type requirements. */}
                                 <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, rotate: (currentState.transform.rotate + 90) % 360 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg> Rotate Right</button>
-                                {/* FIX: Spread currentState.transform to provide a complete ImageTransforms object, satisfying the type requirements. */}
                                 <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, scaleX: currentState.transform.scaleX * -1 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22V2M6 8l-4 4 4 4M18 16l4-4-4-4"/></svg> Flip H</button>
-                                {/* FIX: Spread currentState.transform to provide a complete ImageTransforms object, satisfying the type requirements. */}
                                 <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, scaleY: currentState.transform.scaleY * -1 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12H2M8 6l-4 4 4 4M16 18l-4-4 4-4"/></svg> Flip V</button>
                             </div>
                         </div>
@@ -1197,7 +1238,8 @@ const LiveImageEditorModal: React.FC<{
     transform: ImageTransforms;
     onClose: () => void;
     onSave: (newImageUrl: string) => void;
-}> = ({ isOpen, image, filters, transform, onClose, onSave }) => {
+    onReset: () => void;
+}> = ({ isOpen, image, filters, transform, onClose, onSave, onReset }) => {
     if (!isOpen || !image || !image.url) return null;
 
     const handleSave = () => {
@@ -1232,20 +1274,58 @@ const LiveImageEditorModal: React.FC<{
                 <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent">
                     <h2 className="text-lg font-semibold text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>Live Image Editor</h2>
                     <div className="flex items-center gap-2">
+                        <button onClick={onReset} className="px-4 py-2 text-sm bg-yellow-600/80 hover:bg-yellow-600 border border-yellow-500/50 text-white font-semibold rounded-md transition">Reset</button>
                         <button onClick={onClose} className="px-4 py-2 text-sm bg-red-600/80 hover:bg-red-600 border border-red-500/50 text-white font-semibold rounded-md transition">Cancel</button>
                         <button onClick={handleSave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color border border-cyan-400/50 text-bg-color font-semibold rounded-md transition">Finish & Save</button>
                     </div>
                 </header>
-                <div className="w-full h-full flex items-center justify-center p-16">
-                     <img
-                        src={image.url}
-                        alt="Live editing preview"
-                        className="live-editor-preview-image"
-                        style={{
-                            transform: `rotate(${transform.rotate}deg) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`,
-                            filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`
-                        }}
-                    />
+                <div className="live-editor-layout">
+                    <div className="live-editor-preview-pane">
+                         <img
+                            src={image.url}
+                            alt="Live editing preview"
+                            className="live-editor-preview-image"
+                            style={{
+                                transform: `rotate(${transform.rotate}deg) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`,
+                                filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`
+                            }}
+                        />
+                    </div>
+                    <div className="live-editor-controls-pane">
+                        <div className="editor-control-group">
+                            <h3>Adjustments</h3>
+                            <div className="editor-slider-group">
+                                <label><span>Brightness</span><span>{filters.brightness}%</span></label>
+                                <input type="range" min="0" max="200" value={filters.brightness} readOnly />
+                            </div>
+                            <div className="editor-slider-group">
+                                <label><span>Contrast</span><span>{filters.contrast}%</span></label>
+                                <input type="range" min="0" max="200" value={filters.contrast} readOnly />
+                            </div>
+                            <div className="editor-slider-group">
+                                <label><span>Saturation</span><span>{filters.saturate}%</span></label>
+                                <input type="range" min="0" max="200" value={filters.saturate} readOnly />
+                            </div>
+                        </div>
+                         <div className="editor-control-group">
+                            <h3>Filters</h3>
+                            <div className="editor-button-grid">
+                               <button className={`editor-button ${filters.grayscale > 50 ? 'active' : ''}`}>Grayscale</button>
+                               <button className={`editor-button ${filters.sepia > 50 ? 'active' : ''}`}>Sepia</button>
+                               <button className={`editor-button ${filters.invert > 50 ? 'active' : ''}`}>Invert</button>
+                            </div>
+                        </div>
+                        <div className="editor-control-group">
+                            <h3>Transform</h3>
+                            <div className="editor-slider-group">
+                                <label><span>Rotate</span><span>{transform.rotate}°</span></label>
+                            </div>
+                             <div className="editor-button-grid">
+                               <button className={`editor-button ${transform.scaleX === -1 ? 'active' : ''}`}>Flipped H</button>
+                               <button className={`editor-button ${transform.scaleY === -1 ? 'active' : ''}`}>Flipped V</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div className="live-editor-status">
                     <span className="live-editor-status-dot"></span>
