@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -529,7 +530,7 @@
       /* --- Avatar Customization Modal --- */
       .avatar-modal-content {
         width: 90vw;
-        max-width: 600px;
+        max-width: 800px;
         height: 80vh;
         max-height: 700px;
       }
@@ -834,6 +835,139 @@
         50% { opacity: 0.5; }
       }
 
+      /* --- Code Panel --- */
+      .code-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 1rem;
+        gap: 1rem;
+        overflow-y: auto;
+      }
+      .code-snippet {
+        background-color: var(--assistant-bubble-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .code-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 1rem;
+        background-color: rgba(0,0,0,0.2);
+        border-bottom: 1px solid var(--border-color);
+      }
+      html[data-theme='light'] .code-header {
+        background-color: rgba(0,0,0,0.05);
+      }
+      .code-language {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 600;
+        color: var(--primary-color);
+        text-transform: uppercase;
+        font-size: 0.875rem;
+      }
+      .code-actions { display: flex; align-items: center; gap: 0.5rem; }
+      .code-action-button {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 4px 8px;
+        font-size: 0.8rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background-color: var(--panel-bg);
+        color: var(--text-color-muted);
+        transition: all 0.2s ease;
+      }
+      .code-action-button:hover {
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+        background-color: rgba(34, 211, 238, 0.1);
+      }
+      html[data-theme='light'] .code-action-button:hover {
+        background-color: rgba(8, 145, 178, 0.1);
+      }
+      .code-description {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        color: var(--text-color-muted);
+        border-bottom: 1px solid var(--border-color);
+      }
+      .code-body pre {
+        margin: 0;
+        padding: 1rem;
+        max-height: 400px;
+        overflow: auto;
+        font-size: 0.875rem;
+        background-color: rgba(0,0,0,0.2);
+      }
+      html[data-theme='light'] .code-body pre {
+        background-color: #f8f9fa;
+      }
+      .code-body code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        white-space: pre;
+      }
+
+      /* --- Live Code Editor Panel --- */
+      .live-editor-panel {
+        display: flex;
+        height: 100%;
+        gap: 1rem;
+        padding: 1rem;
+      }
+      .live-editor-code-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .live-editor-preview-pane {
+        flex: 1;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: white; /* Preview against a white background */
+      }
+      .live-editor-textarea {
+        flex-grow: 1;
+        background-color: var(--assistant-bubble-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.875rem;
+        color: var(--text-color);
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .live-editor-textarea:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+      }
+      .live-editor-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+
+      /* --- Website Preview Modal --- */
+      .website-preview-modal-content {
+        width: 90vw;
+        max-width: 1400px;
+        height: 90vh;
+      }
+      .website-preview-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background-color: #fff;
+      }
+
     </style>
   <script type="importmap">
 {
@@ -842,7 +976,10 @@
     "react": "https://aistudiocdn.com/react@^18.3.1",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
     "react-dom/client": "https://aistudiocdn.com/react-dom@^18.3.1/client",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^18.3.1/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^18.3.1/",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.4.0/"
   }
 }
 </script>
