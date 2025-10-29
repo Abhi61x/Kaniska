@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -527,18 +526,89 @@
         animation: panel-enter 0.4s ease-out forwards;
       }
 
-      /* --- Avatar Customization Modal --- */
-      .avatar-modal-content {
+      /* --- Settings Modal --- */
+      .settings-modal-content {
         width: 90vw;
-        max-width: 800px;
-        height: 80vh;
-        max-height: 700px;
+        max-width: 1000px; /* Increased width for two-column layout */
+        height: 85vh;
+        max-height: 750px;
       }
+      .settings-layout {
+        display: flex;
+        flex-grow: 1;
+        min-height: 0;
+      }
+      .settings-nav {
+        width: 220px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--border-color);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .settings-nav-button {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-weight: 500;
+        color: var(--text-color-muted);
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        text-align: left;
+        width: 100%;
+      }
+      .settings-nav-button:hover {
+        color: var(--text-color);
+        background-color: var(--assistant-bubble-bg);
+      }
+      .settings-nav-button.active {
+        color: var(--primary-color);
+        background-color: rgba(34, 211, 238, 0.1);
+        border-color: rgba(34, 211, 238, 0.3);
+      }
+      html[data-theme='light'] .settings-nav-button.active {
+        background-color: rgba(8, 145, 178, 0.1);
+        border-color: rgba(8, 145, 178, 0.3);
+      }
+      .settings-content {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+      }
+      .settings-section {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem; /* Increased gap between cards */
+      }
+      .settings-section-header h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0;
+      }
+      .settings-section-header p {
+        font-size: 0.875rem;
+        color: var(--text-color-muted);
+        margin-top: 0.25rem;
+      }
+      .settings-card {
+        background-color: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+      html[data-theme='light'] .settings-card {
+        background-color: rgba(0,0,0,0.02);
+      }
+
+      /* --- Avatar Customization --- */
       .avatar-gallery-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
         gap: 1rem;
-        padding: 1rem;
       }
       .avatar-item {
         aspect-ratio: 1 / 1;

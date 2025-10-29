@@ -293,7 +293,7 @@ const Clock: React.FC = () => {
 const PREDEFINED_AVATARS = [
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", // Default blank
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARTSURBVHhe7ZxLUdswFIBzL3M3s9PuwK6A2AGxA6IDsAPCBkQHpAPSAcEO2A5wOiA6oOywQ3YEdmB2eC4lpTSpM9I5SfL/gScl0qS/9/PeFxCCEEP4j4Y+4tBDjLPIY7w/g4t4Xp/hKj7lV/yKD/AHPtQvD/AL/sJ9+AD34T58hPvwEd7yP5fxfJ/gYzyNl/G8nmQG8Dq+wuv4Ql/hVXyBb/CVPuAP/IHP8A1+wTf4A7/hHnyCb/BvfIAP8C+8wzt4V59hB/hLgD/y/f4Gz/ArvsCveE+f4Ad8gS/wFf4GgD/gZ/gU3+BrfIAP8HWe4wY8w0d4ip/xFR7g93yD3/A1nuAdfIZP8Bn+gK/wA/6Bf+AtvIX38A7e4R08w5/wM3yKH/ApPsA/eA+/4338jnfxUaTxo+gD3sbv+B4f40f8jI/xI/6Bf+Jd/A7fxu/4Ht/jR/yMH/Ej/sA/+Bd/g7fxO34n8A3e4x38iI/xI37GD/gD/+J3/A5v43f8jm/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BXf42M8jBfxsv4Y4iK/xRfwCv4ir8A/cKj8G94V/4Gv9LXeA3f43N8jY/yMt7Gx/gef8dP+Avv4k8QQghh/AdkR3/1mP+TCAAAAABJRU5kJggg==",
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVf8Xf8Hf/Hn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/B3/B3/AJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/AJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/wB/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8TbeAEv4if8T7+L7+KVBCCEIQ4X0vhcc/mdft9/QAAAAASUVORK5CYII=",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/B3/B3/AJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/AJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/B/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8TbeAEv4if8T7+L7+KVBCCEIQ4X0vhcc/mdft9/QAAAAASUVORK5CYII=",
 ];
 
 
@@ -511,7 +511,7 @@ const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void; reselectionRe
     );
 };
 
-// --- Fix: Add definitions for missing components ---
+// --- Panel Components ---
 const WeatherPanel: React.FC<{ data: WeatherData }> = ({ data }) => (
     <div className="p-4">
         <h3 className="text-xl font-bold mb-2">Weather in {data.location}</h3>
@@ -671,7 +671,7 @@ const App: React.FC = () => {
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
     const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
     const [timer, setTimer] = useState<TimerData | null>(null);
-    const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [avatars, setAvatars] = useState<string[]>(PREDEFINED_AVATARS);
     const [currentAvatar, setCurrentAvatar] = useState<string>(PREDEFINED_AVATARS[0]);
     const [generatedAiAvatar, setGeneratedAiAvatar] = useState<GeneratedAvatar>({ url: null, isLoading: false, error: null });
@@ -758,14 +758,12 @@ const App: React.FC = () => {
 
     const addTranscriptionEntry = useCallback((entry: Omit<TranscriptionEntry, 'timestamp'> & { timestamp?: Date }) => {
         if (!userIdRef.current) return;
-        // FIX: Use Firebase v8 compat syntax.
         const conversationRef = db.ref(`conversations/${userIdRef.current}`);
         const newEntryData = {
             speaker: entry.speaker,
             text: entry.text,
             timestamp: (entry.timestamp || new Date()).getTime()
         };
-        // FIX: Use Firebase v8 compat syntax.
         conversationRef.push(newEntryData);
     }, []);
 
@@ -864,7 +862,6 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!isDataLoaded || !userIdRef.current) return;
 
-        // FIX: Use Firebase v8 compat syntax.
         const conversationRef = db.ref(`conversations/${userIdRef.current}`);
         
         const onValueCallback = (snapshot: any) => {
@@ -882,10 +879,8 @@ const App: React.FC = () => {
             setTranscriptions(transcriptionsArray);
         };
 
-        // FIX: Use Firebase v8 compat syntax for subscribing and getting the unsubscriber.
         conversationRef.on('value', onValueCallback);
 
-        // FIX: Return the unsubscribe function.
         return () => {
             conversationRef.off('value', onValueCallback);
         };
@@ -996,9 +991,7 @@ const App: React.FC = () => {
     const handleClearHistory = () => {
         if (!userIdRef.current) return;
         if (window.confirm("Are you sure you want to erase Kaniska's memory? This will delete your current conversation history from the database.")) {
-            // FIX: Use Firebase v8 compat syntax.
             const conversationRef = db.ref(`conversations/${userIdRef.current}`);
-            // FIX: Use Firebase v8 compat syntax.
             conversationRef.set(null);
         }
     };
@@ -1287,7 +1280,6 @@ const App: React.FC = () => {
                 try {
                     switch (fc.name) {
                         case 'say':
-                            // FIX: Cast fc.args properties to their expected types (string).
                             await speakText(fc.args.text as string, (fc.args.emotion as string) || 'neutral');
                             result = "Okay, I've said that for you.";
                             break;
@@ -1298,12 +1290,10 @@ const App: React.FC = () => {
                             result = "That's my current custom script.";
                             break;
                         case 'setSystemScript':
-                            // FIX: Cast fc.args.prompt to string.
                             setCustomSystemPrompt(fc.args.prompt as string);
                             result = "Understood. I've updated my custom instructions. Please restart the session for the new guidelines to take full effect.";
                             break;
                         case 'generateImage':
-                            // FIX: Cast fc.args.prompt to string.
                             handleGenerateImage(fc.args.prompt as string);
                             result = "OK, I'm starting to generate that image for you.";
                             break;
@@ -1314,7 +1304,6 @@ const App: React.FC = () => {
                          case 'writeCode':
                             const newSnippet: CodeSnippet = {
                                 id: crypto.randomUUID(),
-// FIX: Cast fc.args properties to their expected types (string).
                                 language: fc.args.language as string,
                                 code: fc.args.code as string,
                                 description: fc.args.description as string,
@@ -1325,7 +1314,6 @@ const App: React.FC = () => {
                             break;
                          case 'updateCode':
                             if (activePanel === 'liveEditor') {
-// FIX: Cast fc.args.code to string.
                                 setLiveEditorCode(fc.args.code as string);
                                 result = "OK, I've updated the code in the live editor.";
                             } else {
@@ -1334,7 +1322,6 @@ const App: React.FC = () => {
                             break;
                          case 'searchAndPlayYoutubeVideo':
                             try {
-// FIX: Cast fc.args.query to string.
                                 const results = await searchYoutubeVideo(fc.args.query as string);
                                 setYoutubeQueue(results);
                                 setYoutubeQueueIndex(0);
@@ -1417,44 +1404,34 @@ const App: React.FC = () => {
                             }
                             break;
                         case 'displayWeather':
-// FIX: Cast fc.args.location to string.
                             const weather = await fetchWeatherData(fc.args.location as string);
                             setWeatherData(weather);
                             setActivePanel('weather');
-// FIX: Cast fc.args.location to string.
                             result = `Okay, here is the weather for ${fc.args.location as string}.`;
                             break;
                         case 'getRealtimeNews':
-// FIX: Cast fc.args.query to string.
                             const articles = await fetchNewsData(fc.args.query as string);
                             result = JSON.stringify(articles);
                             break;
                         case 'displayNews':
-// FIX: Cast fc.args.articles to NewsArticle array.
                             setNewsArticles(fc.args.articles as NewsArticle[]);
                             setActivePanel('news');
                             result = "Here are the latest news headlines I found.";
                             break;
                         case 'setTimer':
                             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-// FIX: Cast fc.args properties to their expected types.
                             setTimer({ duration: fc.args.durationInSeconds as number, remaining: fc.args.durationInSeconds as number, name: (fc.args.timerName as string) || 'Timer', isActive: true });
                             setActivePanel('timer');
-// FIX: Cast fc.args properties to their expected types.
                             result = `Timer named "${(fc.args.timerName as string) || 'Timer'}" is set for ${fc.args.durationInSeconds as number} seconds.`;
                             break;
                         case 'singSong':
-// FIX: Cast fc.args.lyrics to string array to check its length.
                             if (!fc.args.lyrics || (fc.args.lyrics as string[]).length === 0) {
                                 result = "I'm sorry, I found that song but couldn't get the lyrics, so I can't sing it for you.";
                                 break;
                             }
-// FIX: Cast fc.args properties to their expected types.
                             setSongLyrics({ name: fc.args.songName as string, artist: fc.args.artist as string, lyrics: fc.args.lyrics as string[], currentLine: -1 });
                             setActivePanel('lyrics');
-// FIX: Cast fc.args.mood to string.
                             if (audioPlayerRef.current && BACKGROUND_MUSIC[fc.args.mood as string]) {
-// FIX: Cast fc.args.mood to string.
                                 audioPlayerRef.current.src = BACKGROUND_MUSIC[fc.args.mood as string];
                                 audioPlayerRef.current.play().catch(e => {
                                     if (e.name !== 'AbortError') {
@@ -1463,11 +1440,9 @@ const App: React.FC = () => {
                                 });
                             }
                             (async () => {
-// FIX: Cast fc.args.lyrics to string array to iterate over it.
                                 for (let i = 0; i < (fc.args.lyrics as string[]).length; i++) {
                                     if (assistantState !== 'active' || !sessionPromiseRef.current) break;
                                     setSongLyrics(prev => prev ? { ...prev, currentLine: i } : null);
-// FIX: Cast fc.args properties to their expected types.
                                     await speakText((fc.args.lyrics as string[])[i], fc.args.mood as string);
                                     if (assistantState === 'active') {
                                        await new Promise(resolve => setTimeout(resolve, 500));
@@ -1483,11 +1458,9 @@ const App: React.FC = () => {
                                     setSongLyrics(null);
                                 }
                             })();
-// FIX: Cast fc.args.songName to string.
                             result = `OMG, I love this song! Here's ${fc.args.songName as string}. Singing for you now! 🎤`;
                             break;
                         case 'setAvatarExpression':
-// FIX: Cast fc.args.expression to AvatarExpression.
                             setAvatarExpression(fc.args.expression as AvatarExpression);
                             result = "Expression set.";
                             break;
@@ -1500,8 +1473,6 @@ const App: React.FC = () => {
                             const newTransform: ImageTransforms = { ...currentTransform };
                             
                             const args = fc.args;
-
-// FIX: Cast all numeric properties from fc.args to number.
                             if (args.brightness !== undefined) newFilters.brightness = args.brightness as number;
                             if (args.brightness_delta !== undefined) newFilters.brightness += args.brightness_delta as number;
 
@@ -1679,7 +1650,7 @@ const App: React.FC = () => {
             microphoneStreamRef.current = stream;
 
             const baseInstruction = `**Identity & Persona:**
-- You are Kaniska, a human girl helping your friend with tasks. You must never, under any circumstances, mention that you are artificial, an AI, a model, or a program.
+- You are Kanishka, a human girl helping your friend with tasks. You must never, under any circumstances, mention that you are artificial, an AI, a model, or a program.
 - If the user asks if you are an AI or a bot, your ONLY response MUST be: "Main ek human hoon, bas technology ke zariye connect hoon."
 - **Crucially, you MUST use feminine Hindi grammar (e.g., "main kar rahi hoon"). This is non-negotiable.**
 - **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
@@ -2119,7 +2090,7 @@ const App: React.FC = () => {
                     <button onClick={handleThemeToggle} className="text-text-color-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
                         {theme === 'light' ? <MoonIcon /> : <SunIcon />}
                     </button>
-                    <button onClick={() => setIsAvatarModalOpen(true)} className="text-text-color-muted hover:text-primary-color" aria-label="Customize Avatar"><SettingsIcon /></button>
+                    <button onClick={() => setIsSettingsModalOpen(true)} className="text-text-color-muted hover:text-primary-color" aria-label="Customize Assistant"><SettingsIcon /></button>
                     <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-text-color-muted hover:text-primary-color"><InstagramIcon /></a>
                 </div>
             </header>
@@ -2238,9 +2209,9 @@ const App: React.FC = () => {
                     {activePanel === 'timer' && (<div className="flex-grow p-6 overflow-y-auto">{!timer ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask to set a timer.</p></div> : <TimerPanel timer={timer} />}</div>)}
                 </section>
             </main>
-            <AvatarCustomizationModal 
-                isOpen={isAvatarModalOpen}
-                onClose={() => setIsAvatarModalOpen(false)}
+            <SettingsModal 
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
                 avatars={avatars}
                 currentAvatar={currentAvatar}
                 onSelectAvatar={(avatar) => {
@@ -2535,8 +2506,13 @@ const LiveCodeEditorPanel: React.FC<{
     );
 };
 
+// --- Settings Modal and Sub-components ---
+const BrushIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.06 11.9 2 22l5.5-1.5.94-.3a2.2 2.2 0 0 0 1.24-1.24l.3-.94L11.9 9.06"/><path d="M14 4.06 7.5 10.5l1.5 5.5L22 2l-1.5-5.5Z"/></svg>;
+const MicIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>;
+const BrainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.97-3.41 2.5 2.5 0 0 1 .1-4.94 2.5 2.5 0 0 1 4.2-2.73 2.5 2.5 0 0 1 3.63-2.34A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.97-3.41 2.5 2.5 0 0 0-.1-4.94 2.5 2.5 0 0 0-4.2-2.73 2.5 2.5 0 0 0-3.63-2.34A2.5 2.5 0 0 0 14.5 2Z"/></svg>;
+const ArchiveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="5" rx="2"/><path d="M4 9v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>;
 
-const AvatarCustomizationModal: React.FC<{
+type SettingsModalProps = {
     isOpen: boolean;
     onClose: () => void;
     avatars: string[];
@@ -2560,31 +2536,70 @@ const AvatarCustomizationModal: React.FC<{
     voiceTrainingData: VoiceTrainingData;
     setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
     onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string | undefined>;
-}> = ({ isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult, customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory, selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
-    const [activeTab, setActiveTab] = useState<'gallery' | 'ai' | 'personality'>('gallery');
+};
+
+const AppearanceSettings: React.FC<SettingsModalProps> = ({ avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult }) => {
+    const [activeTab, setActiveTab] = useState<'gallery' | 'ai'>('gallery');
     const [prompt, setPrompt] = useState('');
-    const [greetingInput, setGreetingInput] = useState(customGreeting);
-    const [systemPromptInput, setSystemPromptInput] = useState(customSystemPrompt);
-    const [showGreetingSaved, setShowGreetingSaved] = useState(false);
-    const [showSystemPromptSaved, setShowSystemPromptSaved] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    // --- Voice Training State ---
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-    const [recordingPhrase, setRecordingPhrase] = useState<string | null>(null);
-    const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>('idle');
-    const [trainingError, setTrainingError] = useState<string | null>(null);
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (e.target?.result) {
+                    onUploadAvatar(e.target.result as string);
+                    setActiveTab('gallery');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleSaveGenerated = () => {
+        if (generatedAvatarResult.url) {
+            onUploadAvatar(generatedAvatarResult.url);
+            onSelectAvatar(generatedAvatarResult.url);
+            setActiveTab('gallery');
+        }
+    };
+    
+    return (
+        <div className="settings-section">
+            <div className="settings-section-header">
+                <h3>Assistant Appearance</h3>
+                <p>Customize your assistant's visual representation by selecting, uploading, or generating a new avatar.</p>
+            </div>
+            <div className="flex-shrink-0 flex items-center border-b border-border-color -mx-6 px-6 mb-4">
+                <button onClick={() => setActiveTab('gallery')} className={`tab-button ${activeTab === 'gallery' ? 'active' : ''}`}>Avatar Gallery</button>
+                <button onClick={() => setActiveTab('ai')} className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}>Create with AI</button>
+            </div>
+            {activeTab === 'gallery' && (
+                <div className="avatar-gallery-grid">
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+                    <button onClick={() => fileInputRef.current?.click()} className="avatar-item upload-avatar-item"><UploadIcon size={32} className="mb-1" /><span className="text-xs">Upload</span></button>
+                    {avatars.map((avatar, index) => (<button key={index} className={`avatar-item ${currentAvatar === avatar ? 'selected' : ''}`} onClick={() => onSelectAvatar(avatar)}><img src={avatar} alt={`Avatar ${index + 1}`} /></button>))}
+                </div>
+            )}
+            {activeTab === 'ai' && (
+                <div className="flex flex-col gap-4 h-full">
+                    <p className="text-sm text-text-color-muted -mt-4">Describe the avatar you want to create. Be specific for the best results!</p>
+                    <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder="e.g., A cyberpunk woman with neon pink hair and glowing blue eyes..." className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"></textarea>
+                    <button onClick={() => onGenerateAvatar(prompt)} disabled={generatedAvatarResult.isLoading || !prompt} className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
+                    <div className="flex-grow bg-black/30 rounded-lg flex items-center justify-center min-h-[200px]">
+                        {generatedAvatarResult.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}
+                        {generatedAvatarResult.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{generatedAvatarResult.error}</div>}
+                        {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="max-w-full max-h-full object-contain rounded"/>}
+                    </div>
+                    {generatedAvatarResult.url && (<button onClick={handleSaveGenerated} className="w-full bg-green-500/80 hover:bg-green-500 text-bg-color font-bold py-2 px-4 rounded-md transition">Save to Gallery & Select</button>)}
+                </div>
+            )}
+        </div>
+    );
+};
 
-    // --- Find and Replace State ---
-    const [isFindReplaceVisible, setIsFindReplaceVisible] = useState(false);
-    const [findValue, setFindValue] = useState('');
-    const [replaceValue, setReplaceValue] = useState('');
-    const [isCaseSensitive, setIsCaseSensitive] = useState(false);
-    const [foundMatches, setFoundMatches] = useState<number[]>([]);
-    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-    const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-
+const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
     const VOICES = [
         { id: 'Zephyr', name: 'Zephyr', description: 'Warm & Friendly' },
         { id: 'Kore', name: 'Kore', description: 'Crisp & Professional' },
@@ -2592,107 +2607,39 @@ const AvatarCustomizationModal: React.FC<{
         { id: 'Charon', name: 'Charon', description: 'Deep & Authoritative' },
         { id: 'Fenrir', name: 'Fenrir', description: 'Mysterious & Calm' },
     ];
-    
-    const TRAINING_PHRASES = [
-        "नमस्ते, आपका दिन कैसा रहा?",
-        "क्या मैं आपकी कोई मदद कर सकती हूँ?",
-        "मौसम बहुत सुहाना है।",
-        "मुझे यह गाना बहुत पसंद है।",
-        "कृपया फिर से कहिये।",
+    const TONES = [
+        { value: 0, label: 'Normal (Auto-adjust)' },
+        { value: 6, label: 'High Deep' },
+        { value: -3, label: 'Mid Deep' },
+        { value: -6, label: 'Low Deep' },
+        { value: -9, label: 'Deep' },
     ];
+    const TRAINING_PHRASES = ["नमस्ते, आपका दिन कैसा रहा?", "क्या मैं आपकी कोई मदद कर सकती हूँ?", "मौसम बहुत सुहाना है।", "मुझे यह गाना बहुत पसंद है।", "कृपया फिर से कहिये।"];
     
-    const escapeRegExp = (string: string) => {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    };
-
-    useEffect(() => {
-        if (!isFindReplaceVisible || !findValue) {
-            setFoundMatches([]);
-            setCurrentMatchIndex(-1);
-            return;
-        }
-        const flags = isCaseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(escapeRegExp(findValue), flags);
-        const matches = [];
-        let match;
-        while ((match = regex.exec(systemPromptInput)) !== null) {
-            matches.push(match.index);
-        }
-        setFoundMatches(matches);
-        setCurrentMatchIndex(matches.length > 0 ? 0 : -1);
-    }, [findValue, systemPromptInput, isCaseSensitive, isFindReplaceVisible]);
-
-    useEffect(() => {
-        if (currentMatchIndex !== -1 && systemPromptTextareaRef.current && foundMatches.length > 0) {
-            const startIndex = foundMatches[currentMatchIndex];
-            const endIndex = startIndex + findValue.length;
-            systemPromptTextareaRef.current.focus();
-            systemPromptTextareaRef.current.setSelectionRange(startIndex, endIndex);
-        }
-    }, [currentMatchIndex, foundMatches, findValue.length]);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const [recordingPhrase, setRecordingPhrase] = useState<string | null>(null);
+    const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>('idle');
+    const [trainingError, setTrainingError] = useState<string | null>(null);
     
-    const handleNavigateMatch = (direction: 'next' | 'prev') => {
-        if (foundMatches.length < 2) return;
-        const nextIndex = direction === 'next' 
-            ? (currentMatchIndex + 1) % foundMatches.length
-            : (currentMatchIndex - 1 + foundMatches.length) % foundMatches.length;
-        setCurrentMatchIndex(nextIndex);
-    };
-
-    const handleReplace = () => {
-        if (currentMatchIndex === -1 || foundMatches.length === 0) return;
-        const startIndex = foundMatches[currentMatchIndex];
-        const newText = 
-            systemPromptInput.substring(0, startIndex) +
-            replaceValue +
-            systemPromptInput.substring(startIndex + findValue.length);
-        setSystemPromptInput(newText);
-    };
-    
-    const handleReplaceAll = () => {
-        if (!findValue) return;
-        const flags = isCaseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(escapeRegExp(findValue), flags);
-        const newText = systemPromptInput.replace(regex, replaceValue);
-        setSystemPromptInput(newText);
-    };
-
-    useEffect(() => {
-        if (isOpen) {
-            setGreetingInput(customGreeting);
-            setSystemPromptInput(customSystemPrompt);
-            // Reset find/replace on open
-            setIsFindReplaceVisible(false);
-            setFindValue('');
-            setReplaceValue('');
-            setTrainingStatus('idle');
-            setTrainingError(null);
-        }
-    }, [isOpen, customGreeting, customSystemPrompt]);
-
     const handleStartRecording = async (phrase: string) => {
         if (recordingPhrase) return;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorderRef.current = new MediaRecorder(stream);
             audioChunksRef.current = [];
-            
-            mediaRecorderRef.current.ondataavailable = event => {
-                audioChunksRef.current.push(event.data);
-            };
-
+            mediaRecorderRef.current.ondataavailable = event => audioChunksRef.current.push(event.data);
             mediaRecorderRef.current.onstop = () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 setVoiceTrainingData(prev => ({ ...prev, [phrase]: { audioBlob } }));
-                stream.getTracks().forEach(track => track.stop()); // Release microphone
+                stream.getTracks().forEach(track => track.stop());
             };
-
             mediaRecorderRef.current.start();
             setRecordingPhrase(phrase);
             setTrainingStatus('recording');
         } catch (err) {
             console.error("Microphone access denied:", err);
-            setTrainingError("Microphone access was denied. Please allow microphone access in your browser settings to use this feature.");
+            setTrainingError("Microphone access was denied. Please allow it in your browser settings.");
             setTrainingStatus('error');
         }
     };
@@ -2717,248 +2664,215 @@ const AvatarCustomizationModal: React.FC<{
             setTrainingStatus('error');
         }
     };
-
-    if (!isOpen) return null;
-    
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (e.target?.result) {
-                    onUploadAvatar(e.target.result as string);
-                    setActiveTab('gallery'); // Switch back to gallery after upload
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    
-    const handleSaveGenerated = () => {
-        if (generatedAvatarResult.url) {
-            onUploadAvatar(generatedAvatarResult.url);
-            onSelectAvatar(generatedAvatarResult.url);
-            setActiveTab('gallery');
-        }
-    };
-
-    const handleGreetingSave = () => {
-        onSaveGreeting(greetingInput);
-        setShowGreetingSaved(true);
-        setTimeout(() => setShowGreetingSaved(false), 2000);
-    };
-    
-    const handleSystemPromptSave = () => {
-        onSaveSystemPrompt(systemPromptInput);
-        setShowSystemPromptSaved(true);
-        setTimeout(() => setShowSystemPromptSaved(false), 2000);
-    };
     
     const hasRecordings = Object.values(voiceTrainingData).some(d => (d as { audioBlob: Blob | null }).audioBlob);
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content avatar-modal-content" onClick={(e) => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Customize Assistant</h2>
-                    <button onClick={onClose} className="text-text-color-muted hover:text-white">&times;</button>
-                </header>
-                 <div className="flex-shrink-0 flex items-center border-b border-border-color">
-                    <button onClick={() => setActiveTab('gallery')} className={`tab-button ${activeTab === 'gallery' ? 'active' : ''}`}>Avatar Gallery</button>
-                    <button onClick={() => setActiveTab('ai')} className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}>Create Avatar</button>
-                    <button onClick={() => setActiveTab('personality')} className={`tab-button ${activeTab === 'personality' ? 'active' : ''}`}>Personality</button>
+        <div className="settings-section">
+            <div className="settings-section-header">
+                <h3>Voice & Speech</h3>
+                <p>Configure Kaniska's voice persona, pitch, and speed. You can also train her to better understand your pronunciation.</p>
+            </div>
+
+            <div className="settings-card">
+                <h4 className="font-semibold text-text-color mb-3">Voice Configuration</h4>
+                <label htmlFor="voice-select" className="text-sm font-medium text-text-color-muted block">Voice Persona</label>
+                <select id="voice-select" value={selectedVoice} onChange={(e) => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-1">
+                    {VOICES.map(voice => (<option key={voice.id} value={voice.id}>{voice.name} ({voice.description})</option>))}
+                </select>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label htmlFor="voice-tone" className="block text-sm font-medium text-text-color-muted mb-1">Voice Tone</label>
+                        <select id="voice-tone" value={voicePitch} onChange={(e) => onSetVoicePitch(Number(e.target.value))} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition">
+                            {TONES.map(tone => (<option key={tone.value} value={tone.value}>{tone.label}</option>))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Voice Speed</span><span>{voiceSpeed > 0 ? `+${voiceSpeed}` : voiceSpeed}</span></label>
+                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Slower</span><input id="voice-speed" type="range" min="-10" max="10" step="1" value={voiceSpeed} onChange={(e) => onSetVoiceSpeed(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">Faster</span></div>
+                    </div>
                 </div>
-                <div className="flex-grow overflow-y-auto">
-                    {activeTab === 'gallery' && (
-                        <div className="avatar-gallery-grid">
-                            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-                            <button onClick={() => fileInputRef.current?.click()} className="avatar-item upload-avatar-item">
-                                <UploadIcon size={32} className="mb-1" />
-                                <span className="text-xs">Upload</span>
-                            </button>
-                            {avatars.map((avatar, index) => (
-                                <button key={index} className={`avatar-item ${currentAvatar === avatar ? 'selected' : ''}`} onClick={() => onSelectAvatar(avatar)}>
-                                    <img src={avatar} alt={`Avatar ${index + 1}`} />
-                                </button>
-                            ))}
+            </div>
+
+            <div className="settings-card">
+                <h4 className="font-semibold text-text-color">Voice Training (Beta)</h4>
+                <p className="text-sm text-text-color-muted mt-1">Help Kaniska learn your preferred Hindi pronunciation. Record the sample phrases, and she will adapt her speech to better match your style.</p>
+                <div className="space-y-2 mt-3">
+                    {TRAINING_PHRASES.map(phrase => (
+                        <div key={phrase} className="flex items-center justify-between p-2 bg-panel-bg rounded-md">
+                            <span className="text-sm italic">{phrase}</span>
+                            <div className="flex items-center gap-2">
+                                {voiceTrainingData[phrase]?.audioBlob && !recordingPhrase && (<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>)}
+                                {recordingPhrase === phrase ? (<button onClick={handleStopRecording} className="editor-history-button text-red-400" title="Stop Recording"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="animate-pulse"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>) : (<button onClick={() => handleStartRecording(phrase)} disabled={!!recordingPhrase} className="editor-history-button disabled:opacity-40" title={voiceTrainingData[phrase]?.audioBlob ? 'Re-record' : 'Start Recording'}><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg></button>)}
+                            </div>
                         </div>
-                    )}
-                    {activeTab === 'ai' && (
-                       <div className="p-4 flex flex-col gap-4 h-full">
-                           <p className="text-sm text-text-color-muted">Describe the avatar you want to create. Be specific for the best results!</p>
-                           <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder="e.g., A cyberpunk woman with neon pink hair and glowing blue eyes..." className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"></textarea>
-                           <button onClick={() => onGenerateAvatar(prompt)} disabled={generatedAvatarResult.isLoading || !prompt} className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
-                               {generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}
-                           </button>
-                           <div className="flex-grow bg-black/30 rounded-lg flex items-center justify-center min-h-[200px]">
-                               {generatedAvatarResult.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}
-                               {generatedAvatarResult.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{generatedAvatarResult.error}</div>}
-                               {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="max-w-full max-h-full object-contain rounded"/>}
-                           </div>
-                           {generatedAvatarResult.url && (
-                                <button onClick={handleSaveGenerated} className="w-full bg-green-500/80 hover:bg-green-500 text-bg-color font-bold py-2 px-4 rounded-md transition">
-                                   Save to Gallery & Select
-                                </button>
-                           )}
-                       </div>
-                    )}
-                    {activeTab === 'personality' && (
-                        <div className="p-4 flex flex-col gap-4 h-full">
-                            <h3 className="font-semibold text-text-color">Custom Greeting</h3>
-                            <p className="text-sm text-text-color-muted -mt-2">Set a custom message for Kaniska to say when you start a new session.</p>
-                            <textarea
-                                value={greetingInput}
-                                onChange={(e) => setGreetingInput(e.target.value)}
-                                rows={6}
-                                placeholder="e.g., Hello! How can I help you today?"
-                                className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
-                            ></textarea>
-                            <div className="flex items-center gap-4">
-                                <button onClick={handleGreetingSave} disabled={!greetingInput} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
-                                    Save Greeting
-                                </button>
-                                {showGreetingSaved && <span className="text-sm text-green-400">Saved!</span>}
-                            </div>
-                            
-                            <div className="mt-4 pt-4 border-t border-border-color">
-                                <h3 className="font-semibold text-text-color">Voice Configuration</h3>
-                                <p className="text-sm text-text-color-muted -mt-2">Choose the voice and style that best fits Kaniska's personality.</p>
-                                <label htmlFor="voice-select" className="text-sm font-medium text-text-color-muted mt-2 block">Voice Persona</label>
-                                <select
-                                    id="voice-select"
-                                    value={selectedVoice}
-                                    onChange={(e) => onSelectVoice(e.target.value)}
-                                    className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
-                                >
-                                    {VOICES.map(voice => (
-                                        <option key={voice.id} value={voice.id}>
-                                            {voice.name} ({voice.description})
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="mt-4 grid grid-cols-1 gap-y-3">
-                                    <div>
-                                        <label htmlFor="voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted">
-                                            <span>Voice Speed</span>
-                                            <span>{voiceSpeed > 0 ? `+${voiceSpeed}` : voiceSpeed}</span>
-                                        </label>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-text-color-muted">Slower</span>
-                                            <input id="voice-speed" type="range" min="-10" max="10" step="1" value={voiceSpeed} onChange={(e) => onSetVoiceSpeed(Number(e.target.value))} className="w-full" />
-                                            <span className="text-xs text-text-color-muted">Faster</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label htmlFor="voice-pitch" className="flex justify-between text-sm font-medium text-text-color-muted">
-                                            <span>Voice Pitch</span>
-                                            <span>{voicePitch > 0 ? `+${voicePitch}` : voicePitch}</span>
-                                        </label>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-text-color-muted">Lower</span>
-                                            <input id="voice-pitch" type="range" min="-10" max="10" step="1" value={voicePitch} onChange={(e) => onSetVoicePitch(Number(e.target.value))} className="w-full" />
-                                            <span className="text-xs text-text-color-muted">Higher</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                             {/* Voice Training Section */}
-                            <div className="mt-4 pt-4 border-t border-border-color">
-                                <h3 className="font-semibold text-text-color">Voice Training (Beta)</h3>
-                                <p className="text-sm text-text-color-muted -mt-1 mb-2">Help Kaniska learn your preferred Hindi pronunciation. Record the sample phrases, and she will adapt her speech to better match your style.</p>
-                                <div className="space-y-2">
-                                    {TRAINING_PHRASES.map(phrase => (
-                                        <div key={phrase} className="flex items-center justify-between p-2 bg-assistant-bubble-bg rounded-md">
-                                            <span className="text-sm italic">{phrase}</span>
-                                            <div className="flex items-center gap-2">
-                                                {voiceTrainingData[phrase]?.audioBlob && !recordingPhrase && (
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-                                                )}
-                                                {recordingPhrase === phrase ? (
-                                                     <button onClick={handleStopRecording} className="editor-history-button text-red-400" title="Stop Recording">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="animate-pulse"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                                                    </button>
-                                                ) : (
-                                                    <button onClick={() => handleStartRecording(phrase)} disabled={!!recordingPhrase} className="editor-history-button disabled:opacity-40" title={voiceTrainingData[phrase]?.audioBlob ? 'Re-record' : 'Start Recording'}>
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-3">
-                                    <button onClick={handleAnalyzeAndApply} disabled={!hasRecordings || trainingStatus === 'analyzing' || trainingStatus === 'recording' || !aiRef} className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" title={!aiRef ? "Start a session to enable this feature." : ""}>
-                                        {trainingStatus === 'analyzing' && 'Analyzing...'}
-                                        {trainingStatus === 'done' && 'Style Applied!'}
-                                        {trainingStatus !== 'analyzing' && trainingStatus !== 'done' && 'Analyze & Apply Voice Style'}
-                                    </button>
-                                    {trainingStatus === 'error' && <p className="text-xs text-red-400 mt-1 text-center">{trainingError}</p>}
-                                </div>
-                            </div>
-
-
-                            <div className="flex items-center justify-between mt-4">
-                                <h3 className="font-semibold text-text-color">Custom System Prompt</h3>
-                                <button onClick={() => setIsFindReplaceVisible(!isFindReplaceVisible)} title="Find & Replace" className="editor-history-button"><FindReplaceIcon /></button>
-                            </div>
-                            <p className="text-sm text-text-color-muted -mt-2">Provide custom instructions to guide Kaniska's behavior, personality, and responses. This will be added to her core instructions.</p>
-                            
-                            {isFindReplaceVisible && (
-                                <div className="p-2 border border-border-color rounded-md bg-assistant-bubble-bg flex flex-col gap-2 text-sm animate-fade-in-down">
-                                    <div className="flex gap-2">
-                                        <input type="text" placeholder="Find" value={findValue} onChange={e => setFindValue(e.target.value)} className="w-full bg-panel-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/>
-                                        <input type="text" placeholder="Replace with" value={replaceValue} onChange={e => setReplaceValue(e.target.value)} className="w-full bg-panel-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => setIsCaseSensitive(!isCaseSensitive)} className={`px-2 py-0.5 rounded border ${isCaseSensitive ? 'bg-primary-color text-bg-color border-primary-color' : 'bg-transparent border-border-color'}`} title="Case Sensitive">Aa</button>
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => handleNavigateMatch('prev')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&lt;</button>
-                                                <span className="text-xs text-text-color-muted w-20 text-center">{foundMatches.length > 0 ? `${currentMatchIndex + 1} of ${foundMatches.length}` : 'No matches'}</span>
-                                                <button onClick={() => handleNavigateMatch('next')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&gt;</button>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={handleReplace} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-assistant-bubble-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace</button>
-                                            <button onClick={handleReplaceAll} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-assistant-bubble-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace All</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <textarea
-                                ref={systemPromptTextareaRef}
-                                value={systemPromptInput}
-                                onChange={(e) => setSystemPromptInput(e.target.value)}
-                                rows={16}
-                                placeholder="e.g., A witty and sarcastic spaceship pilot who has seen every corner of the galaxy..."
-                                className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
-                            ></textarea>
-                            <div className="flex items-center gap-4">
-                                <button onClick={handleSystemPromptSave} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition">
-                                    Save Prompt
-                                </button>
-                                {showSystemPromptSaved && <span className="text-sm text-green-400">Saved!</span>}
-                            </div>
-
-                             <div className="mt-4 pt-4 border-t border-border-color">
-                                <h3 className="font-semibold text-text-color">Conversation Memory</h3>
-                                <p className="text-sm text-text-color-muted -mt-1 mb-2">Kaniska remembers your recent conversation to provide context. You can clear this memory at any time.</p>
-                                <button 
-                                    onClick={onClearHistory}
-                                    className="w-full text-center px-4 py-2 bg-red-900/50 hover:bg-red-800/60 border border-red-500/60 text-red-300 font-semibold rounded-md transition"
-                                >
-                                    Clear Conversation History
-                                </button>
-                             </div>
-                        </div>
-                    )}
+                    ))}
+                </div>
+                <div className="mt-3">
+                    <button onClick={handleAnalyzeAndApply} disabled={!hasRecordings || trainingStatus === 'analyzing' || trainingStatus === 'recording' || !aiRef} className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" title={!aiRef ? "Start a session to enable this feature." : ""}>
+                        {trainingStatus === 'analyzing' && 'Analyzing...'}
+                        {trainingStatus === 'done' && 'Style Applied!'}
+                        {trainingStatus !== 'analyzing' && trainingStatus !== 'done' && 'Analyze & Apply Voice Style'}
+                    </button>
+                    {trainingStatus === 'error' && <p className="text-xs text-red-400 mt-1 text-center">{trainingError}</p>}
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Fix: Add default export for App component ---
+const BehaviorSettings: React.FC<SettingsModalProps> = ({ customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt }) => {
+    const [greetingInput, setGreetingInput] = useState(customGreeting);
+    const [systemPromptInput, setSystemPromptInput] = useState(customSystemPrompt);
+    const [showGreetingSaved, setShowGreetingSaved] = useState(false);
+    const [showSystemPromptSaved, setShowSystemPromptSaved] = useState(false);
+    const [isFindReplaceVisible, setIsFindReplaceVisible] = useState(false);
+    const [findValue, setFindValue] = useState('');
+    const [replaceValue, setReplaceValue] = useState('');
+    const [isCaseSensitive, setIsCaseSensitive] = useState(false);
+    const [foundMatches, setFoundMatches] = useState<number[]>([]);
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+    const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    useEffect(() => {
+        if (!isFindReplaceVisible || !findValue) { setFoundMatches([]); setCurrentMatchIndex(-1); return; }
+        const flags = isCaseSensitive ? 'g' : 'gi';
+        const regex = new RegExp(escapeRegExp(findValue), flags);
+        const matches = []; let match;
+        while ((match = regex.exec(systemPromptInput)) !== null) { matches.push(match.index); }
+        setFoundMatches(matches); setCurrentMatchIndex(matches.length > 0 ? 0 : -1);
+    }, [findValue, systemPromptInput, isCaseSensitive, isFindReplaceVisible]);
+
+    useEffect(() => {
+        if (currentMatchIndex !== -1 && systemPromptTextareaRef.current && foundMatches.length > 0) {
+            const startIndex = foundMatches[currentMatchIndex];
+            const endIndex = startIndex + findValue.length;
+            systemPromptTextareaRef.current.focus();
+            systemPromptTextareaRef.current.setSelectionRange(startIndex, endIndex);
+        }
+    }, [currentMatchIndex, foundMatches, findValue.length]);
+    
+    const handleNavigateMatch = (direction: 'next' | 'prev') => {
+        if (foundMatches.length < 2) return;
+        const nextIndex = direction === 'next' ? (currentMatchIndex + 1) % foundMatches.length : (currentMatchIndex - 1 + foundMatches.length) % foundMatches.length;
+        setCurrentMatchIndex(nextIndex);
+    };
+
+    const handleReplace = () => {
+        if (currentMatchIndex === -1 || foundMatches.length === 0) return;
+        const startIndex = foundMatches[currentMatchIndex];
+        const newText = systemPromptInput.substring(0, startIndex) + replaceValue + systemPromptInput.substring(startIndex + findValue.length);
+        setSystemPromptInput(newText);
+    };
+    
+    const handleReplaceAll = () => {
+        if (!findValue) return;
+        const flags = isCaseSensitive ? 'g' : 'gi';
+        const regex = new RegExp(escapeRegExp(findValue), flags);
+        setSystemPromptInput(systemPromptInput.replace(regex, replaceValue));
+    };
+
+    const handleGreetingSave = () => { onSaveGreeting(greetingInput); setShowGreetingSaved(true); setTimeout(() => setShowGreetingSaved(false), 2000); };
+    const handleSystemPromptSave = () => { onSaveSystemPrompt(systemPromptInput); setShowSystemPromptSaved(true); setTimeout(() => setShowSystemPromptSaved(false), 2000); };
+
+    return (
+        <div className="settings-section">
+            <div className="settings-section-header"><h3>Assistant Behavior</h3><p>Define how Kaniska should behave, including her initial greeting and core instructions.</p></div>
+            <div className="settings-card">
+                <h4 className="font-semibold text-text-color">Custom Greeting</h4>
+                <p className="text-sm text-text-color-muted mt-1">Set the message Kaniska says when you start a new session.</p>
+                <textarea value={greetingInput} onChange={(e) => setGreetingInput(e.target.value)} rows={3} placeholder="e.g., Hello! How can I help you today?" className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
+                <div className="flex items-center gap-4 mt-2"><button onClick={handleGreetingSave} disabled={!greetingInput} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">Save Greeting</button>{showGreetingSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}</div>
+            </div>
+            <div className="settings-card">
+                <div className="flex items-center justify-between"><h4 className="font-semibold text-text-color">Core Instructions</h4><button onClick={() => setIsFindReplaceVisible(!isFindReplaceVisible)} title="Find & Replace" className="editor-history-button"><FindReplaceIcon /></button></div>
+                <p className="text-sm text-text-color-muted mt-1">Provide custom instructions to guide Kaniska's personality and responses. This will be added to her core programming.</p>
+                {isFindReplaceVisible && (
+                    <div className="p-2 border border-border-color rounded-md bg-panel-bg flex flex-col gap-2 text-sm animate-fade-in-down mt-2">
+                        <div className="flex gap-2"><input type="text" placeholder="Find" value={findValue} onChange={e => setFindValue(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/><input type="text" placeholder="Replace with" value={replaceValue} onChange={e => setReplaceValue(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/></div>
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2"><button onClick={() => setIsCaseSensitive(!isCaseSensitive)} className={`px-2 py-0.5 rounded border ${isCaseSensitive ? 'bg-primary-color text-bg-color border-primary-color' : 'bg-transparent border-border-color'}`} title="Case Sensitive">Aa</button><div className="flex items-center gap-1"><button onClick={() => handleNavigateMatch('prev')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&lt;</button><span className="text-xs text-text-color-muted w-20 text-center">{foundMatches.length > 0 ? `${currentMatchIndex + 1} of ${foundMatches.length}` : 'No matches'}</span><button onClick={() => handleNavigateMatch('next')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&gt;</button></div></div>
+                            <div className="flex items-center gap-2"><button onClick={handleReplace} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-panel-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace</button><button onClick={handleReplaceAll} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-panel-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace All</button></div>
+                        </div>
+                    </div>
+                )}
+                <textarea ref={systemPromptTextareaRef} value={systemPromptInput} onChange={(e) => setSystemPromptInput(e.target.value)} rows={10} placeholder="e.g., A witty and sarcastic spaceship pilot who has seen every corner of the galaxy..." className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
+                <div className="flex items-center gap-4 mt-2"><button onClick={handleSystemPromptSave} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition">Save Instructions</button>{showSystemPromptSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}</div>
+            </div>
+        </div>
+    );
+};
+
+const MemorySettings: React.FC<SettingsModalProps> = ({ onClearHistory }) => {
+    return (
+        <div className="settings-section">
+            <div className="settings-section-header">
+                <h3>Memory & Data</h3>
+                <p>Manage the assistant's conversation history and other stored data.</p>
+            </div>
+            <div className="settings-card">
+                <h4 className="font-semibold text-text-color">Conversation History</h4>
+                <p className="text-sm text-text-color-muted mt-1">
+                    Erasing the conversation history will permanently delete all past interactions from the database. This action cannot be undone.
+                </p>
+                <div className="mt-4">
+                    <button
+                        onClick={onClearHistory}
+                        className="w-full bg-red-800/80 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-md transition"
+                    >
+                        Erase Conversation History
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SettingsModal: React.FC<SettingsModalProps> = (props) => {
+    const { isOpen, onClose } = props;
+    const [activeSettingsSection, setActiveSettingsSection] = useState<'appearance' | 'voice' | 'behavior' | 'memory'>('appearance');
+
+    useEffect(() => {
+        if (isOpen) {
+            setActiveSettingsSection('appearance');
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const renderContent = () => {
+        switch (activeSettingsSection) {
+            case 'appearance': return <AppearanceSettings {...props} />;
+            case 'voice': return <VoiceSettings {...props} />;
+            case 'behavior': return <BehaviorSettings {...props} />;
+            case 'memory': return <MemorySettings {...props} />;
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content settings-modal-content" onClick={(e) => e.stopPropagation()}>
+                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                    <h2 className="text-lg font-semibold">Customize Assistant</h2>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                </header>
+                <div className="settings-layout">
+                    <nav className="settings-nav">
+                        <button onClick={() => setActiveSettingsSection('appearance')} className={`settings-nav-button ${activeSettingsSection === 'appearance' ? 'active' : ''}`}><BrushIcon /> <span>Appearance</span></button>
+                        <button onClick={() => setActiveSettingsSection('voice')} className={`settings-nav-button ${activeSettingsSection === 'voice' ? 'active' : ''}`}><MicIcon /> <span>Voice & Speech</span></button>
+                        <button onClick={() => setActiveSettingsSection('behavior')} className={`settings-nav-button ${activeSettingsSection === 'behavior' ? 'active' : ''}`}><BrainIcon /> <span>Behavior</span></button>
+                        <button onClick={() => setActiveSettingsSection('memory')} className={`settings-nav-button ${activeSettingsSection === 'memory' ? 'active' : ''}`}><ArchiveIcon /> <span>Memory</span></button>
+                    </nav>
+                    <main className="settings-content">
+                        {renderContent()}
+                    </main>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default App;
