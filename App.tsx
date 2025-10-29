@@ -519,14 +519,13 @@ const ApiKeySelectionScreen: React.FC<{
     reselectionReason?: string | null;
 }> = ({ onKeySelected, onKeySaved, reselectionReason }) => {
     const [apiKeyInput, setApiKeyInput] = useState('');
+    const isStudioAvailable = !!window.aistudio?.openSelectKey;
 
     const handleSelectKey = async () => {
-        if (window.aistudio?.openSelectKey) {
+        if (isStudioAvailable) {
             await window.aistudio.openSelectKey();
             // Assume key selection is successful and proceed to avoid race conditions.
             onKeySelected();
-        } else {
-            alert("API key selection is not available in this environment.");
         }
     };
 
@@ -555,10 +554,17 @@ const ApiKeySelectionScreen: React.FC<{
                 </p>
                 <button
                     onClick={handleSelectKey}
-                    className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition"
+                    disabled={!isStudioAvailable}
+                    title={!isStudioAvailable ? "AI Studio key selection is not supported in this environment." : "Select a key from your Google AI Studio account"}
+                    className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Select Key via AI Studio
                 </button>
+                 {!isStudioAvailable && (
+                    <p className="text-xs text-yellow-400 mt-2">
+                        AI Studio selection is not available. Please paste a key directly.
+                    </p>
+                )}
 
                 <div className="my-6 relative flex items-center">
                     <div className="flex-grow border-t border-border-color"></div>
@@ -584,7 +590,7 @@ const ApiKeySelectionScreen: React.FC<{
                 </div>
 
                 <p className="text-xs text-text-color-muted mt-4">
-                    For more information on billing and API keys, please visit the{' '}
+                    Your key is saved securely in a database for this browser. For more information on billing, visit the{' '}
                     <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">
                         official documentation
                     </a>.
@@ -1314,7 +1320,8 @@ const App: React.FC = () => {
     const speakText = useCallback(async (
         text: string,
         emotion: string = 'neutral',
-        voiceOverride?: { voice: string; pitch: number; speed: number }
+        voiceOverride?: { voice: string; pitch: number; speed: number },
+        isSinging: boolean = false
     ) => {
         const audioContext = getOutputAudioContext();
         const ai = getAiClient();
@@ -1324,13 +1331,12 @@ const App: React.FC = () => {
         }
 
         const currentVoice = voiceOverride?.voice || selectedVoice;
-        // The TTS API doesn't have pitch/speed parameters directly.
-        // We influence it via the prompt.
         const effectiveSpeed = voiceOverride?.speed ?? voiceSpeed;
         const effectivePitch = voiceOverride?.pitch ?? voicePitch;
 
         const emotionToPrompt = (txt: string, emo: string): string => {
             const sanitizedText = txt.replace(/"/g, "'");
+            const action = isSinging ? "Sing this line" : "Say this";
             const instructions: string[] = [];
             let hasSpeedHint = false;
 
@@ -1355,13 +1361,11 @@ const App: React.FC = () => {
                 else if (effectiveSpeed > 1.1) instructions.push('at a fast pace');
             }
             
-            // Pitch is harder to control with text prompts but we can try hints
             if (effectivePitch <= -4) instructions.push('in a deep voice');
             else if (effectivePitch >= 4) instructions.push('in a high-pitched voice');
 
-
             if (instructions.length === 0) return sanitizedText;
-            return `Say this ${instructions.join(', ')}: "${sanitizedText}"`;
+            return `${action} ${instructions.join(', ')}: "${sanitizedText}"`;
         };
 
         try {
@@ -1386,17 +1390,21 @@ const App: React.FC = () => {
             const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
             if (base64Audio) {
                 const audioBuffer = await decodeAudioData(decode(base64Audio), currentAudioContext, 24000, 1);
-                const source = currentAudioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(currentAudioContext.destination);
-                const endedPromise = new Promise(resolve => source.addEventListener('ended', resolve));
-                source.addEventListener('ended', () => sourcesRef.current.delete(source));
-                const currentTime = currentAudioContext.currentTime;
-                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
-                source.start(nextStartTimeRef.current);
-                nextStartTimeRef.current += audioBuffer.duration;
-                sourcesRef.current.add(source);
-                await endedPromise;
+                if (audioBuffer && audioBuffer.duration > 0) {
+                    const source = currentAudioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(currentAudioContext.destination);
+                    const endedPromise = new Promise(resolve => source.addEventListener('ended', resolve));
+                    source.addEventListener('ended', () => sourcesRef.current.delete(source));
+                    const currentTime = currentAudioContext.currentTime;
+                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
+                    source.start(nextStartTimeRef.current);
+                    nextStartTimeRef.current += audioBuffer.duration;
+                    sourcesRef.current.add(source);
+                    await endedPromise;
+                } else {
+                    console.warn("Received empty or invalid audio buffer from TTS, skipping playback.");
+                }
             }
         } catch (error) {
             const errorMessage = handleApiError(error, 'SpeakText');
@@ -1434,24 +1442,28 @@ const App: React.FC = () => {
             const audioContext = getOutputAudioContext();
             if (audioContext) {
                 const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
-                const source = audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioContext.destination);
-                source.addEventListener('ended', () => {
-                    sourcesRef.current.delete(source);
-                    if (sourcesRef.current.size === 0) {
-                        setAvatarExpression('listening');
-                        if (audioPlayerRef.current && !audioPlayerRef.current.paused && !songLyrics) {
-                            audioPlayerRef.current.pause();
-                            audioPlayerRef.current.currentTime = 0;
+                if (audioBuffer && audioBuffer.duration > 0) {
+                    const source = audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(audioContext.destination);
+                    source.addEventListener('ended', () => {
+                        sourcesRef.current.delete(source);
+                        if (sourcesRef.current.size === 0) {
+                            setAvatarExpression('listening');
+                            if (audioPlayerRef.current && !audioPlayerRef.current.paused && !songLyrics) {
+                                audioPlayerRef.current.pause();
+                                audioPlayerRef.current.currentTime = 0;
+                            }
                         }
-                    }
-                });
-                const currentTime = audioContext.currentTime;
-                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
-                source.start(nextStartTimeRef.current);
-                nextStartTimeRef.current += audioBuffer.duration;
-                sourcesRef.current.add(source);
+                    });
+                    const currentTime = audioContext.currentTime;
+                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
+                    source.start(nextStartTimeRef.current);
+                    nextStartTimeRef.current += audioBuffer.duration;
+                    sourcesRef.current.add(source);
+                } else {
+                     console.warn("Received empty or invalid audio buffer from Live API, skipping playback.");
+                }
             }
         }
 
@@ -1678,7 +1690,7 @@ const App: React.FC = () => {
                                 for (let i = 0; i < (fc.args.lyrics as string[]).length; i++) {
                                     if (assistantState !== 'active' || !sessionPromiseRef.current) break;
                                     setSongLyrics(prev => prev ? { ...prev, currentLine: i } : null);
-                                    await speakText((fc.args.lyrics as string[])[i], fc.args.mood as string);
+                                    await speakText((fc.args.lyrics as string[])[i], fc.args.mood as string, undefined, true);
                                     if (assistantState === 'active') {
                                        await new Promise(resolve => setTimeout(resolve, 500));
                                     } else {
@@ -2651,6 +2663,9 @@ const App: React.FC = () => {
                 voiceTrainingData={voiceTrainingData}
                 setVoiceTrainingData={setVoiceTrainingData}
                 onAnalyzeVoice={handleAnalyzeVoice}
+                userId={userIdRef.current}
+                setUserApiKey={setUserApiKey}
+                setIsStudioKeySelected={setIsStudioKeySelected}
             />
              <ImageEditorModal
                 isOpen={!!editingImage}
@@ -2956,6 +2971,9 @@ type SettingsModalProps = {
     voiceTrainingData: VoiceTrainingData;
     setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
     onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string | undefined>;
+    userId: string | null;
+    setUserApiKey: (key: string | null) => void;
+    setIsStudioKeySelected: (selected: boolean) => void;
 };
 
 const AppearanceSettings: React.FC<SettingsModalProps> = ({ avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult }) => {
@@ -3251,7 +3269,18 @@ const BehaviorSettings: React.FC<SettingsModalProps> = (props) => {
     );
 };
 
-const MemorySettings: React.FC<SettingsModalProps> = ({ onClearHistory }) => {
+const MemorySettings: React.FC<SettingsModalProps> = ({ onClearHistory, userId, setUserApiKey, setIsStudioKeySelected }) => {
+    const handleClearApiKey = () => {
+        if (!userId) return;
+        if (window.confirm("Are you sure you want to clear your saved API key? You will be asked to provide one again after reloading.")) {
+            db.ref(`apiKeys/${userId}`).remove();
+            setUserApiKey(null);
+            setIsStudioKeySelected(false);
+            // Reload to force the API key screen to show.
+            window.location.reload();
+        }
+    };
+
     return (
         <div className="settings-section">
             <div className="settings-section-header">
@@ -3269,6 +3298,20 @@ const MemorySettings: React.FC<SettingsModalProps> = ({ onClearHistory }) => {
                         className="w-full bg-red-800/80 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-md transition"
                     >
                         Erase Conversation History
+                    </button>
+                </div>
+            </div>
+            <div className="settings-card">
+                <h4 className="font-semibold text-text-color">API Key</h4>
+                <p className="text-sm text-text-color-muted mt-1">
+                    Remove your saved Gemini API key from this browser. You will need to provide a new one to continue using Kaniska's features.
+                </p>
+                <div className="mt-4">
+                    <button
+                        onClick={handleClearApiKey}
+                        className="w-full bg-yellow-600/80 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md transition"
+                    >
+                        Clear Saved API Key
                     </button>
                 </div>
             </div>
