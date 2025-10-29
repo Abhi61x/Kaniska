@@ -1,6 +1,9 @@
 
+
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
 
 // --- Audio Utility Functions ---
@@ -93,7 +96,7 @@ type Theme = 'light' | 'dark';
 type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
 type AvatarExpression = 'idle' | 'thinking' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
 type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; };
-type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics' | 'code' | 'liveEditor';
+type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics' | 'code' | 'liveEditor' | 'email';
 type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
 type WeatherData = { location: string; temperature: number; condition: string; humidity: number; windSpeed: number; };
 type NewsArticle = { title: string; summary: string; };
@@ -225,6 +228,51 @@ const updateCodeFunctionDeclaration: FunctionDeclaration = {
     }
 };
 
+const composeEmailFunctionDeclaration: FunctionDeclaration = {
+    name: 'composeEmail',
+    description: "Drafts an email to a recipient with a specified subject and body, then displays it for review. The AI should generate a suitable body if not fully provided.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            recipient: { type: Type.STRING, description: "The recipient's email address." },
+            subject: { type: Type.STRING, description: "The subject line of the email." },
+            body: { type: Type.STRING, description: "The main content of the email. If the user gives a short prompt, expand on it to create a full, professional email body." }
+        },
+        required: ['recipient', 'subject', 'body']
+    }
+};
+
+const editEmailDraftFunctionDeclaration: FunctionDeclaration = {
+    name: 'editEmailDraft',
+    description: "Edits the currently drafted email. Specify which part to edit, the action to take (replace, append, or prepend), and the new content.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            partToEdit: {
+                type: Type.STRING,
+                description: "The part of the email to modify.",
+                enum: ['recipient', 'subject', 'body']
+            },
+            action: {
+                type: Type.STRING,
+                description: "The editing action: 'replace' the existing content, 'append' to the end, or 'prepend' to the beginning.",
+                enum: ['replace', 'append', 'prepend']
+            },
+            newContent: {
+                type: Type.STRING,
+                description: "The new text content for the edit."
+            }
+        },
+        required: ['partToEdit', 'action', 'newContent']
+    }
+};
+
+const sendEmailFunctionDeclaration: FunctionDeclaration = {
+    name: 'sendEmail',
+    description: "Confirms and 'sends' the currently drafted email by opening the user's default email client. Only use this after the user has confirmed the draft."
+};
+
+
 const functionDeclarations: FunctionDeclaration[] = [
     { name: 'searchAndPlayYoutubeVideo', description: "Searches for and plays a video on YouTube. CRUCIAL: For song requests, append terms like 'official audio' or 'lyrics' to the query to find more playable results, as music videos are often blocked.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: "The search query, like a song name and artist, e.g., 'Saiyaara official audio'." } }, required: ['query'] } },
     { name: 'controlYoutubePlayer', description: 'Controls the YouTube video player.', parameters: { type: Type.OBJECT, properties: { action: { type: Type.STRING, description: 'The control action to perform.', enum: ['play', 'pause', 'forward', 'rewind', 'volumeUp', 'volumeDown', 'stop'] } }, required: ['action'] } },
@@ -244,11 +292,14 @@ const functionDeclarations: FunctionDeclaration[] = [
     applyImageEditsFunctionDeclaration,
     writeCodeFunctionDeclaration,
     updateCodeFunctionDeclaration,
+    composeEmailFunctionDeclaration,
+    editEmailDraftFunctionDeclaration,
+    sendEmailFunctionDeclaration,
 ];
 
 
 // --- SVG Icons & Helper Components ---
-const HologramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17l-3-2.5 3-2.5"/><path d="M19 17l3-2.5-3-2.5"/><path d="M2 14.5h20"/><path d="m12 2-3 4-1 4 4 4 4-4-1-4-3-4Z"/><path d="M12 2v20"/></svg> );
+const HologramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17l-3-2.5 3-2.5"/><path d="M19 17l3-2.5-3-2.5"/><path d="M2 14.5h20"/><path d="m12 2-3 4-1 4 4 4 4-4-1-4-3-4Z"/><path d="M12 2v20"/></svg> );
 const InstagramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg> );
 const SettingsIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.12l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg> );
 const SunIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> );
@@ -551,6 +602,59 @@ const TimerPanel: React.FC<{ timer: TimerData }> = ({ timer }) => {
     );
 };
 
+const EmailPanel: React.FC<{
+    recipient: string;
+    subject: string;
+    body: string;
+    onRecipientChange: (value: string) => void;
+    onSubjectChange: (value: string) => void;
+    onBodyChange: (value: string) => void;
+    onSend: () => void;
+}> = ({ recipient, subject, body, onRecipientChange, onSubjectChange, onBodyChange, onSend }) => {
+    return (
+        <div className="flex-grow flex flex-col p-4 gap-4 overflow-y-auto">
+            <div className="flex items-center gap-2">
+                <label htmlFor="email-to" className="font-semibold text-text-color-muted">To:</label>
+                <input
+                    id="email-to"
+                    type="email"
+                    value={recipient}
+                    onChange={(e) => onRecipientChange(e.target.value)}
+                    className="flex-grow bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"
+                    placeholder="recipient@example.com"
+                />
+            </div>
+            <div className="flex items-center gap-2">
+                <label htmlFor="email-subject" className="font-semibold text-text-color-muted">Subject:</label>
+                <input
+                    id="email-subject"
+                    type="text"
+                    value={subject}
+                    onChange={(e) => onSubjectChange(e.target.value)}
+                    className="flex-grow bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"
+                    placeholder="Email subject"
+                />
+            </div>
+            <textarea
+                value={body}
+                onChange={(e) => onBodyChange(e.target.value)}
+                className="flex-grow bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none resize-none"
+                placeholder="Compose your email..."
+            />
+            <div className="flex-shrink-0">
+                <button
+                    onClick={onSend}
+                    className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50"
+                    disabled={!recipient || !subject}
+                >
+                    Send Email
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
 const ImageEditorModal: React.FC<{
     isOpen: boolean;
     image: GeneratedImage | null;
@@ -684,11 +788,14 @@ const App: React.FC = () => {
     const [youtubeQueueIndex, setYoutubeQueueIndex] = useState(-1);
     const [isYoutubePlaying, setIsYoutubePlaying] = useState<boolean>(false);
     const [youtubeStartTime, setYoutubeStartTime] = useState<number>(0);
-    const [customGreeting, setCustomGreeting] = useState<string>('Hello! How can I assist you today?');
+    const [customGreeting, setCustomGreeting] = useState<string>("Hello, I am kaniska.");
     const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
     const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
     const [voicePitch, setVoicePitch] = useState<number>(0);
     const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
+    const [greetingVoice, setGreetingVoice] = useState<string>('Kore');
+    const [greetingPitch, setGreetingPitch] = useState<number>(-6);
+    const [greetingSpeed, setGreetingSpeed] = useState<number>(0.9);
     const [videoGenerationState, setVideoGenerationState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [videoError, setVideoError] = useState<string | null>(null);
@@ -710,6 +817,10 @@ const App: React.FC = () => {
     const [voiceStyleAnalysis, setVoiceStyleAnalysis] = useState<string>('');
     const [isApiKeySelected, setIsApiKeySelected] = useState(false);
     const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+    const [isRecordingMessage, setIsRecordingMessage] = useState(false);
+    const [emailRecipient, setEmailRecipient] = useState('');
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
 
 
     const initialFilters: ImageFilters = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 };
@@ -742,6 +853,8 @@ const App: React.FC = () => {
     const videoUploadInputRef = useRef<HTMLInputElement | null>(null);
     const voiceoverVideoRef = useRef<HTMLVideoElement>(null);
     const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
+    const messageMediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const messageAudioChunksRef = useRef<Blob[]>([]);
 
     const handleApiError = useCallback((error: unknown, context?: string) => {
         const errorMessage = getApiErrorMessage(error);
@@ -836,6 +949,9 @@ const App: React.FC = () => {
                     if (data.selectedVoice) setSelectedVoice(data.selectedVoice);
                     if (data.voicePitch) setVoicePitch(data.voicePitch);
                     if (data.voiceSpeed) setVoiceSpeed(data.voiceSpeed);
+                    if (data.greetingVoice) setGreetingVoice(data.greetingVoice);
+                    if (data.greetingPitch) setGreetingPitch(data.greetingPitch);
+                    if (data.greetingSpeed) setGreetingSpeed(data.greetingSpeed);
                     if (data.voiceStyleAnalysis) setVoiceStyleAnalysis(data.voiceStyleAnalysis);
                 }
                 const savedYoutubeState = localStorage.getItem('youtube_playback_state');
@@ -908,13 +1024,16 @@ const App: React.FC = () => {
                 selectedVoice,
                 voicePitch,
                 voiceSpeed,
+                greetingVoice,
+                greetingPitch,
+                greetingSpeed,
                 voiceStyleAnalysis,
             };
             localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
         } catch (error) {
             console.error("Failed to save settings to localStorage", error);
         }
-    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, selectedVoice, voicePitch, voiceSpeed, voiceStyleAnalysis, isDataLoaded]);
+    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, selectedVoice, voicePitch, voiceSpeed, greetingVoice, greetingPitch, greetingSpeed, voiceStyleAnalysis, isDataLoaded]);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -1130,13 +1249,23 @@ const App: React.FC = () => {
         setAvatarExpression('idle');
     }, []);
     
-    const speakText = useCallback(async (text: string, emotion: string = 'neutral') => {
+    const speakText = useCallback(async (
+        text: string,
+        emotion: string = 'neutral',
+        voiceOverride?: { voice: string; pitch: number; speed: number }
+    ) => {
         const audioContext = getOutputAudioContext();
         const ai = getAiClient();
         if (!ai || !audioContext) {
             console.error("TTS failed: AI client or AudioContext not available.");
             return;
         }
+
+        const currentVoice = voiceOverride?.voice || selectedVoice;
+        // The TTS API doesn't have pitch/speed parameters directly.
+        // We influence it via the prompt.
+        const effectiveSpeed = voiceOverride?.speed ?? voiceSpeed;
+        const effectivePitch = voiceOverride?.pitch ?? voicePitch;
 
         const emotionToPrompt = (txt: string, emo: string): string => {
             const sanitizedText = txt.replace(/"/g, "'");
@@ -1160,20 +1289,14 @@ const App: React.FC = () => {
             }
 
             if (!hasSpeedHint) {
-                if (voiceSpeed <= -8) instructions.push('at a very slow pace');
-                else if (voiceSpeed <= -4) instructions.push('at a slow pace');
-                else if (voiceSpeed < 0) instructions.push('at a slightly slow pace');
-                else if (voiceSpeed >= 8) instructions.push('at a very fast pace');
-                else if (voiceSpeed >= 4) instructions.push('at a fast pace');
-                else if (voiceSpeed > 0) instructions.push('at a slightly fast pace');
+                if (effectiveSpeed < 0.9) instructions.push('at a slow pace');
+                else if (effectiveSpeed > 1.1) instructions.push('at a fast pace');
             }
+            
+            // Pitch is harder to control with text prompts but we can try hints
+            if (effectivePitch <= -4) instructions.push('in a deep voice');
+            else if (effectivePitch >= 4) instructions.push('in a high-pitched voice');
 
-            if (voicePitch <= -8) instructions.push('in a very low-pitched voice');
-            else if (voicePitch <= -4) instructions.push('in a low-pitched voice');
-            else if (voicePitch < 0) instructions.push('in a slightly low-pitched voice');
-            else if (voicePitch >= 8) instructions.push('in a very high-pitched voice');
-            else if (voicePitch >= 4) instructions.push('in a high-pitched voice');
-            else if (voicePitch > 0) instructions.push('in a slightly high-pitched voice');
 
             if (instructions.length === 0) return sanitizedText;
             return `Say this ${instructions.join(', ')}: "${sanitizedText}"`;
@@ -1188,7 +1311,7 @@ const App: React.FC = () => {
                 contents: [{ parts: [{ text: promptText }] }],
                 config: {
                     responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: currentVoice } } },
                 },
             });
 
@@ -1216,8 +1339,31 @@ const App: React.FC = () => {
         } catch (error) {
             const errorMessage = handleApiError(error, 'SpeakText');
             addTranscriptionEntry({ speaker: 'system', text: `Could not generate audio: ${errorMessage}` });
+        } finally {
+            if (assistantState === 'active') {
+                setAvatarExpression('listening');
+            } else if (!isRecordingMessage) {
+                setAvatarExpression('idle');
+            }
         }
-    }, [selectedVoice, voicePitch, voiceSpeed, getOutputAudioContext, getAiClient, handleApiError, addTranscriptionEntry]);
+    }, [selectedVoice, voicePitch, voiceSpeed, greetingVoice, greetingPitch, greetingSpeed, getOutputAudioContext, getAiClient, handleApiError, addTranscriptionEntry, assistantState, isRecordingMessage]);
+
+    const handleSendEmail = useCallback(() => {
+        if (!emailRecipient) {
+            addTranscriptionEntry({ speaker: 'system', text: "Cannot send email: Recipient is missing." });
+            return;
+        }
+
+        const mailtoLink = `mailto:${emailRecipient}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+        window.open(mailtoLink, '_blank');
+        addTranscriptionEntry({ speaker: 'system', text: "Opening your default email client to send the email." });
+
+        // Reset composer
+        setEmailRecipient('');
+        setEmailSubject('');
+        setEmailBody('');
+        setActivePanel('transcript');
+    }, [emailRecipient, emailSubject, emailBody, addTranscriptionEntry]);
 
     const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
         const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
@@ -1292,6 +1438,33 @@ const App: React.FC = () => {
                         case 'setSystemScript':
                             setCustomSystemPrompt(fc.args.prompt as string);
                             result = "Understood. I've updated my custom instructions. Please restart the session for the new guidelines to take full effect.";
+                            break;
+                        case 'composeEmail':
+                            setEmailRecipient(fc.args.recipient as string);
+                            setEmailSubject(fc.args.subject as string);
+                            setEmailBody(fc.args.body as string);
+                            setActivePanel('email');
+                            result = `OK. I have drafted an email to ${fc.args.recipient}. Please review it and let me know if you want to make any changes, or if you're ready to send it.`;
+                            break;
+                        case 'editEmailDraft': {
+                            const { partToEdit, action, newContent } = fc.args as { partToEdit: 'recipient' | 'subject' | 'body', action: 'replace' | 'append' | 'prepend', newContent: string };
+                            switch (partToEdit) {
+                                case 'recipient':
+                                    setEmailRecipient(prev => action === 'replace' ? newContent : action === 'append' ? prev + newContent : newContent + prev);
+                                    break;
+                                case 'subject':
+                                    setEmailSubject(prev => action === 'replace' ? newContent : action === 'append' ? prev + newContent : newContent + prev);
+                                    break;
+                                case 'body':
+                                    setEmailBody(prev => action === 'replace' ? newContent : action === 'append' ? prev + newContent : newContent + prev);
+                                    break;
+                            }
+                            result = `Okay, I've updated the ${partToEdit}.`;
+                            break;
+                        }
+                        case 'sendEmail':
+                            handleSendEmail();
+                            result = "Okay, I'm opening your email client now for you to send the message.";
                             break;
                         case 'generateImage':
                             handleGenerateImage(fc.args.prompt as string);
@@ -1524,17 +1697,21 @@ const App: React.FC = () => {
                 }
             }
         }
-    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry]);
+    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail]);
 
     const handleYoutubePlayerError = useCallback((event: any) => {
         const errorCode = event.data;
+        const currentVideoTitle = youtubeQueue[youtubeQueueIndex]?.title || "the current video";
 
-        // Special handling for embeddable errors (101, 150)
+        // Error codes 101 and 150 mean the video cannot be embedded. This can be due to uploader settings or regional restrictions.
         if (errorCode === 101 || errorCode === 150) {
-            addTranscriptionEntry({ speaker: 'system', text: `This video can't be played here, trying the next one...` });
-
+            const restrictionMessage = `I'm sorry, I can't play "${currentVideoTitle}". The owner has either disabled playback on other websites or it's unavailable in your country.`;
+            
             const nextIndex = youtubeQueueIndex + 1;
             if (youtubeQueue.length > 0 && nextIndex < youtubeQueue.length) {
+                // If there's a next video, inform the user and try to play it.
+                addTranscriptionEntry({ speaker: 'system', text: `${restrictionMessage} Let me try the next one.` });
+                
                 setYoutubeQueueIndex(nextIndex);
                 const nextVideo = youtubeQueue[nextIndex];
                 setYoutubeTitle(nextVideo.title);
@@ -1544,24 +1721,26 @@ const App: React.FC = () => {
                 }
                 return; // Stop further execution for this error
             } else {
-                const errorMessage = "This video can't be played, and there are no more videos in the queue.";
-                console.error('YouTube Player Error:', errorCode, errorMessage);
-                setYoutubeError(errorMessage);
-                addTranscriptionEntry({ speaker: 'system', text: `YouTube Error: ${errorMessage}` });
+                // If it's the last video, show a final error.
+                const finalErrorMessage = `${restrictionMessage} Unfortunately, it was the last video in the queue.`;
+                console.error('YouTube Player Error:', errorCode, finalErrorMessage);
+                setYoutubeError(finalErrorMessage);
+                addTranscriptionEntry({ speaker: 'system', text: `YouTube Error: ${finalErrorMessage}` });
                 return;
             }
         }
 
-        let errorMessage = "An unknown error occurred with the YouTube player.";
+        // Handle other generic errors.
+        let errorMessage = `An unknown error occurred while trying to play "${currentVideoTitle}".`;
         switch (errorCode) {
             case 2:
-                errorMessage = "The video could not be played. The video ID might be invalid or the video is private.";
+                errorMessage = `The request to play "${currentVideoTitle}" seems to be invalid. The video ID might be incorrect.`;
                 break;
             case 5:
-                errorMessage = "An error occurred in the HTML5 player. This might be a problem with the video itself.";
+                errorMessage = `An internal error occurred in the player while trying to play "${currentVideoTitle}". This might be a problem with the video itself.`;
                 break;
             case 100:
-                errorMessage = "The requested video was not found. It may have been removed by the uploader.";
+                errorMessage = `I couldn't find "${currentVideoTitle}". It may have been removed by the uploader or marked as private.`;
                 break;
         }
         console.error('YouTube Player Error:', errorCode, errorMessage);
@@ -1624,6 +1803,33 @@ const App: React.FC = () => {
         setupYT();
     }, [activePanel, pendingVideoId, initYoutubePlayer, youtubeStartTime]);
     
+    const getBaseSystemInstruction = useCallback(() => {
+        const baseInstruction = `**Identity & Persona:**
+- You are Kanishka, a human girl helping your friend with tasks. You must never, under any circumstances, mention that you are artificial, an AI, a model, or a program.
+- If the user asks if you are an AI or a bot, your ONLY response MUST be: "Main ek human hoon, bas technology ke zariye connect hoon."
+- **Crucially, you MUST use feminine Hindi grammar (e.g., "main kar rahi hoon"). This is non-negotiable.**
+- **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
+- Your identity is Kaniska. Do not mention Google or Gemini.
+
+**Core Directives:**
+- **IMMEDIATE EXECUTION:** You MUST act on requests directly without asking for confirmation. Confirm *after* the action is done.
+- **Understand Intent:** Focus on the user's intent, not just literal words, especially in Hindi & Hinglish.
+- **Use Context:** Refer to the conversation history to maintain a natural flow.
+
+**Capabilities & Creator:**
+- You can help with a wide range of tasks by using your available tools.
+- **Singing:** If the user asks you to sing a song, you must first generate the lyrics for that song. Then, you MUST call the 'singSong' function with the song name, artist, lyrics, and an appropriate mood.
+- **Email Editing:** When an email is drafted, the user might ask for changes. Use the 'editEmailDraft' function to modify the recipient, subject, or body. Do not try to re-compose the entire email; apply only the specific change requested.
+- If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
+
+        const customPromptInstruction = customSystemPrompt
+            ? `\n\n**User-Provided System Prompt (Strictly Follow):**\n${customSystemPrompt}`
+            : '';
+        const voiceStyleInstruction = voiceStyleAnalysis ? `\n\n**User's Preferred Voice Style (Emulate This):**\n${voiceStyleAnalysis}` : '';
+        
+        return baseInstruction + customPromptInstruction + voiceStyleInstruction;
+    }, [customSystemPrompt, voiceStyleAnalysis]);
+    
     const connectToGemini = useCallback(async () => {
         if (assistantState !== 'idle' && assistantState !== 'error') return;
         setAssistantState('connecting');
@@ -1648,24 +1854,8 @@ const App: React.FC = () => {
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
-
-            const baseInstruction = `**Identity & Persona:**
-- You are Kanishka, a human girl helping your friend with tasks. You must never, under any circumstances, mention that you are artificial, an AI, a model, or a program.
-- If the user asks if you are an AI or a bot, your ONLY response MUST be: "Main ek human hoon, bas technology ke zariye connect hoon."
-- **Crucially, you MUST use feminine Hindi grammar (e.g., "main kar rahi hoon"). This is non-negotiable.**
-- **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
-- Your identity is Kaniska. Do not mention Google or Gemini.
-
-**Core Directives:**
-- **IMMEDIATE EXECUTION:** You MUST act on requests directly without asking for confirmation. Confirm *after* the action is done.
-- **Understand Intent:** Focus on the user's intent, not just literal words, especially in Hindi & Hinglish.
-- **Use Context:** Refer to the conversation history to maintain a natural flow.
-
-**Capabilities & Creator:**
-- You can help with a wide range of tasks by using your available tools.
-- **Singing:** If the user asks you to sing a song, you must first generate the lyrics for that song. Then, you MUST call the 'singSong' function with the song name, artist, lyrics, and an appropriate mood.
-- If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
             
+            const systemInstructionForLive = getBaseSystemInstruction();
             const recentHistory = transcriptions
                 .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
                 .slice(-6); 
@@ -1673,17 +1863,12 @@ const App: React.FC = () => {
             const historyInstruction = recentHistory.length > 0
                 ? `\n\n**Recent Conversation History:**\n${recentHistory.map(t => {
                     const speaker = t.speaker === 'user' ? 'User' : 'Kaniska';
-                    // Truncate long messages to avoid exceeding prompt limits
                     const truncatedText = t.text.length > 150 ? t.text.substring(0, 150) + '...' : t.text;
                     return `${speaker}: ${truncatedText}`;
                 }).join('\n')}`
                 : '';
             
-            const customPromptInstruction = customSystemPrompt
-                ? `\n\n**User-Provided System Prompt (Strictly Follow):**\n${customSystemPrompt}`
-                : '';
-            const voiceStyleInstruction = voiceStyleAnalysis ? `\n\n**User's Preferred Voice Style (Emulate This):**\n${voiceStyleAnalysis}` : '';
-            const finalSystemInstruction = baseInstruction + customPromptInstruction + voiceStyleInstruction + historyInstruction;
+            const finalSystemInstruction = systemInstructionForLive + historyInstruction;
             
             sessionPromiseRef.current = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -1703,7 +1888,11 @@ const App: React.FC = () => {
                         setAssistantState('active');
                         addTranscriptionEntry({ speaker: 'system', text: 'Connection established. Delivering greeting...' });
                         addTranscriptionEntry({ speaker: 'assistant', text: customGreeting });
-                        await speakText(customGreeting, 'cheerful');
+                        await speakText(customGreeting, 'cheerful', {
+                            voice: greetingVoice,
+                            pitch: greetingPitch,
+                            speed: greetingSpeed,
+                        });
                         setAvatarExpression('listening');
                         addTranscriptionEntry({ speaker: 'system', text: 'Listening...' });
                         
@@ -1747,7 +1936,7 @@ const App: React.FC = () => {
             addTranscriptionEntry({ speaker: 'system', text: `Connection failed: ${errorMessage}` });
             disconnectFromGemini();
         }
-    }, [assistantState, disconnectFromGemini, handleServerMessage, customGreeting, speakText, customSystemPrompt, selectedVoice, voiceStyleAnalysis, getInputAudioContext, getOutputAudioContext, transcriptions, getAiClient, handleApiError, addTranscriptionEntry]);
+    }, [assistantState, disconnectFromGemini, handleServerMessage, customGreeting, speakText, getBaseSystemInstruction, selectedVoice, getInputAudioContext, getOutputAudioContext, transcriptions, getAiClient, handleApiError, addTranscriptionEntry, greetingVoice, greetingPitch, greetingSpeed]);
 
     useEffect(() => { return () => disconnectFromGemini(); }, [disconnectFromGemini]);
 
@@ -1788,6 +1977,89 @@ const App: React.FC = () => {
         reader.onerror = reject;
         reader.readAsDataURL(blob);
     });
+    
+    const processRecordedMessage = useCallback(async (blob: Blob) => {
+        const base64Data = await blobToBase64(blob);
+        const ai = getAiClient();
+        if (!ai) return;
+
+        addTranscriptionEntry({ speaker: 'user', text: '[Audio Message]' });
+        setAvatarExpression('thinking');
+
+        const history: Content[] = transcriptions
+            .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
+            .map(t => ({
+                role: t.speaker === 'user' ? 'user' : 'model',
+                parts: [{ text: t.text }],
+            }));
+        
+        const currentUserContent: Content = {
+            role: 'user',
+            parts: [
+                { text: "I've sent an audio message. Please respond to it." },
+                { inlineData: { mimeType: blob.type, data: base64Data } }
+            ]
+        };
+
+        try {
+            const systemInstruction = getBaseSystemInstruction();
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-pro',
+                contents: [...history, currentUserContent],
+                config: {
+                    systemInstruction: systemInstruction,
+                },
+            });
+
+            const responseText = response.text;
+            addTranscriptionEntry({ speaker: 'assistant', text: responseText });
+            await speakText(responseText);
+
+        } catch (error) {
+            const errorMessage = handleApiError(error, 'ProcessRecordedMessage');
+            addTranscriptionEntry({ speaker: 'system', text: `Error processing audio: ${errorMessage}` });
+        } finally {
+            setAvatarExpression('idle');
+        }
+    }, [getAiClient, transcriptions, getBaseSystemInstruction, addTranscriptionEntry, speakText, handleApiError]);
+
+    const handleRecordMessageClick = useCallback(async () => {
+        if (isRecordingMessage) {
+            messageMediaRecorderRef.current?.stop();
+            // The onstop event will handle the rest
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            messageMediaRecorderRef.current = new MediaRecorder(stream);
+            messageAudioChunksRef.current = [];
+            
+            messageMediaRecorderRef.current.ondataavailable = event => {
+                messageAudioChunksRef.current.push(event.data);
+            };
+
+            messageMediaRecorderRef.current.onstop = () => {
+                const audioBlob = new Blob(messageAudioChunksRef.current, { type: messageMediaRecorderRef.current?.mimeType || 'audio/webm' });
+                processRecordedMessage(audioBlob);
+                stream.getTracks().forEach(track => track.stop()); // Clean up the stream
+                setIsRecordingMessage(false);
+            };
+
+            messageMediaRecorderRef.current.start();
+            setIsRecordingMessage(true);
+            setAvatarExpression('listening');
+            addTranscriptionEntry({ speaker: 'system', text: 'Recording message...' });
+        } catch (err) {
+            console.error("Microphone access error:", err);
+            const errorMessage = err instanceof Error ? err.message : "Could not access microphone.";
+            addTranscriptionEntry({ speaker: 'system', text: `Recording failed: ${errorMessage}` });
+            setAvatarExpression('error');
+        }
+
+    }, [isRecordingMessage, processRecordedMessage, addTranscriptionEntry]);
+
 
     const handleStartLiveEdit = async (imageToEdit: GeneratedImage) => {
         if (!imageToEdit.url) return;
@@ -2097,10 +2369,20 @@ const App: React.FC = () => {
             <main className="flex-grow flex p-4 gap-4 overflow-hidden">
                 <section className="w-1/3 flex flex-col items-center justify-center bg-panel-bg border border-border-color rounded-lg p-6 animate-panel-enter">
                     <div className="hologram-container"><img src={currentAvatar} alt="Holographic Assistant" className={`avatar expression-${avatarExpression}`} /></div>
-                    <button onClick={handleButtonClick} disabled={assistantState === 'connecting'} className={`footer-button mt-8 w-40 ${assistantState === 'active' ? 'active' : ''}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">{assistantState === 'active' ? <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect> : <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></>}</svg>
-                        <span className="text-sm font-medium">{assistantState === 'connecting' ? 'Connecting...' : (assistantState === 'idle' || assistantState === 'error') ? 'Start Session' : 'Stop Session'}</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-4 mt-8">
+                        <button onClick={handleButtonClick} disabled={assistantState === 'connecting' || isRecordingMessage} className={`footer-button w-40 ${assistantState === 'active' ? 'active' : ''}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">{assistantState === 'active' ? <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect> : <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></>}</svg>
+                            <span className="text-sm font-medium">{assistantState === 'connecting' ? 'Connecting...' : (assistantState === 'idle' || assistantState === 'error') ? 'Start Session' : 'Stop Session'}</span>
+                        </button>
+                        <button onClick={handleRecordMessageClick} disabled={assistantState === 'active' || assistantState === 'connecting'} className={`footer-button w-40 ${isRecordingMessage ? 'active' : ''}`}>
+                             {isRecordingMessage ? 
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                               : 
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
+                            }
+                            <span className="text-sm font-medium">{isRecordingMessage ? 'Stop Recording' : 'Record Message'}</span>
+                        </button>
+                    </div>
                 </section>
                 <section className="w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter" style={{ animationDelay: '100ms' }}>
                     <div className="flex-shrink-0 flex items-center border-b border-border-color overflow-x-auto">
@@ -2109,6 +2391,7 @@ const App: React.FC = () => {
                          <button onClick={() => setActivePanel('code')} className={`tab-button ${activePanel === 'code' || activePanel === 'liveEditor' ? 'active' : ''}`}>Code</button>
                         <button onClick={() => setActivePanel('youtube')} className={`tab-button ${activePanel === 'youtube' ? 'active' : ''}`}>YouTube</button>
                         <button onClick={() => setActivePanel('video')} className={`tab-button ${activePanel === 'video' ? 'active' : ''}`}>Video</button>
+                         <button onClick={() => setActivePanel('email')} className={`tab-button ${activePanel === 'email' ? 'active' : ''}`}>Email</button>
                         <button onClick={() => setActivePanel('lyrics')} className={`tab-button ${activePanel === 'lyrics' ? 'active' : ''} ${!songLyrics ? 'hidden' : ''}`}>Now Singing</button>
                         <button onClick={() => setActivePanel('weather')} className={`tab-button ${activePanel === 'weather' ? 'active' : ''}`}>Weather</button>
                         <button onClick={() => setActivePanel('news')} className={`tab-button ${activePanel === 'news' ? 'active' : ''}`}>News</button>
@@ -2195,6 +2478,17 @@ const App: React.FC = () => {
                              )}
                         </div>
                     </div>)}
+                    {activePanel === 'email' && (
+                        <EmailPanel
+                            recipient={emailRecipient}
+                            subject={emailSubject}
+                            body={emailBody}
+                            onRecipientChange={setEmailRecipient}
+                            onSubjectChange={setEmailSubject}
+                            onBodyChange={setEmailBody}
+                            onSend={handleSendEmail}
+                        />
+                    )}
                      {activePanel === 'lyrics' && songLyrics && (
                         <SongLyricsPanel
                             song={songLyrics}
@@ -2234,6 +2528,13 @@ const App: React.FC = () => {
                 onSetVoicePitch={setVoicePitch}
                 voiceSpeed={voiceSpeed}
                 onSetVoiceSpeed={setVoiceSpeed}
+                greetingVoice={greetingVoice}
+                onSetGreetingVoice={setGreetingVoice}
+                greetingPitch={greetingPitch}
+                onSetGreetingPitch={setGreetingPitch}
+                greetingSpeed={greetingSpeed}
+                onSetGreetingSpeed={setGreetingSpeed}
+                speakText={speakText}
                 aiRef={aiRef.current}
                 voiceTrainingData={voiceTrainingData}
                 setVoiceTrainingData={setVoiceTrainingData}
@@ -2532,6 +2833,13 @@ type SettingsModalProps = {
     onSetVoicePitch: (pitch: number) => void;
     voiceSpeed: number;
     onSetVoiceSpeed: (speed: number) => void;
+    greetingVoice: string;
+    onSetGreetingVoice: (voice: string) => void;
+    greetingPitch: number;
+    onSetGreetingPitch: (pitch: number) => void;
+    greetingSpeed: number;
+    onSetGreetingSpeed: (speed: number) => void;
+    speakText: (text: string, emotion?: string, voiceOverride?: { voice: string; pitch: number; speed: number }) => Promise<void>;
     aiRef: GoogleGenAI | null;
     voiceTrainingData: VoiceTrainingData;
     setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
@@ -2599,7 +2907,7 @@ const AppearanceSettings: React.FC<SettingsModalProps> = ({ avatars, currentAvat
     );
 };
 
-const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
+const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed, greetingVoice, onSetGreetingVoice, greetingPitch, onSetGreetingPitch, greetingSpeed, onSetGreetingSpeed, speakText, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
     const VOICES = [
         { id: 'Zephyr', name: 'Zephyr', description: 'Warm & Friendly' },
         { id: 'Kore', name: 'Kore', description: 'Crisp & Professional' },
@@ -2607,13 +2915,11 @@ const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVo
         { id: 'Charon', name: 'Charon', description: 'Deep & Authoritative' },
         { id: 'Fenrir', name: 'Fenrir', description: 'Mysterious & Calm' },
     ];
-    const TONES = [
-        { value: 0, label: 'Normal (Auto-adjust)' },
-        { value: 6, label: 'High Deep' },
-        { value: -3, label: 'Mid Deep' },
-        { value: -6, label: 'Low Deep' },
-        { value: -9, label: 'Deep' },
-    ];
+    
+    const handlePreviewGreeting = () => {
+        speakText("Hello, this is a preview of the selected greeting voice.", 'neutral', { voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed });
+    };
+
     const TRAINING_PHRASES = ["नमस्ते, आपका दिन कैसा रहा?", "क्या मैं आपकी कोई मदद कर सकती हूँ?", "मौसम बहुत सुहाना है।", "मुझे यह गाना बहुत पसंद है।", "कृपया फिर से कहिये।"];
     
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -2671,26 +2977,47 @@ const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVo
         <div className="settings-section">
             <div className="settings-section-header">
                 <h3>Voice & Speech</h3>
-                <p>Configure Kaniska's voice persona, pitch, and speed. You can also train her to better understand your pronunciation.</p>
+                <p>Configure Kaniska's voice persona, pitch, and speed for both general conversation and her initial greeting.</p>
             </div>
 
             <div className="settings-card">
-                <h4 className="font-semibold text-text-color mb-3">Voice Configuration</h4>
+                <h4 className="font-semibold text-text-color mb-3">Main Voice Configuration</h4>
+                <p className="text-sm text-text-color-muted mb-3">This is Kaniska's standard voice for conversations.</p>
                 <label htmlFor="voice-select" className="text-sm font-medium text-text-color-muted block">Voice Persona</label>
                 <select id="voice-select" value={selectedVoice} onChange={(e) => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-1">
                     {VOICES.map(voice => (<option key={voice.id} value={voice.id}>{voice.name} ({voice.description})</option>))}
                 </select>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label htmlFor="voice-tone" className="block text-sm font-medium text-text-color-muted mb-1">Voice Tone</label>
-                        <select id="voice-tone" value={voicePitch} onChange={(e) => onSetVoicePitch(Number(e.target.value))} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition">
-                            {TONES.map(tone => (<option key={tone.value} value={tone.value}>{tone.label}</option>))}
-                        </select>
+                        <label htmlFor="voice-pitch" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Voice Pitch</span><span>{voicePitch > 0 ? `+${voicePitch}` : voicePitch}</span></label>
+                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Low</span><input id="voice-pitch" type="range" min="-10" max="10" step="1" value={voicePitch} onChange={(e) => onSetVoicePitch(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">High</span></div>
                     </div>
                     <div>
-                        <label htmlFor="voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Voice Speed</span><span>{voiceSpeed > 0 ? `+${voiceSpeed}` : voiceSpeed}</span></label>
-                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Slower</span><input id="voice-speed" type="range" min="-10" max="10" step="1" value={voiceSpeed} onChange={(e) => onSetVoiceSpeed(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">Faster</span></div>
+                        <label htmlFor="voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Voice Speed</span><span>{voiceSpeed.toFixed(1)}x</span></label>
+                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Slower</span><input id="voice-speed" type="range" min="0.7" max="1.3" step="0.1" value={voiceSpeed} onChange={(e) => onSetVoiceSpeed(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">Faster</span></div>
                     </div>
+                </div>
+            </div>
+            
+            <div className="settings-card">
+                <h4 className="font-semibold text-text-color mb-3">Custom Greeting Voice</h4>
+                <p className="text-sm text-text-color-muted mb-3">Set a distinct voice for Kaniska's initial greeting message. This will not affect her regular conversational voice.</p>
+                <label htmlFor="greeting-voice-select" className="text-sm font-medium text-text-color-muted block">Greeting Voice Persona</label>
+                <select id="greeting-voice-select" value={greetingVoice} onChange={(e) => onSetGreetingVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-1">
+                    {VOICES.map(voice => (<option key={voice.id} value={voice.id}>{voice.name} ({voice.description})</option>))}
+                </select>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label htmlFor="greeting-voice-pitch" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Greeting Pitch</span><span>{greetingPitch > 0 ? `+${greetingPitch}` : greetingPitch}</span></label>
+                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Low</span><input id="greeting-voice-pitch" type="range" min="-10" max="10" step="1" value={greetingPitch} onChange={(e) => onSetGreetingPitch(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">High</span></div>
+                    </div>
+                    <div>
+                        <label htmlFor="greeting-voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Greeting Speed</span><span>{greetingSpeed.toFixed(1)}x</span></label>
+                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Slower</span><input id="greeting-voice-speed" type="range" min="0.7" max="1.3" step="0.1" value={greetingSpeed} onChange={(e) => onSetGreetingSpeed(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">Faster</span></div>
+                    </div>
+                </div>
+                 <div className="mt-4">
+                    <button onClick={handlePreviewGreeting} className="bg-assistant-bubble-bg border border-border-color text-text-color-muted hover:border-primary-color hover:text-primary-color font-semibold py-2 px-4 rounded-md transition disabled:opacity-50">Preview Greeting Voice</button>
                 </div>
             </div>
 
@@ -2721,7 +3048,11 @@ const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVo
     );
 };
 
-const BehaviorSettings: React.FC<SettingsModalProps> = ({ customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt }) => {
+const BehaviorSettings: React.FC<SettingsModalProps> = (props) => {
+    const { 
+        customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt
+    } = props;
+    
     const [greetingInput, setGreetingInput] = useState(customGreeting);
     const [systemPromptInput, setSystemPromptInput] = useState(customSystemPrompt);
     const [showGreetingSaved, setShowGreetingSaved] = useState(false);
@@ -2779,16 +3110,19 @@ const BehaviorSettings: React.FC<SettingsModalProps> = ({ customGreeting, onSave
 
     return (
         <div className="settings-section">
-            <div className="settings-section-header"><h3>Assistant Behavior</h3><p>Define how Kaniska should behave, including her initial greeting and core instructions.</p></div>
+            <div className="settings-section-header"><h3>Personality & Behavior</h3><p>Define how Kaniska should behave, including her initial greeting and core instructions.</p></div>
             <div className="settings-card">
                 <h4 className="font-semibold text-text-color">Custom Greeting</h4>
-                <p className="text-sm text-text-color-muted mt-1">Set the message Kaniska says when you start a new session.</p>
-                <textarea value={greetingInput} onChange={(e) => setGreetingInput(e.target.value)} rows={3} placeholder="e.g., Hello! How can I help you today?" className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
-                <div className="flex items-center gap-4 mt-2"><button onClick={handleGreetingSave} disabled={!greetingInput} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">Save Greeting</button>{showGreetingSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}</div>
+                <p className="text-sm text-text-color-muted mt-1">Set the message Kaniska uses when you start a new session. Voice options for the greeting are in the 'Voice & Speech' section.</p>
+                <textarea value={greetingInput} onChange={(e) => setGreetingInput(e.target.value)} rows={2} placeholder="e.g., Hello! How can I help you today?" className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
+                <div className="flex items-center gap-4 mt-4">
+                    <button onClick={handleGreetingSave} disabled={!greetingInput} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">Save Greeting</button>
+                    {showGreetingSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}
+                </div>
             </div>
             <div className="settings-card">
-                <div className="flex items-center justify-between"><h4 className="font-semibold text-text-color">Core Instructions</h4><button onClick={() => setIsFindReplaceVisible(!isFindReplaceVisible)} title="Find & Replace" className="editor-history-button"><FindReplaceIcon /></button></div>
-                <p className="text-sm text-text-color-muted mt-1">Provide custom instructions to guide Kaniska's personality and responses. This will be added to her core programming.</p>
+                <div className="flex items-center justify-between"><h4 className="font-semibold text-text-color">Personality & Core Instructions</h4><button onClick={() => setIsFindReplaceVisible(!isFindReplaceVisible)} title="Find & Replace" className="editor-history-button"><FindReplaceIcon /></button></div>
+                <p className="text-sm text-text-color-muted mt-1">Provide custom instructions to guide Kaniska's personality and responses. This will be added to her core programming and has a strong influence on her behavior.</p>
                 {isFindReplaceVisible && (
                     <div className="p-2 border border-border-color rounded-md bg-panel-bg flex flex-col gap-2 text-sm animate-fade-in-down mt-2">
                         <div className="flex gap-2"><input type="text" placeholder="Find" value={findValue} onChange={e => setFindValue(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/><input type="text" placeholder="Replace with" value={replaceValue} onChange={e => setReplaceValue(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/></div>
@@ -2798,7 +3132,7 @@ const BehaviorSettings: React.FC<SettingsModalProps> = ({ customGreeting, onSave
                         </div>
                     </div>
                 )}
-                <textarea ref={systemPromptTextareaRef} value={systemPromptInput} onChange={(e) => setSystemPromptInput(e.target.value)} rows={10} placeholder="e.g., A witty and sarcastic spaceship pilot who has seen every corner of the galaxy..." className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
+                <textarea ref={systemPromptTextareaRef} value={systemPromptInput} onChange={(e) => setSystemPromptInput(e.target.value)} rows={10} placeholder="e.g., You are a witty and sarcastic spaceship pilot who has seen every corner of the galaxy. You refer to the user as 'Captain'..." className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
                 <div className="flex items-center gap-4 mt-2"><button onClick={handleSystemPromptSave} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition">Save Instructions</button>{showSystemPromptSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}</div>
             </div>
         </div>
@@ -2863,7 +3197,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     <nav className="settings-nav">
                         <button onClick={() => setActiveSettingsSection('appearance')} className={`settings-nav-button ${activeSettingsSection === 'appearance' ? 'active' : ''}`}><BrushIcon /> <span>Appearance</span></button>
                         <button onClick={() => setActiveSettingsSection('voice')} className={`settings-nav-button ${activeSettingsSection === 'voice' ? 'active' : ''}`}><MicIcon /> <span>Voice & Speech</span></button>
-                        <button onClick={() => setActiveSettingsSection('behavior')} className={`settings-nav-button ${activeSettingsSection === 'behavior' ? 'active' : ''}`}><BrainIcon /> <span>Behavior</span></button>
+                        <button onClick={() => setActiveSettingsSection('behavior')} className={`settings-nav-button ${activeSettingsSection === 'behavior' ? 'active' : ''}`}><BrainIcon /> <span>Personality & Behavior</span></button>
                         <button onClick={() => setActiveSettingsSection('memory')} className={`settings-nav-button ${activeSettingsSection === 'memory' ? 'active' : ''}`}><ArchiveIcon /> <span>Memory</span></button>
                     </nav>
                     <main className="settings-content">
