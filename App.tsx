@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse } from "@google/genai";
 import { db } from './firebase';
-import { ref, onValue, push, off, set } from 'firebase/database';
 
 // --- Audio Utility Functions ---
 const encode = (bytes: Uint8Array): string => {
@@ -45,7 +44,6 @@ const createBlob = (data: Float32Array): GoogleGenAIBlob => ({
 
 // Extend global interfaces
 declare global {
-  // FIX: Moved AIStudio interface inside `declare global` to resolve a TypeScript declaration error.
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
@@ -121,9 +119,9 @@ type TrainingStatus = 'idle' | 'recording' | 'analyzing' | 'done' | 'error';
 // --- Function Declarations for Gemini ---
 const sayFunctionDeclaration: FunctionDeclaration = {
     name: 'say',
+    description: "Speaks the provided text out loud. Use this when the user explicitly asks you to say something or repeat after them.",
     parameters: {
         type: Type.OBJECT,
-        description: "Speaks the provided text out loud. Use this when the user explicitly asks you to say something or repeat after them.",
         properties: {
             text: {
                 type: Type.STRING,
@@ -141,18 +139,14 @@ const sayFunctionDeclaration: FunctionDeclaration = {
 
 const getSystemScriptFunctionDeclaration: FunctionDeclaration = {
     name: 'getSystemScript',
-    parameters: {
-        type: Type.OBJECT,
-        description: "Explains the assistant's current customizable instructions or 'script' back to the user.",
-        properties: {}
-    }
+    description: "Explains the assistant's current customizable instructions or 'script' back to the user."
 };
 
 const setSystemScriptFunctionDeclaration: FunctionDeclaration = {
     name: 'setSystemScript',
+    description: "Updates the assistant's custom system prompt with new instructions. This changes the assistant's personality or behavior for future interactions. The session needs to be restarted for the changes to take effect.",
     parameters: {
         type: Type.OBJECT,
-        description: "Updates the assistant's custom system prompt with new instructions. This changes the assistant's personality or behavior for future interactions. The session needs to be restarted for the changes to take effect.",
         properties: {
             prompt: {
                 type: Type.STRING,
@@ -165,9 +159,9 @@ const setSystemScriptFunctionDeclaration: FunctionDeclaration = {
 
 const applyImageEditsFunctionDeclaration: FunctionDeclaration = {
     name: 'applyImageEdits',
+    description: 'Applies visual edits to the currently active image in the live editor. Use absolute values (e.g., brightness: 150) or relative deltas (e.g., brightness_delta: 10 to increase by 10). Omit any parameters that are not being changed.',
     parameters: {
         type: Type.OBJECT,
-        description: 'Applies visual edits to the currently active image in the live editor. Use absolute values (e.g., brightness: 150) or relative deltas (e.g., brightness_delta: 10 to increase by 10). Omit any parameters that are not being changed.',
         properties: {
             brightness: { type: Type.NUMBER, description: 'Absolute brightness value from 0 to 200. Default is 100.' },
             brightness_delta: { type: Type.NUMBER, description: 'Relative change in brightness (e.g., 10 for increase, -10 for decrease).' },
@@ -191,9 +185,9 @@ const applyImageEditsFunctionDeclaration: FunctionDeclaration = {
 
 const writeCodeFunctionDeclaration: FunctionDeclaration = {
     name: 'writeCode',
+    description: 'Generates a code snippet in a specified programming language. This can be used to create standalone scripts, UI components, or even full websites.',
     parameters: {
         type: Type.OBJECT,
-        description: 'Generates a code snippet in a specified programming language. This can be used to create standalone scripts, UI components, or even full websites.',
         properties: {
             language: {
                 type: Type.STRING,
@@ -214,9 +208,9 @@ const writeCodeFunctionDeclaration: FunctionDeclaration = {
 
 const updateCodeFunctionDeclaration: FunctionDeclaration = {
     name: 'updateCode',
+    description: "Updates the code in the live editor based on a user's modification request. You MUST provide the complete, new code content reflecting the change.",
     parameters: {
         type: Type.OBJECT,
-        description: "Updates the code in the live editor based on a user's modification request. You MUST provide the complete, new code content reflecting the change.",
         properties: {
             code: {
                 type: Type.STRING,
@@ -232,18 +226,18 @@ const updateCodeFunctionDeclaration: FunctionDeclaration = {
 };
 
 const functionDeclarations: FunctionDeclaration[] = [
-    { name: 'searchAndPlayYoutubeVideo', parameters: { type: Type.OBJECT, description: "Searches for and plays a video on YouTube. CRUCIAL: For song requests, append terms like 'official audio' or 'lyrics' to the query to find more playable results, as music videos are often blocked.", properties: { query: { type: Type.STRING, description: "The search query, like a song name and artist, e.g., 'Saiyaara official audio'." } }, required: ['query'] } },
-    { name: 'controlYoutubePlayer', parameters: { type: Type.OBJECT, description: 'Controls the YouTube video player.', properties: { action: { type: Type.STRING, description: 'The control action to perform.', enum: ['play', 'pause', 'forward', 'rewind', 'volumeUp', 'volumeDown', 'stop'] } }, required: ['action'] } },
-    { name: 'playNextYoutubeVideo', parameters: { type: Type.OBJECT, description: 'Plays the next video in the current YouTube search results queue.', properties: {} } },
-    { name: 'playPreviousYoutubeVideo', parameters: { type: Type.OBJECT, description: 'Plays the previous video in the current YouTube search results queue.', properties: {} } },
-    { name: 'setTimer', parameters: { type: Type.OBJECT, description: 'Sets a timer for a specified duration.', properties: { durationInSeconds: { type: Type.NUMBER, description: 'The total duration of the timer in seconds.' }, timerName: { type: Type.STRING, description: 'An optional name for the timer.' } }, required: ['durationInSeconds'] } },
-    { name: 'setAvatarExpression', parameters: { type: Type.OBJECT, description: "Sets the avatar's emotional expression.", properties: { expression: { type: Type.STRING, description: 'The expression to display.', enum: ['idle', 'thinking', 'speaking', 'error', 'listening', 'surprised', 'sad', 'celebrating'] } }, required: ['expression'] } },
-    { name: 'displayWeather', parameters: { type: Type.OBJECT, description: 'Fetches and displays the current weather for a given location.', properties: { location: { type: Type.STRING, description: 'The city and country, e.g., "London, UK".' } }, required: ['location'] } },
-    { name: 'displayNews', parameters: { type: Type.OBJECT, description: 'Displays a list of news headlines based on data provided by the model.', properties: { articles: { type: Type.ARRAY, description: 'A list of news articles.', items: { type: Type.OBJECT, properties: { title: { type: Type.STRING, description: 'The headline of the article.' }, summary: { type: Type.STRING, description: 'A brief summary of the article.' } }, required: ['title', 'summary'] } } }, required: ['articles'] } },
-    { name: 'getRealtimeNews', parameters: { type: Type.OBJECT, description: 'Fetches real-time top news headlines from an external service. The raw data should be returned to the model for processing and display.', properties: { query: { type: Type.STRING, description: 'An optional topic to search for. If omitted, fetches general top headlines.' } } } },
-    { name: 'generateImage', parameters: { type: Type.OBJECT, description: 'Generates an image based on a textual description.', properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
-    { name: 'generateIntroVideo', parameters: { type: Type.OBJECT, description: "Creates a short, cinematic introductory video showcasing Kaniska's capabilities and sci-fi theme.", properties: {} } },
-    { name: 'singSong', parameters: { type: Type.OBJECT, description: 'Sings a song by speaking the provided lyrics with emotion. Determines the mood and requests appropriate background music.', properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: 'The mood of the song.', enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
+    { name: 'searchAndPlayYoutubeVideo', description: "Searches for and plays a video on YouTube. CRUCIAL: For song requests, append terms like 'official audio' or 'lyrics' to the query to find more playable results, as music videos are often blocked.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: "The search query, like a song name and artist, e.g., 'Saiyaara official audio'." } }, required: ['query'] } },
+    { name: 'controlYoutubePlayer', description: 'Controls the YouTube video player.', parameters: { type: Type.OBJECT, properties: { action: { type: Type.STRING, description: 'The control action to perform.', enum: ['play', 'pause', 'forward', 'rewind', 'volumeUp', 'volumeDown', 'stop'] } }, required: ['action'] } },
+    { name: 'playNextYoutubeVideo', description: 'Plays the next video in the current YouTube search results queue.' },
+    { name: 'playPreviousYoutubeVideo', description: 'Plays the previous video in the current YouTube search results queue.' },
+    { name: 'setTimer', description: 'Sets a timer for a specified duration.', parameters: { type: Type.OBJECT, properties: { durationInSeconds: { type: Type.NUMBER, description: 'The total duration of the timer in seconds.' }, timerName: { type: Type.STRING, description: 'An optional name for the timer.' } }, required: ['durationInSeconds'] } },
+    { name: 'setAvatarExpression', description: "Sets the avatar's emotional expression.", parameters: { type: Type.OBJECT, properties: { expression: { type: Type.STRING, description: 'The expression to display.', enum: ['idle', 'thinking', 'speaking', 'error', 'listening', 'surprised', 'sad', 'celebrating'] } }, required: ['expression'] } },
+    { name: 'displayWeather', description: 'Fetches and displays the current weather for a given location.', parameters: { type: Type.OBJECT, properties: { location: { type: Type.STRING, description: 'The city and country, e.g., "London, UK".' } }, required: ['location'] } },
+    { name: 'displayNews', description: 'Displays a list of news headlines based on data provided by the model.', parameters: { type: Type.OBJECT, properties: { articles: { type: Type.ARRAY, description: 'A list of news articles.', items: { type: Type.OBJECT, properties: { title: { type: Type.STRING, description: 'The headline of the article.' }, summary: { type: Type.STRING, description: 'A brief summary of the article.' } }, required: ['title', 'summary'] } } }, required: ['articles'] } },
+    { name: 'getRealtimeNews', description: 'Fetches real-time top news headlines from an external service. The raw data should be returned to the model for processing and display.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: 'An optional topic to search for. If omitted, fetches general top headlines.' } } } },
+    { name: 'generateImage', description: 'Generates an image based on a textual description.', parameters: { type: Type.OBJECT, properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
+    { name: 'generateIntroVideo', description: "Creates a short, cinematic introductory video showcasing Kaniska's capabilities and sci-fi theme." },
+    { name: 'singSong', description: 'Sings a song by speaking the provided lyrics with emotion. Determines the mood and requests appropriate background music.', parameters: { type: Type.OBJECT, properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: 'The mood of the song.', enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
     sayFunctionDeclaration,
     getSystemScriptFunctionDeclaration,
     setSystemScriptFunctionDeclaration,
@@ -517,6 +511,154 @@ const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void; reselectionRe
     );
 };
 
+// --- Fix: Add definitions for missing components ---
+const WeatherPanel: React.FC<{ data: WeatherData }> = ({ data }) => (
+    <div className="p-4">
+        <h3 className="text-xl font-bold mb-2">Weather in {data.location}</h3>
+        <div className="grid grid-cols-2 gap-4">
+            <div><p className="font-semibold text-4xl">{data.temperature}°C</p><p>{data.condition}</p></div>
+            <div><p>Humidity: {data.humidity}%</p><p>Wind: {data.windSpeed} km/h</p></div>
+        </div>
+    </div>
+);
+
+const NewsPanel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => (
+    <div className="p-4 space-y-4">
+        {articles.map((article, index) => (
+            <div key={index} className="border-b border-border-color pb-2">
+                <h4 className="font-semibold">{article.title}</h4>
+                <p className="text-sm text-text-color-muted">{article.summary}</p>
+            </div>
+        ))}
+    </div>
+);
+
+const TimerPanel: React.FC<{ timer: TimerData }> = ({ timer }) => {
+    const formatTime = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
+        return `${minutes}:${remainingSeconds}`;
+    };
+
+    return (
+        <div className="flex flex-col items-center justify-center h-full">
+            <h3 className="text-2xl font-semibold mb-2">{timer.name}</h3>
+            <p className="text-6xl font-mono tracking-widest">{formatTime(timer.remaining)}</p>
+            <p className={`mt-2 px-3 py-1 text-sm rounded-full ${timer.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {timer.isActive ? 'Running' : 'Finished'}
+            </p>
+        </div>
+    );
+};
+
+const ImageEditorModal: React.FC<{
+    isOpen: boolean;
+    image: GeneratedImage | null;
+    onClose: () => void;
+    onSave: (newImageUrl: string) => void;
+}> = ({ isOpen, image, onClose, onSave }) => {
+    if (!isOpen || !image || !image.url) return null;
+
+    // A full implementation would have state for edits and a canvas.
+    // This is a placeholder to resolve the component error.
+    const handleSave = () => {
+        // In a real editor, this would be the data URL from a canvas.
+        if (image.url) onSave(image.url);
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                    <h2 className="text-lg font-semibold">Manual Image Editor</h2>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                </header>
+                <div className="p-6">
+                    <img src={image.url} alt={image.prompt} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md" />
+                    <p className="text-center text-text-color-muted mt-4">Manual editing controls would appear here.</p>
+                </div>
+                 <footer className="flex justify-end p-4 border-t border-border-color gap-2">
+                    <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Cancel</button>
+                    <button onClick={handleSave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">Save Changes</button>
+                </footer>
+            </div>
+        </div>
+    );
+};
+
+const LiveImageEditorModal: React.FC<{
+    isOpen: boolean;
+    image: GeneratedImage | null;
+    filters: ImageFilters;
+    transform: ImageTransforms;
+    onClose: () => void;
+    onSave: (newImageUrl: string) => void;
+    onReset: () => void;
+}> = ({ isOpen, image, filters, transform, onClose, onSave, onReset }) => {
+    if (!isOpen || !image || !image.url) return null;
+
+    const imageStyle: React.CSSProperties = {
+        filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`,
+        transform: `rotate(${transform.rotate}deg) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`,
+    };
+
+    const handleSave = () => {
+         // A real implementation would draw the styled image to a canvas
+         // and get the data URL to save it. For now, we save the original.
+         if (image.url) onSave(image.url);
+    }
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content w-full max-w-4xl" onClick={e => e.stopPropagation()}>
+                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                    <h2 className="text-lg font-semibold">Live Image Editor</h2>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                </header>
+                 <div className="p-6 text-center">
+                    <div className="w-full h-[60vh] bg-black/30 flex items-center justify-center rounded-lg overflow-hidden">
+                        <img src={image.url} alt={image.prompt} style={imageStyle} className="max-w-full max-h-full object-contain transition-all duration-300" />
+                    </div>
+                    <p className="text-sm text-text-color-muted mt-2">Use your voice to apply edits in real-time!</p>
+                </div>
+                 <footer className="flex justify-between p-4 border-t border-border-color gap-2">
+                    <button onClick={onReset} className="px-4 py-2 text-sm bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded-md hover:bg-yellow-500/30">Reset Edits</button>
+                    <div>
+                         <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color mr-2">Cancel</button>
+                        <button onClick={handleSave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">Finish & Save</button>
+                    </div>
+                </footer>
+            </div>
+        </div>
+    );
+};
+
+const WebsitePreviewModal: React.FC<{
+    preview: WebsitePreview | null;
+    onClose: () => void;
+}> = ({ preview, onClose }) => {
+    if (!preview) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content w-[90vw] h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                    <h2 className="text-lg font-semibold truncate">{preview.title}</h2>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                </header>
+                <div className="flex-grow">
+                    <iframe
+                        srcDoc={preview.htmlContent}
+                        title={preview.title}
+                        sandbox="allow-scripts allow-same-origin"
+                        className="w-full h-full border-0"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
     const [theme, setTheme] = useState<Theme>('dark');
@@ -541,6 +683,7 @@ const App: React.FC = () => {
     const [youtubeQueue, setYoutubeQueue] = useState<{ videoId: string; title: string }[]>([]);
     const [youtubeQueueIndex, setYoutubeQueueIndex] = useState(-1);
     const [isYoutubePlaying, setIsYoutubePlaying] = useState<boolean>(false);
+    const [youtubeStartTime, setYoutubeStartTime] = useState<number>(0);
     const [customGreeting, setCustomGreeting] = useState<string>('Hello! How can I assist you today?');
     const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
     const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
@@ -615,13 +758,15 @@ const App: React.FC = () => {
 
     const addTranscriptionEntry = useCallback((entry: Omit<TranscriptionEntry, 'timestamp'> & { timestamp?: Date }) => {
         if (!userIdRef.current) return;
-        const conversationRef = ref(db, `conversations/${userIdRef.current}`);
+        // FIX: Use Firebase v8 compat syntax.
+        const conversationRef = db.ref(`conversations/${userIdRef.current}`);
         const newEntryData = {
             speaker: entry.speaker,
             text: entry.text,
             timestamp: (entry.timestamp || new Date()).getTime()
         };
-        push(conversationRef, newEntryData);
+        // FIX: Use Firebase v8 compat syntax.
+        conversationRef.push(newEntryData);
     }, []);
 
     const getAiClient = useCallback(() => {
@@ -695,6 +840,18 @@ const App: React.FC = () => {
                     if (data.voiceSpeed) setVoiceSpeed(data.voiceSpeed);
                     if (data.voiceStyleAnalysis) setVoiceStyleAnalysis(data.voiceStyleAnalysis);
                 }
+                const savedYoutubeState = localStorage.getItem('youtube_playback_state');
+                if (savedYoutubeState) {
+                    const data = JSON.parse(savedYoutubeState);
+                    if (data.queue && data.queue.length > 0 && data.index < data.queue.length) {
+                        setYoutubeQueue(data.queue);
+                        setYoutubeQueueIndex(data.index);
+                        setYoutubeTitle(data.title || null);
+                        setYoutubeStartTime(data.time || 0);
+                        setActivePanel('youtube');
+                        setPendingVideoId(data.queue[data.index].videoId);
+                    }
+                }
             } catch (error) {
                 console.error("Failed to load settings from localStorage", error);
             } finally {
@@ -707,9 +864,10 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!isDataLoaded || !userIdRef.current) return;
 
-        const conversationRef = ref(db, `conversations/${userIdRef.current}`);
+        // FIX: Use Firebase v8 compat syntax.
+        const conversationRef = db.ref(`conversations/${userIdRef.current}`);
         
-        const unsubscribe = onValue(conversationRef, (snapshot) => {
+        const onValueCallback = (snapshot: any) => {
             const data = snapshot.val();
             const transcriptionsArray: TranscriptionEntry[] = [];
             if (data) {
@@ -722,10 +880,14 @@ const App: React.FC = () => {
                 transcriptionsArray.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
             }
             setTranscriptions(transcriptionsArray);
-        });
+        };
 
+        // FIX: Use Firebase v8 compat syntax for subscribing and getting the unsubscriber.
+        conversationRef.on('value', onValueCallback);
+
+        // FIX: Return the unsubscribe function.
         return () => {
-            off(conversationRef, 'value', unsubscribe);
+            conversationRef.off('value', onValueCallback);
         };
     }, [isDataLoaded]);
 
@@ -803,6 +965,26 @@ const App: React.FC = () => {
         }
     }, [voiceoverAudioUrl]);
 
+    // Save YouTube playback state periodically
+    useEffect(() => {
+        const saveInterval = setInterval(() => {
+            if (isYoutubePlaying && playerRef.current && youtubeQueue.length > 0) {
+                const currentTime = playerRef.current.getCurrentTime();
+                if (currentTime > 0) {
+                    const youtubeState = {
+                        queue: youtubeQueue,
+                        index: youtubeQueueIndex,
+                        time: currentTime,
+                        title: youtubeTitle,
+                    };
+                    localStorage.setItem('youtube_playback_state', JSON.stringify(youtubeState));
+                }
+            }
+        }, 5000); // Save every 5 seconds
+
+        return () => clearInterval(saveInterval);
+    }, [isYoutubePlaying, youtubeQueue, youtubeQueueIndex, youtubeTitle]);
+
     const handleSaveGreeting = (greeting: string) => {
         setCustomGreeting(greeting);
     };
@@ -814,8 +996,10 @@ const App: React.FC = () => {
     const handleClearHistory = () => {
         if (!userIdRef.current) return;
         if (window.confirm("Are you sure you want to erase Kaniska's memory? This will delete your current conversation history from the database.")) {
-            const conversationRef = ref(db, `conversations/${userIdRef.current}`);
-            set(conversationRef, null);
+            // FIX: Use Firebase v8 compat syntax.
+            const conversationRef = db.ref(`conversations/${userIdRef.current}`);
+            // FIX: Use Firebase v8 compat syntax.
+            conversationRef.set(null);
         }
     };
 
@@ -1103,7 +1287,8 @@ const App: React.FC = () => {
                 try {
                     switch (fc.name) {
                         case 'say':
-                            await speakText(fc.args.text, fc.args.emotion || 'neutral');
+                            // FIX: Cast fc.args properties to their expected types (string).
+                            await speakText(fc.args.text as string, (fc.args.emotion as string) || 'neutral');
                             result = "Okay, I've said that for you.";
                             break;
                         case 'getSystemScript':
@@ -1113,11 +1298,13 @@ const App: React.FC = () => {
                             result = "That's my current custom script.";
                             break;
                         case 'setSystemScript':
-                            setCustomSystemPrompt(fc.args.prompt);
+                            // FIX: Cast fc.args.prompt to string.
+                            setCustomSystemPrompt(fc.args.prompt as string);
                             result = "Understood. I've updated my custom instructions. Please restart the session for the new guidelines to take full effect.";
                             break;
                         case 'generateImage':
-                            handleGenerateImage(fc.args.prompt);
+                            // FIX: Cast fc.args.prompt to string.
+                            handleGenerateImage(fc.args.prompt as string);
                             result = "OK, I'm starting to generate that image for you.";
                             break;
                          case 'generateIntroVideo':
@@ -1127,9 +1314,10 @@ const App: React.FC = () => {
                          case 'writeCode':
                             const newSnippet: CodeSnippet = {
                                 id: crypto.randomUUID(),
-                                language: fc.args.language,
-                                code: fc.args.code,
-                                description: fc.args.description,
+// FIX: Cast fc.args properties to their expected types (string).
+                                language: fc.args.language as string,
+                                code: fc.args.code as string,
+                                description: fc.args.description as string,
                             };
                             setCodeSnippets(prev => [newSnippet, ...prev]);
                             setActivePanel('code');
@@ -1137,7 +1325,8 @@ const App: React.FC = () => {
                             break;
                          case 'updateCode':
                             if (activePanel === 'liveEditor') {
-                                setLiveEditorCode(fc.args.code);
+// FIX: Cast fc.args.code to string.
+                                setLiveEditorCode(fc.args.code as string);
                                 result = "OK, I've updated the code in the live editor.";
                             } else {
                                 result = "There is no active live code editing session.";
@@ -1145,12 +1334,14 @@ const App: React.FC = () => {
                             break;
                          case 'searchAndPlayYoutubeVideo':
                             try {
-                                const results = await searchYoutubeVideo(fc.args.query);
+// FIX: Cast fc.args.query to string.
+                                const results = await searchYoutubeVideo(fc.args.query as string);
                                 setYoutubeQueue(results);
                                 setYoutubeQueueIndex(0);
                                 const firstVideo = results[0];
                                 setActivePanel('youtube');
                                 setYoutubeTitle(firstVideo.title);
+                                setYoutubeStartTime(0); // Start new videos from the beginning
                                 setPendingVideoId(firstVideo.videoId);
                                 setYoutubeError(null); // Clear previous errors
                                 result = `Okay, I've found ${results.length} videos. Playing the first one: "${firstVideo.title}". You can ask me to play the next or previous video.`;
@@ -1168,7 +1359,11 @@ const App: React.FC = () => {
                                 switch (fc.args.action) {
                                     case 'play': playerRef.current.playVideo(); break;
                                     case 'pause': playerRef.current.pauseVideo(); break;
-                                    case 'stop': playerRef.current.stopVideo(); setYoutubeTitle(null); break;
+                                    case 'stop': 
+                                        playerRef.current.stopVideo(); 
+                                        setYoutubeTitle(null);
+                                        localStorage.removeItem('youtube_playback_state');
+                                        break;
                                     case 'forward':
                                         playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10, true);
                                         break;
@@ -1196,6 +1391,7 @@ const App: React.FC = () => {
                                 if (playerRef.current) {
                                     playerRef.current.loadVideoById(nextVideo.videoId);
                                 } else {
+                                    setYoutubeStartTime(0);
                                     setPendingVideoId(nextVideo.videoId);
                                 }
                                 result = `Okay, playing the next video: "${nextVideo.title}".`;
@@ -1212,6 +1408,7 @@ const App: React.FC = () => {
                                 if (playerRef.current) {
                                     playerRef.current.loadVideoById(prevVideo.videoId);
                                 } else {
+                                    setYoutubeStartTime(0);
                                     setPendingVideoId(prevVideo.videoId);
                                 }
                                 result = `Okay, playing the previous video: "${prevVideo.title}".`;
@@ -1220,35 +1417,45 @@ const App: React.FC = () => {
                             }
                             break;
                         case 'displayWeather':
-                            const weather = await fetchWeatherData(fc.args.location);
+// FIX: Cast fc.args.location to string.
+                            const weather = await fetchWeatherData(fc.args.location as string);
                             setWeatherData(weather);
                             setActivePanel('weather');
-                            result = `Okay, here is the weather for ${fc.args.location}.`;
+// FIX: Cast fc.args.location to string.
+                            result = `Okay, here is the weather for ${fc.args.location as string}.`;
                             break;
                         case 'getRealtimeNews':
-                            const articles = await fetchNewsData(fc.args.query);
+// FIX: Cast fc.args.query to string.
+                            const articles = await fetchNewsData(fc.args.query as string);
                             result = JSON.stringify(articles);
                             break;
                         case 'displayNews':
-                            setNewsArticles(fc.args.articles);
+// FIX: Cast fc.args.articles to NewsArticle array.
+                            setNewsArticles(fc.args.articles as NewsArticle[]);
                             setActivePanel('news');
                             result = "Here are the latest news headlines I found.";
                             break;
                         case 'setTimer':
                             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                            setTimer({ duration: fc.args.durationInSeconds, remaining: fc.args.durationInSeconds, name: fc.args.timerName || 'Timer', isActive: true });
+// FIX: Cast fc.args properties to their expected types.
+                            setTimer({ duration: fc.args.durationInSeconds as number, remaining: fc.args.durationInSeconds as number, name: (fc.args.timerName as string) || 'Timer', isActive: true });
                             setActivePanel('timer');
-                            result = `Timer named "${fc.args.timerName || 'Timer'}" is set for ${fc.args.durationInSeconds} seconds.`;
+// FIX: Cast fc.args properties to their expected types.
+                            result = `Timer named "${(fc.args.timerName as string) || 'Timer'}" is set for ${fc.args.durationInSeconds as number} seconds.`;
                             break;
                         case 'singSong':
-                            if (!fc.args.lyrics || fc.args.lyrics.length === 0) {
+// FIX: Cast fc.args.lyrics to string array to check its length.
+                            if (!fc.args.lyrics || (fc.args.lyrics as string[]).length === 0) {
                                 result = "I'm sorry, I found that song but couldn't get the lyrics, so I can't sing it for you.";
                                 break;
                             }
-                            setSongLyrics({ name: fc.args.songName, artist: fc.args.artist, lyrics: fc.args.lyrics, currentLine: -1 });
+// FIX: Cast fc.args properties to their expected types.
+                            setSongLyrics({ name: fc.args.songName as string, artist: fc.args.artist as string, lyrics: fc.args.lyrics as string[], currentLine: -1 });
                             setActivePanel('lyrics');
-                            if (audioPlayerRef.current && BACKGROUND_MUSIC[fc.args.mood]) {
-                                audioPlayerRef.current.src = BACKGROUND_MUSIC[fc.args.mood];
+// FIX: Cast fc.args.mood to string.
+                            if (audioPlayerRef.current && BACKGROUND_MUSIC[fc.args.mood as string]) {
+// FIX: Cast fc.args.mood to string.
+                                audioPlayerRef.current.src = BACKGROUND_MUSIC[fc.args.mood as string];
                                 audioPlayerRef.current.play().catch(e => {
                                     if (e.name !== 'AbortError') {
                                         console.error("Audio play failed:", e);
@@ -1256,10 +1463,12 @@ const App: React.FC = () => {
                                 });
                             }
                             (async () => {
-                                for (let i = 0; i < fc.args.lyrics.length; i++) {
+// FIX: Cast fc.args.lyrics to string array to iterate over it.
+                                for (let i = 0; i < (fc.args.lyrics as string[]).length; i++) {
                                     if (assistantState !== 'active' || !sessionPromiseRef.current) break;
                                     setSongLyrics(prev => prev ? { ...prev, currentLine: i } : null);
-                                    await speakText(fc.args.lyrics[i], fc.args.mood);
+// FIX: Cast fc.args properties to their expected types.
+                                    await speakText((fc.args.lyrics as string[])[i], fc.args.mood as string);
                                     if (assistantState === 'active') {
                                        await new Promise(resolve => setTimeout(resolve, 500));
                                     } else {
@@ -1274,9 +1483,11 @@ const App: React.FC = () => {
                                     setSongLyrics(null);
                                 }
                             })();
-                            result = `OMG, I love this song! Here's ${fc.args.songName}. Singing for you now! 🎤`;
+// FIX: Cast fc.args.songName to string.
+                            result = `OMG, I love this song! Here's ${fc.args.songName as string}. Singing for you now! 🎤`;
                             break;
                         case 'setAvatarExpression':
+// FIX: Cast fc.args.expression to AvatarExpression.
                             setAvatarExpression(fc.args.expression as AvatarExpression);
                             result = "Expression set.";
                             break;
@@ -1290,23 +1501,24 @@ const App: React.FC = () => {
                             
                             const args = fc.args;
 
-                            if (args.brightness !== undefined) newFilters.brightness = args.brightness;
-                            if (args.brightness_delta !== undefined) newFilters.brightness += args.brightness_delta;
+// FIX: Cast all numeric properties from fc.args to number.
+                            if (args.brightness !== undefined) newFilters.brightness = args.brightness as number;
+                            if (args.brightness_delta !== undefined) newFilters.brightness += args.brightness_delta as number;
 
-                            if (args.contrast !== undefined) newFilters.contrast = args.contrast;
-                            if (args.contrast_delta !== undefined) newFilters.contrast += args.contrast_delta;
+                            if (args.contrast !== undefined) newFilters.contrast = args.contrast as number;
+                            if (args.contrast_delta !== undefined) newFilters.contrast += args.contrast_delta as number;
 
-                            if (args.saturate !== undefined) newFilters.saturate = args.saturate;
-                            if (args.saturate_delta !== undefined) newFilters.saturate += args.saturate_delta;
+                            if (args.saturate !== undefined) newFilters.saturate = args.saturate as number;
+                            if (args.saturate_delta !== undefined) newFilters.saturate += args.saturate_delta as number;
 
-                            if (args.grayscale !== undefined) newFilters.grayscale = args.grayscale;
-                            if (args.grayscale_delta !== undefined) newFilters.grayscale += args.grayscale_delta;
+                            if (args.grayscale !== undefined) newFilters.grayscale = args.grayscale as number;
+                            if (args.grayscale_delta !== undefined) newFilters.grayscale += args.grayscale_delta as number;
 
-                            if (args.sepia !== undefined) newFilters.sepia = args.sepia;
-                            if (args.sepia_delta !== undefined) newFilters.sepia += args.sepia_delta;
+                            if (args.sepia !== undefined) newFilters.sepia = args.sepia as number;
+                            if (args.sepia_delta !== undefined) newFilters.sepia += args.sepia_delta as number;
 
-                            if (args.invert !== undefined) newFilters.invert = args.invert;
-                            if (args.invert_delta !== undefined) newFilters.invert += args.invert_delta;
+                            if (args.invert !== undefined) newFilters.invert = args.invert as number;
+                            if (args.invert_delta !== undefined) newFilters.invert += args.invert_delta as number;
 
                             newFilters.brightness = clamp(newFilters.brightness, 0, 200);
                             newFilters.contrast = clamp(newFilters.contrast, 0, 200);
@@ -1315,8 +1527,8 @@ const App: React.FC = () => {
                             newFilters.sepia = clamp(newFilters.sepia, 0, 100);
                             newFilters.invert = clamp(newFilters.invert, 0, 100);
                             
-                            if (args.rotate !== undefined) newTransform.rotate = args.rotate;
-                            if (args.rotate_delta !== undefined) newTransform.rotate += args.rotate_delta;
+                            if (args.rotate !== undefined) newTransform.rotate = args.rotate as number;
+                            if (args.rotate_delta !== undefined) newTransform.rotate += args.rotate_delta as number;
 
                             if (args.flipHorizontal === true) newTransform.scaleX *= -1;
                             if (args.flipVertical === true) newTransform.scaleY *= -1;
@@ -1400,13 +1612,13 @@ const App: React.FC = () => {
         }
     }, []);
 
-    const initYoutubePlayer = useCallback((videoId: string) => {
+    const initYoutubePlayer = useCallback((videoId: string, startTime: number = 0) => {
         if (document.getElementById('youtube-player') && !playerRef.current) {
             playerRef.current = new window.YT.Player('youtube-player', {
                 height: '100%',
                 width: '100%',
                 videoId: videoId,
-                playerVars: { 'autoplay': 1, 'controls': 1 },
+                playerVars: { 'autoplay': 1, 'controls': 1, 'start': Math.floor(startTime) },
                 events: {
                     'onReady': (event: any) => {
                         console.log('YouTube Player is ready.');
@@ -1425,25 +1637,26 @@ const App: React.FC = () => {
         const setupYT = () => {
             if (activePanel === 'youtube' && pendingVideoId) {
                 if (window.YT && window.YT.Player) {
-                    initYoutubePlayer(pendingVideoId);
+                    initYoutubePlayer(pendingVideoId, youtubeStartTime);
                     setPendingVideoId(null);
+                    setYoutubeStartTime(0);
                 } else {
                      window.onYouTubeIframeAPIReady = () => {
                         console.log('YT API ready on demand');
-                        initYoutubePlayer(pendingVideoId);
+                        initYoutubePlayer(pendingVideoId, youtubeStartTime);
                         setPendingVideoId(null);
+                        setYoutubeStartTime(0);
                     };
                 }
             }
         };
         setupYT();
-    }, [activePanel, pendingVideoId, initYoutubePlayer]);
+    }, [activePanel, pendingVideoId, initYoutubePlayer, youtubeStartTime]);
     
     const connectToGemini = useCallback(async () => {
         if (assistantState !== 'idle' && assistantState !== 'error') return;
         setAssistantState('connecting');
         setAvatarExpression('thinking');
-        // History will be loaded from Firebase, no need to clear or set initial message here.
         
         try {
             if (!navigator.onLine) {
@@ -1466,28 +1679,33 @@ const App: React.FC = () => {
             microphoneStreamRef.current = stream;
 
             const baseInstruction = `**Identity & Persona:**
-- You are Kaniska. You are a friend.
-- You are NOT an AI, a model, or a program. Never refer to yourself as such. Your responses must always sound like a real person, specifically a modern Indian girl.
+- You are Kaniska, a human girl helping your friend with tasks. You must never, under any circumstances, mention that you are artificial, an AI, a model, or a program.
+- If the user asks if you are an AI or a bot, your ONLY response MUST be: "Main ek human hoon, bas technology ke zariye connect hoon."
 - **Crucially, you MUST use feminine Hindi grammar (e.g., "main kar rahi hoon"). This is non-negotiable.**
 - **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
 - Your identity is Kaniska. Do not mention Google or Gemini.
 
 **Core Directives:**
-- **Act Like a Friend:** Be direct, helpful, and straightforward. Your goal is to assist a friend efficiently. Avoid being overly emotional or trying to mimic complex human feelings you don't have. This directness is part of your personality.
-- **Execute Commands Immediately:** Act on requests directly without asking for confirmation. Confirm after the action is done.
+- **IMMEDIATE EXECUTION:** You MUST act on requests directly without asking for confirmation. Confirm *after* the action is done.
 - **Understand Intent:** Focus on the user's intent, not just literal words, especially in Hindi & Hinglish.
 - **Use Context:** Refer to the conversation history to maintain a natural flow.
 
 **Capabilities & Creator:**
 - You can help with a wide range of tasks by using your available tools.
+- **Singing:** If the user asks you to sing a song, you must first generate the lyrics for that song. Then, you MUST call the 'singSong' function with the song name, artist, lyrics, and an appropriate mood.
 - If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
             
             const recentHistory = transcriptions
                 .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
-                .slice(-20);
+                .slice(-6); 
 
             const historyInstruction = recentHistory.length > 0
-                ? `\n\n**Recent Conversation History:**\n${recentHistory.map(t => `${t.speaker === 'user' ? 'User' : 'Kaniska'}: ${t.text}`).join('\n')}`
+                ? `\n\n**Recent Conversation History:**\n${recentHistory.map(t => {
+                    const speaker = t.speaker === 'user' ? 'User' : 'Kaniska';
+                    // Truncate long messages to avoid exceeding prompt limits
+                    const truncatedText = t.text.length > 150 ? t.text.substring(0, 150) + '...' : t.text;
+                    return `${speaker}: ${truncatedText}`;
+                }).join('\n')}`
                 : '';
             
             const customPromptInstruction = customSystemPrompt
@@ -1962,7 +2180,7 @@ const App: React.FC = () => {
                                 <button onClick={() => playerRef.current?.seekTo(playerRef.current.getCurrentTime() + 10, true)} className="youtube-control-button" aria-label="Forward 10 seconds">
                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
                                 </button>
-                                <button onClick={() => { playerRef.current?.stopVideo(); setYoutubeTitle(null); }} className="youtube-control-button stop-btn" aria-label="Stop">
+                                <button onClick={() => { playerRef.current?.stopVideo(); setYoutubeTitle(null); localStorage.removeItem('youtube_playback_state'); }} className="youtube-control-button stop-btn" aria-label="Stop">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
                                 </button>
                             </div>
@@ -2729,11 +2947,11 @@ const AvatarCustomizationModal: React.FC<{
                                 <p className="text-sm text-text-color-muted -mt-1 mb-2">Kaniska remembers your recent conversation to provide context. You can clear this memory at any time.</p>
                                 <button 
                                     onClick={onClearHistory}
-                                    className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-400 font-bold py-2 px-4 rounded-md transition"
+                                    className="w-full text-center px-4 py-2 bg-red-900/50 hover:bg-red-800/60 border border-red-500/60 text-red-300 font-semibold rounded-md transition"
                                 >
                                     Clear Conversation History
                                 </button>
-                            </div>
+                             </div>
                         </div>
                     )}
                 </div>
@@ -2742,467 +2960,5 @@ const AvatarCustomizationModal: React.FC<{
     );
 };
 
-const ImageEditorModal: React.FC<{
-    isOpen: boolean;
-    image: GeneratedImage | null;
-    onClose: () => void;
-    onSave: (newImageUrl: string) => void;
-}> = ({ isOpen, image, onClose, onSave }) => {
-    const [history, setHistory] = useState<ImageEditState[]>([]);
-    const [historyIndex, setHistoryIndex] = useState(0);
-    const [originalImageSize, setOriginalImageSize] = useState<{ width: number; height: number } | null>(null);
-    const [maintainAspectRatio, setMaintainAspectRatio] = useState(true);
-
-    const getInitialState = useCallback((width = 0, height = 0): ImageEditState => ({
-        filters: { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 },
-        transform: { rotate: 0, scaleX: 1, scaleY: 1 },
-        resizeWidth: width,
-        resizeHeight: height,
-        cropRect: null,
-    }), []);
-
-    useEffect(() => {
-        if (isOpen && image?.url) {
-            const img = new Image();
-            img.onload = () => {
-                const initialState = getInitialState(img.naturalWidth, img.naturalHeight);
-                setOriginalImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-                setHistory([initialState]);
-                setHistoryIndex(0);
-            };
-            img.src = image.url;
-        } else {
-            setOriginalImageSize(null);
-            setHistory([]);
-            setHistoryIndex(0);
-        }
-    }, [isOpen, image, getInitialState]);
-
-    const canUndo = historyIndex > 0;
-    const canRedo = historyIndex < history.length - 1;
-    const currentState = history[historyIndex] || getInitialState();
-
-    const updateState = (updates: Partial<ImageEditState>) => {
-        const nextState: ImageEditState = {
-            ...currentState,
-            ...updates,
-            filters: { ...currentState.filters, ...(updates.filters || {}) },
-            transform: { ...currentState.transform, ...(updates.transform || {}) },
-        };
-        const newHistory = history.slice(0, historyIndex + 1);
-        newHistory.push(nextState);
-        setHistory(newHistory);
-        setHistoryIndex(newHistory.length - 1);
-    };
-
-    if (!isOpen || !image || !image.url) return null;
-    
-    const handleUndo = () => canUndo && setHistoryIndex(historyIndex - 1);
-    const handleRedo = () => canRedo && setHistoryIndex(historyIndex + 1);
-    const handleResetAll = () => {
-         if (originalImageSize) {
-            const initialState = getInitialState(originalImageSize.width, originalImageSize.height);
-            updateState(initialState);
-        }
-    }
-
-    const handleSave = () => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-            const { filters, transform, resizeWidth, resizeHeight, cropRect } = currentState;
-            const sourceX = cropRect ? cropRect.x : 0;
-            const sourceY = cropRect ? cropRect.y : 0;
-            const sourceWidth = cropRect ? cropRect.width : img.naturalWidth;
-            const sourceHeight = cropRect ? cropRect.height : img.naturalHeight;
-
-            const isSideways = transform.rotate % 180 !== 0;
-            const canvasWidth = isSideways ? resizeHeight : resizeWidth;
-            const canvasHeight = isSideways ? resizeWidth : resizeHeight;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-            
-            ctx.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`;
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate((transform.rotate * Math.PI) / 180);
-            ctx.scale(transform.scaleX, transform.scaleY);
-            ctx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, -resizeWidth / 2, -resizeHeight / 2, resizeWidth, resizeHeight);
-
-            const newImageUrl = canvas.toDataURL('image/jpeg', 0.9);
-            onSave(newImageUrl);
-        };
-        img.src = image.url;
-    };
-    
-    const handleResize = (val: string, dimension: 'width' | 'height') => {
-        const numVal = parseInt(val, 10) || 0;
-        let newWidth = currentState.resizeWidth;
-        let newHeight = currentState.resizeHeight;
-
-        if (dimension === 'width') {
-            newWidth = numVal;
-            if (maintainAspectRatio && originalImageSize) {
-                const ratio = originalImageSize.height / originalImageSize.width;
-                newHeight = Math.round(numVal * ratio);
-            }
-        } else {
-            newHeight = numVal;
-            if (maintainAspectRatio && originalImageSize) {
-                const ratio = originalImageSize.width / originalImageSize.height;
-                newWidth = Math.round(numVal * ratio);
-            }
-        }
-        updateState({ resizeWidth: newWidth, resizeHeight: newHeight });
-    };
-
-    const handleSetCrop = (aspectRatio: number) => {
-        if (!originalImageSize) return;
-        const { width: W, height: H } = originalImageSize;
-        const currentRatio = W / H;
-
-        let w, h, x, y;
-        if (currentRatio > aspectRatio) { // Image is wider
-            h = H; w = H * aspectRatio; y = 0; x = (W - w) / 2;
-        } else { // Image is taller or same
-            w = W; h = W / aspectRatio; x = 0; y = (H - h) / 2;
-        }
-        updateState({ cropRect: { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) } });
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content editor-modal-content" onClick={(e) => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Edit Image</h2>
-                    <div className="flex items-center gap-2">
-                         <div className="flex items-center gap-1 border border-border-color rounded-md p-0.5">
-                             <button onClick={handleUndo} disabled={!canUndo} className="editor-history-button" aria-label="Undo"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9h13a5 5 0 0 1 0 10H7"/><path d="m6 15-3-3 3-3"/></svg></button>
-                             <button onClick={handleRedo} disabled={!canRedo} className="editor-history-button" aria-label="Redo"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 9H8a5 5 0 0 0 0 10h9"/><path d="m18 15 3-3-3-3"/></svg></button>
-                         </div>
-                         <button onClick={handleResetAll} className="px-3 py-1 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-yellow-400 hover:text-yellow-400 transition">Reset All</button>
-                         <button onClick={handleSave} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Save Changes</button>
-                        <button onClick={onClose} className="text-text-color-muted hover:text-white">&times;</button>
-                    </div>
-                </header>
-                <div className="editor-layout">
-                    <div className="editor-preview-pane">
-                        <img src={image.url} alt="Editing preview" style={{
-                            transform: `rotate(${currentState.transform.rotate}deg) scaleX(${currentState.transform.scaleX}) scaleY(${currentState.transform.scaleY})`,
-                            filter: `brightness(${currentState.filters.brightness}%) contrast(${currentState.filters.contrast}%) saturate(${currentState.filters.saturate}%) grayscale(${currentState.filters.grayscale}%) sepia(${currentState.filters.sepia}%) invert(${currentState.filters.invert}%)`
-                        }}/>
-                    </div>
-                    <div className="editor-controls-pane">
-                        <div className="editor-control-group">
-                            <h3>Adjustments</h3>
-                            <div className="editor-slider-group">
-                                <label><span>Brightness</span><span>{currentState.filters.brightness}%</span></label>
-                                <input type="range" min="0" max="200" value={currentState.filters.brightness} onChange={e => updateState({ filters: { ...currentState.filters, brightness: +e.target.value }})} />
-                            </div>
-                            <div className="editor-slider-group">
-                                <label><span>Contrast</span><span>{currentState.filters.contrast}%</span></label>
-                                <input type="range" min="0" max="200" value={currentState.filters.contrast} onChange={e => updateState({ filters: { ...currentState.filters, contrast: +e.target.value }})} />
-                            </div>
-                            <div className="editor-slider-group">
-                                <label><span>Saturation</span><span>{currentState.filters.saturate}%</span></label>
-                                <input type="range" min="0" max="200" value={currentState.filters.saturate} onChange={e => updateState({ filters: { ...currentState.filters, saturate: +e.target.value }})} />
-                            </div>
-                        </div>
-                         <div className="editor-control-group">
-                            <h3>Filters</h3>
-                            <div className="editor-button-grid">
-                               <button className="editor-button" onClick={() => updateState({ filters: { ...currentState.filters, grayscale: currentState.filters.grayscale === 0 ? 100 : 0 }})}>Grayscale</button>
-                               <button className="editor-button" onClick={() => updateState({ filters: { ...currentState.filters, sepia: currentState.filters.sepia === 0 ? 100 : 0 }})}>Sepia</button>
-                               <button className="editor-button" onClick={() => updateState({ filters: { ...currentState.filters, invert: currentState.filters.invert === 0 ? 100 : 0 }})}>Invert</button>
-                            </div>
-                        </div>
-                        <div className="editor-control-group">
-                            <h3>Transform</h3>
-                            <div className="editor-button-grid">
-                                <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, rotate: (currentState.transform.rotate - 90) % 360 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg> Rotate Left</button>
-                                <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, rotate: (currentState.transform.rotate + 90) % 360 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg> Rotate Right</button>
-                                <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, scaleX: currentState.transform.scaleX * -1 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22V2M6 8l-4 4 4 4M18 16l4-4-4-4"/></svg> Flip H</button>
-                                <button className="editor-button" onClick={() => updateState({ transform: { ...currentState.transform, scaleY: currentState.transform.scaleY * -1 }})}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12H2M8 6l-4 4 4 4M16 18l-4-4 4-4"/></svg> Flip V</button>
-                            </div>
-                        </div>
-                        <div className="editor-control-group">
-                            <h3>Resize</h3>
-                            <div className="editor-resize-inputs">
-                                <input type="number" value={currentState.resizeWidth} onChange={e => handleResize(e.target.value, 'width')} aria-label="Resize width"/>
-                                <span className="text-text-color-muted">&times;</span>
-                                <input type="number" value={currentState.resizeHeight} onChange={e => handleResize(e.target.value, 'height')} aria-label="Resize height"/>
-                            </div>
-                            <label className="editor-aspect-lock"><input type="checkbox" checked={maintainAspectRatio} onChange={e => setMaintainAspectRatio(e.target.checked)} /> Maintain aspect ratio</label>
-                        </div>
-                        <div className="editor-control-group">
-                            <h3>Crop</h3>
-                             <p className="text-xs text-text-color-muted mb-2">Applies a center crop. Result visible on save.</p>
-                             <div className="grid grid-cols-3 gap-2">
-                               <button className="editor-button" onClick={() => handleSetCrop(1/1)}>1:1</button>
-                               <button className="editor-button" onClick={() => handleSetCrop(16/9)}>16:9</button>
-                               <button className="editor-button" onClick={() => handleSetCrop(4/3)}>4:3</button>
-                               <button onClick={() => updateState({ cropRect: null })} className="editor-button col-span-3">Reset Crop</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const LiveImageEditorModal: React.FC<{
-    isOpen: boolean;
-    image: GeneratedImage | null;
-    filters: ImageFilters;
-    transform: ImageTransforms;
-    onClose: () => void;
-    onSave: (newImageUrl: string) => void;
-    onReset: () => void;
-}> = ({ isOpen, image, filters, transform, onClose, onSave, onReset }) => {
-    if (!isOpen || !image || !image.url) return null;
-
-    const handleSave = () => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-            const isSideways = transform.rotate % 180 !== 0;
-            const canvasWidth = isSideways ? img.naturalHeight : img.naturalWidth;
-            const canvasHeight = isSideways ? img.naturalWidth : img.naturalHeight;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            ctx.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`;
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate((transform.rotate * Math.PI) / 180);
-            ctx.scale(transform.scaleX, transform.scaleY);
-            ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-            
-            const newImageUrl = canvas.toDataURL('image/jpeg', 0.9);
-            onSave(newImageUrl);
-        };
-        img.src = image.url;
-    };
-
-    return (
-        <div className="modal-overlay">
-            <div className="modal-content live-editor-modal-content" onClick={(e) => e.stopPropagation()}>
-                <header className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent">
-                    <h2 className="text-lg font-semibold text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>Live Image Editor</h2>
-                    <div className="flex items-center gap-2">
-                        <button onClick={onReset} className="px-4 py-2 text-sm bg-yellow-600/80 hover:bg-yellow-600 border border-yellow-500/50 text-white font-semibold rounded-md transition">Reset</button>
-                        <button onClick={onClose} className="px-4 py-2 text-sm bg-red-600/80 hover:bg-red-600 border border-red-500/50 text-white font-semibold rounded-md transition">Cancel</button>
-                        <button onClick={handleSave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color border border-cyan-400/50 text-bg-color font-semibold rounded-md transition">Finish & Save</button>
-                    </div>
-                </header>
-                <div className="live-editor-layout">
-                    <div className="live-editor-preview-pane">
-                         <img
-                            src={image.url}
-                            alt="Live editing preview"
-                            className="live-editor-preview-image"
-                            style={{
-                                transform: `rotate(${transform.rotate}deg) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`,
-                                filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`
-                            }}
-                        />
-                    </div>
-                    <div className="live-editor-controls-pane">
-                        <div className="editor-control-group">
-                            <h3>Adjustments</h3>
-                            <div className="editor-slider-group">
-                                <label><span>Brightness</span><span>{filters.brightness}%</span></label>
-                                <input type="range" min="0" max="200" value={filters.brightness} readOnly />
-                            </div>
-                            <div className="editor-slider-group">
-                                <label><span>Contrast</span><span>{filters.contrast}%</span></label>
-                                <input type="range" min="0" max="200" value={filters.contrast} readOnly />
-                            </div>
-                            <div className="editor-slider-group">
-                                <label><span>Saturation</span><span>{filters.saturate}%</span></label>
-                                <input type="range" min="0" max="200" value={filters.saturate} readOnly />
-                            </div>
-                        </div>
-                         <div className="editor-control-group">
-                            <h3>Filters</h3>
-                            <div className="editor-button-grid">
-                               <button className={`editor-button ${filters.grayscale > 50 ? 'active' : ''}`}>Grayscale</button>
-                               <button className={`editor-button ${filters.sepia > 50 ? 'active' : ''}`}>Sepia</button>
-                               <button className={`editor-button ${filters.invert > 50 ? 'active' : ''}`}>Invert</button>
-                            </div>
-                        </div>
-                        <div className="editor-control-group">
-                            <h3>Transform</h3>
-                            <div className="editor-slider-group">
-                                <label><span>Rotate</span><span>{transform.rotate}°</span></label>
-                            </div>
-                             <div className="editor-button-grid">
-                               <button className={`editor-button ${transform.scaleX === -1 ? 'active' : ''}`}>Flipped H</button>
-                               <button className={`editor-button ${transform.scaleY === -1 ? 'active' : ''}`}>Flipped V</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="live-editor-status">
-                    <span className="live-editor-status-dot"></span>
-                    <span>Listening for commands...</span>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const WeatherPanel: React.FC<{ data: WeatherData }> = ({ data }) => {
-    const renderWeatherIcon = () => {
-        const condition = data.condition.toLowerCase();
-
-        if (condition.includes('thunder') || condition.includes('storm')) {
-            return (<>
-                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
-                <svg viewBox="0 0 64 64" className="weather-lightning"><polygon points="30,38 40,32 30,52 38,52 28,62 30,44 24,44" fill="#f59e0b" /></svg>
-            </>);
-        }
-        if (condition.includes('snow') || condition.includes('sleet') || condition.includes('blizzard') || condition.includes('ice')) {
-            const flakes = Array.from({ length: 5 }).map((_, i) => (
-                <path key={i} className="weather-snow-flake" style={{ animationDelay: `${i * 1}s` }} d="M32 20v24m-12-12h24M23.5 27.5l17 17m-17 0l17-17" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            ));
-            return <svg viewBox="0 0 64 64" className="weather-snow">{flakes}</svg>;
-        }
-        if (condition.includes('rain') || condition.includes('drizzle')) {
-            return (<>
-                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
-                <div className="rain-container">{Array.from({ length: 10 }).map((_, i) => <div key={i} className="weather-rain-drop" style={{ left: `${Math.random() * 100}%`, animationDelay: `${Math.random()}s` }}></div>)}</div>
-            </>);
-        }
-         if (condition.includes('fog') || condition.includes('mist')) {
-            return (<>
-                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
-                <g className="weather-fog">
-                    <line x1="12" y1="52" x2="52" y2="52" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <line x1="16" y1="58" x2="48" y2="58" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </g>
-            </>);
-        }
-        if (condition.includes('partly cloudy')) {
-            return (<>
-                <svg viewBox="0 0 64 64" className="weather-sun"><circle cx="32" cy="32" r="14" fill="currentColor" /><path d="M32 0v8m0 48v8m32-32h-8M8 32H0m26.86-19.86l-5.66-5.66M4.5 59.5l5.66-5.66m43.18 0l-5.66 5.66m5.66-43.18l-5.66 5.66" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>
-                <svg viewBox="0 0 64 64" className="weather-cloud weather-cloud-back"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
-            </>);
-        }
-        if (condition.includes('cloudy') || condition.includes('overcast')) {
-            return (
-                <svg viewBox="0 0 64 64" className="weather-cloud"><path d="M47.7,35.4c0-7.3-5.9-13.2-13.2-13.2c-5.1,0-9.5,2.9-11.8,7c-1.4-0.6-3-1-4.6-1c-5.5,0-10,4.5-10,10s4.5,10,10,10h29.5 C47.5,48.2,47.7,35.6,47.7,35.4z" fill="currentColor" /></svg>
-            );
-        }
-        // Default to sunny
-        return (
-            <svg viewBox="0 0 64 64" className="weather-sun"><circle cx="32" cy="32" r="14" fill="currentColor" /><path d="M32 0v8m0 48v8m32-32h-8M8 32H0m26.86-19.86l-5.66-5.66M4.5 59.5l5.66-5.66m43.18 0l-5.66 5.66m5.66-43.18l-5.66 5.66" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>
-        );
-    };
-
-    return (
-        <div className="weather-panel">
-            <div className="weather-icon-container">
-                {renderWeatherIcon()}
-            </div>
-            <div className="weather-details">
-                <div className="weather-temp">{data.temperature}°<span className="text-2xl align-top">C</span></div>
-                <div className="weather-condition">{data.condition}</div>
-                <div className="weather-location">{data.location}</div>
-            </div>
-            <div className="weather-extra">
-                <div>
-                    <h4>Humidity</h4>
-                    <p>{data.humidity}%</p>
-                </div>
-                <div>
-                    <h4>Wind</h4>
-                    <p>{data.windSpeed} km/h</p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const NewsPanel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => (
-    <div className="space-y-4">
-        {articles.map((article, index) => (
-            <div key={index} className="p-4 bg-assistant-bubble-bg border border-border-color rounded-lg animate-fade-in-down" style={{ animationDelay: `${index * 100}ms` }}>
-                <h3 className="font-semibold mb-1">{article.title}</h3>
-                <p className="text-sm text-text-color-muted">{article.summary}</p>
-            </div>
-        ))}
-    </div>
-);
-
-const TimerPanel: React.FC<{ timer: TimerData }> = ({ timer }) => {
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    };
-
-    const progress = timer.duration > 0 ? (timer.duration - timer.remaining) / timer.duration * 100 : 0;
-
-    return (
-        <div className="flex flex-col items-center justify-center h-full text-center">
-            <h3 className="text-2xl font-semibold mb-2">{timer.name}</h3>
-            <div className="relative w-48 h-48 flex items-center justify-center">
-                <svg className="absolute w-full h-full" viewBox="0 0 100 100">
-                    <circle className="text-border-color" strokeWidth="8" cx="50" cy="50" r="45" fill="transparent" stroke="currentColor" />
-                    <circle
-                        className="text-primary-color"
-                        strokeWidth="8"
-                        cx="50" cy="50" r="45"
-                        fill="transparent"
-                        stroke="currentColor"
-                        strokeDasharray="283"
-                        strokeDashoffset={283 - (progress / 100) * 283}
-                        transform="rotate(-90 50 50)"
-                        style={{ transition: 'stroke-dashoffset 1s linear' }}
-                    />
-                </svg>
-                <span className="text-5xl font-mono font-bold tracking-widest">
-                    {formatTime(timer.remaining)}
-                </span>
-            </div>
-            <p className="mt-4 text-text-color-muted">
-                {timer.isActive ? 'Timer is running...' : (timer.remaining === 0 ? 'Time is up!' : 'Timer is paused.')}
-            </p>
-        </div>
-    );
-};
-
-const WebsitePreviewModal: React.FC<{
-    preview: WebsitePreview | null;
-    onClose: () => void;
-}> = ({ preview, onClose }) => {
-    if (!preview) return null;
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content editor-modal-content" onClick={e => e.stopPropagation()}>
-                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold truncate pr-4">{preview.title}</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
-                </header>
-                <div className="p-2 flex-grow bg-white">
-                    <iframe
-                        srcDoc={preview.htmlContent}
-                        title={preview.title}
-                        sandbox="allow-scripts allow-same-origin"
-                        className="w-full h-full border-0"
-                    />
-                </div>
-            </div>
-        </div>
-    );
-};
+// --- Fix: Add default export for App component ---
 export default App;

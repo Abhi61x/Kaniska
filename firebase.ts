@@ -1,5 +1,6 @@
-import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
+// FIX: Switched to Firebase v8 compat imports to resolve initialization error. The error indicates that the installed SDK version is not v9+.
+import firebase from "firebase/compat/app";
+import "firebase/compat/database";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
@@ -14,5 +15,11 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getDatabase(app);
+// FIX: Use Firebase v8 compat syntax for initialization, preventing re-initialization.
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+
+// FIX: Use Firebase v8 compat syntax to get database instance.
+export const db = firebase.database();
