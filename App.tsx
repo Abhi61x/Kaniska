@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -825,8 +824,6 @@ const WebsitePreviewModal: React.FC<{
     );
 };
 
-// --- FIX START: Add missing component definitions ---
-// --- FIX START: Define missing QuickActions component ---
 const QuickActions: React.FC<{ onAction: (action: string) => void; disabled: boolean }> = ({ onAction, disabled }) => (
     <div className="flex-shrink-0 p-3 border-t border-border-color flex items-center justify-center gap-2">
         <p className="text-xs text-text-color-muted font-semibold mr-2">Quick Actions:</p>
@@ -836,7 +833,6 @@ const QuickActions: React.FC<{ onAction: (action: string) => void; disabled: boo
         <button onClick={() => onAction('joke')} disabled={disabled} className="quick-action-button">Tell a Joke</button>
     </div>
 );
-// --- FIX END: Define missing QuickActions component ---
 
 const CodePanel: React.FC<{
     snippets: CodeSnippet[];
@@ -1089,11 +1085,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     );
 };
 
-// --- FIX END: Add missing component definitions ---
-
-// --- FIX START: Export App component as a named export ---
 export const App: React.FC = () => {
-// --- FIX END: Export App component as a named export ---
     const [theme, setTheme] = useState<Theme>('dark');
     const [assistantState, setAssistantState] = useState<AssistantState>('idle');
     const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('idle');
@@ -1122,9 +1114,9 @@ export const App: React.FC = () => {
     const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
     const [voicePitch, setVoicePitch] = useState<number>(0);
     const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
-    const [greetingVoice, setGreetingVoice] = useState<string>('Kore');
-    const [greetingPitch, setGreetingPitch] = useState<number>(-6);
-    const [greetingSpeed, setGreetingSpeed] = useState<number>(0.9);
+    const [greetingVoice, setGreetingVoice] = useState<string>('Zephyr');
+    const [greetingPitch, setGreetingPitch] = useState<number>(0);
+    const [greetingSpeed, setGreetingSpeed] = useState<number>(1);
     const [videoGenerationState, setVideoGenerationState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [videoError, setVideoError] = useState<string | null>(null);
@@ -2746,6 +2738,57 @@ export const App: React.FC = () => {
 
     }, [getAiClient]);
 
+    const handlePreviousVideo = () => {
+        if (youtubeQueue.length > 0 && youtubeQueueIndex > 0) {
+            const newIndex = youtubeQueueIndex - 1;
+            setYoutubeQueueIndex(newIndex);
+            const prevVideo = youtubeQueue[newIndex];
+            setYoutubeTitle(prevVideo.title);
+            setYoutubeError(null);
+            if (playerRef.current) {
+                playerRef.current.loadVideoById(prevVideo.videoId);
+            } else {
+                setPendingVideoId(prevVideo.videoId);
+            }
+        }
+    };
+
+    const handleNextVideo = () => {
+        if (youtubeQueue.length > 0 && youtubeQueueIndex < youtubeQueue.length - 1) {
+            const newIndex = youtubeQueueIndex + 1;
+            setYoutubeQueueIndex(newIndex);
+            const nextVideo = youtubeQueue[newIndex];
+            setYoutubeTitle(nextVideo.title);
+            setYoutubeError(null);
+            if (playerRef.current) {
+                playerRef.current.loadVideoById(nextVideo.videoId);
+            } else {
+                setPendingVideoId(nextVideo.videoId);
+            }
+        }
+    };
+
+    const handlePlayPause = () => {
+        if (playerRef.current) {
+            if (isYoutubePlaying) {
+                playerRef.current.pauseVideo();
+            } else {
+                playerRef.current.playVideo();
+            }
+        }
+    };
+
+    const handleStop = () => {
+        if (playerRef.current) {
+            playerRef.current.stopVideo();
+            setYoutubeTitle(null);
+            setYoutubeQueue([]);
+            setYoutubeQueueIndex(-1);
+            setIsYoutubePlaying(false);
+            localStorage.removeItem('youtube_playback_state');
+        }
+    };
+
     if (!isDataLoaded || isApiKeyLoading) {
         return <div className="h-screen w-screen flex items-center justify-center bg-bg-color"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>;
     }
@@ -2848,29 +2891,202 @@ export const App: React.FC = () => {
                         />
                     )}
                     {activePanel === 'youtube' && (<div className="flex-grow p-4 flex flex-col gap-2 overflow-hidden">
+                        {youtubeTitle && <h3 className="text-lg font-semibold truncate flex-shrink-0 px-2">{youtubeTitle}</h3>}
                         <div className="youtube-container">
-                            {youtubeError ? (<div className="w-full h-full flex flex-col items-center justify-center bg-black text-red-400 p-4 text-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><h3 className="text-lg font-semibold">Playback Error</h3><p className="text-sm">{youtubeError}</p></div>) : (<div id="youtube-player" />)}
+                            {youtubeError ? (<div className="w-full h-full flex flex-col items-center justify-center bg-black text-red-400 p-4 text-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><p className="font-semibold mb-2">Playback Error</p><p className="text-sm">{youtubeError}</p></div>) : (<div id="youtube-player"></div>)}
                         </div>
-                        <h3 className="text-center text-md font-semibold text-text-color-muted truncate h-6">{youtubeError ? 'Could not load video' : (youtubeTitle || 'No video is playing.')}</h3>
-                         {youtubeTitle && !youtubeError && (
-                            <div className="youtube-controls-container">
-                                <button onClick={() => playerRef.current?.seekTo(playerRef.current.getCurrentTime() - 10, true)} className="youtube-control-button" aria-label="Rewind 10 seconds">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
-                                </button>
-                                <button onClick={() => isYoutubePlaying ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause' : 'Play'}>
-{/* --- FIX START: Fix truncated SVG tag and complete JSX structure --- */}
-                                    {isYoutubePlaying ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                    )}
-                                </button>
-                            </div>
-                         )}
+                        <div className="youtube-controls-container">
+                             <button onClick={handlePreviousVideo} disabled={youtubeQueueIndex <= 0} className="youtube-control-button">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                            </button>
+                             <button onClick={handlePlayPause} className="youtube-control-button play-pause-btn">
+                                {isYoutubePlaying ? 
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                    : 
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                }
+                            </button>
+                            <button onClick={handleStop} className="youtube-control-button stop-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                            </button>
+                            {/* FIX: Corrected function name from handleNext to handleNextVideo and completed the button element. */}
+                            <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                            </button>
+                        </div>
                     </div>)}
+                    {activePanel === 'video' && (<div className="flex-grow flex flex-col items-center justify-center p-4 gap-4 overflow-hidden">
+                        <div className="w-full flex-grow relative bg-black/30 rounded-lg flex items-center justify-center min-h-0">
+                            {videoGenerationState === 'generating' && (
+                                <div className="text-center">
+                                    <div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin mx-auto mb-4"></div>
+                                    <p className="font-semibold text-lg">Generating Video</p>
+                                    <p className="text-sm text-text-color-muted">{videoProgressMessage}</p>
+                                </div>
+                            )}
+                            {videoGenerationState === 'error' && <div className="text-red-400 p-4 text-center"><strong>Error:</strong> {videoError}</div>}
+                            {videoUrl && <video src={videoUrl} controls autoPlay className="max-w-full max-h-full object-contain"></video>}
+                            {!videoUrl && videoGenerationState === 'idle' && (
+                                <div className="text-center text-text-color-muted">
+                                    <p>Ask Kaniska to generate a video to see it here.</p>
+                                    <p className="text-xs mt-2">Try: "Generate an intro video for yourself"</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-shrink-0 w-full p-4 border border-border-color rounded-lg bg-assistant-bubble-bg">
+                            <h4 className="font-semibold mb-2">Video Voiceover</h4>
+                            <div className="flex flex-col sm:flex-row gap-4 items-start">
+                                <div className="flex-shrink-0 w-full sm:w-48">
+                                    <video ref={voiceoverVideoRef} src={uploadedVideoUrl || ''} controls muted className={`w-full aspect-video rounded-md bg-black ${!uploadedVideoUrl ? 'hidden' : ''}`}></video>
+                                    <button onClick={() => videoUploadInputRef.current?.click()} className="w-full mt-2 px-3 py-1.5 text-sm bg-primary-color/20 text-primary-color border border-primary-color/50 rounded-md hover:bg-primary-color/30 flex items-center justify-center gap-2">
+                                        <UploadIcon size={16} /> {uploadedVideoUrl ? 'Change Video' : 'Upload Video'}
+                                    </button>
+                                    <input type="file" ref={videoUploadInputRef} onChange={handleVideoUpload} accept="video/*" className="hidden" />
+                                </div>
+                                <div className="flex-grow">
+                                    <button onClick={handleGenerateVoiceover} disabled={!uploadedVideoUrl || (voiceoverState !== 'idle' && voiceoverState !== 'done' && voiceoverState !== 'error')} className="w-full px-4 py-2 font-semibold bg-primary-color/80 text-bg-color rounded-md hover:bg-primary-color disabled:opacity-50 disabled:cursor-not-allowed">
+                                        {voiceoverState === 'idle' || voiceoverState === 'done' || voiceoverState === 'error' ? 'Generate Voiceover' : 'Generating...'}
+                                    </button>
+                                    <p className="text-xs text-text-color-muted mt-2">Upload a short video (under 10s recommended) and Kaniska will describe it and generate a voiceover.</p>
+                                    {voiceoverProgress && <p className="text-sm mt-2 text-cyan-400">{voiceoverProgress}</p>}
+                                    {voiceoverError && <p className="text-sm mt-2 text-red-400">{voiceoverError}</p>}
+                                    {videoDescription && (
+                                        <div className="mt-4 p-2 bg-black/20 rounded-md">
+                                            <h5 className="text-xs font-bold text-text-color-muted">Generated Script:</h5>
+                                            <p className="text-xs italic">"{videoDescription}"</p>
+                                        </div>
+                                    )}
+                                    {voiceoverAudioUrl && <audio ref={voiceoverAudioRef} src={voiceoverAudioUrl} controls className="w-full mt-2"></audio>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>)}
+                    {activePanel === 'email' && (
+                        <EmailPanel
+                            recipient={emailRecipient}
+                            subject={emailSubject}
+                            body={emailBody}
+                            onRecipientChange={setEmailRecipient}
+                            onSubjectChange={setEmailSubject}
+                            onBodyChange={setEmailBody}
+                            onSend={handleSendEmail}
+                        />
+                    )}
+                    {activePanel === 'lyrics' && songLyrics && (
+                        <div className="flex-grow p-4 sm:p-6 overflow-y-auto bg-black/20 flex flex-col items-center justify-center text-center">
+                            <h3 className="text-xl font-bold">{songLyrics.name}</h3>
+                            <p className="text-md text-text-color-muted mb-6">{songLyrics.artist}</p>
+                            <div className="lyrics-container w-full max-w-lg">
+                                {songLyrics.lyrics.map((line, index) => (
+                                    <p key={index} className={`lyrics-line ${index === songLyrics.currentLine ? 'active' : ''}`}>
+                                        {line}
+                                    </p>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {activePanel === 'weather' && (weatherData ? <WeatherPanel data={weatherData} /> : <div className="flex-grow flex items-center justify-center text-text-color-muted"><p>Ask Kaniska for the weather to see it here.</p></div>)}
+                    {activePanel === 'news' && (newsArticles.length > 0 ? <NewsPanel articles={newsArticles} /> : <div className="flex-grow flex items-center justify-center text-text-color-muted"><p>Ask Kaniska for news to see it here.</p></div>)}
+                    {activePanel === 'timer' && (timer ? <TimerPanel timer={timer} /> : <div className="flex-grow flex items-center justify-center text-text-color-muted"><p>Ask Kaniska to set a timer to see it here.</p></div>)}
                 </section>
             </main>
+            {isSettingsModalOpen && (
+                <SettingsModal
+                    isOpen={isSettingsModalOpen}
+                    onClose={() => setIsSettingsModalOpen(false)}
+                    avatars={avatars}
+                    currentAvatar={currentAvatar}
+                    onSelectAvatar={setCurrentAvatar}
+                    onUploadAvatar={(newAvatar) => setAvatars(prev => [...prev, newAvatar])}
+                    onGenerateAvatar={handleGenerateAvatar}
+                    generatedAvatarResult={generatedAiAvatar}
+                    customGreeting={customGreeting}
+                    onSaveGreeting={handleSaveGreeting}
+                    customSystemPrompt={customSystemPrompt}
+                    onSaveSystemPrompt={handleSaveSystemPrompt}
+                    onClearHistory={handleClearHistory}
+                    selectedVoice={selectedVoice}
+                    onSelectVoice={setSelectedVoice}
+                    voicePitch={voicePitch}
+                    onSetVoicePitch={setVoicePitch}
+                    voiceSpeed={voiceSpeed}
+                    onSetVoiceSpeed={setVoiceSpeed}
+                    greetingVoice={greetingVoice}
+                    onSetGreetingVoice={setGreetingVoice}
+                    greetingPitch={greetingPitch}
+                    onSetGreetingPitch={setGreetingPitch}
+                    greetingSpeed={greetingSpeed}
+                    onSetGreetingSpeed={setGreetingSpeed}
+                    speakText={speakText}
+                    aiRef={aiRef.current}
+                    voiceTrainingData={voiceTrainingData}
+                    setVoiceTrainingData={setVoiceTrainingData}
+                    onAnalyzeVoice={handleAnalyzeVoice}
+                    userId={userIdRef.current}
+                    setUserApiKey={setUserApiKey}
+                    setIsStudioKeySelected={setIsStudioKeySelected}
+                />
+            )}
+            {editingImage && (
+                <ImageEditorModal
+                    isOpen={!!editingImage}
+                    image={editingImage}
+                    onClose={() => setEditingImage(null)}
+                    onSave={(newUrl) => {
+                        setGeneratedImages(prev => prev.map(img => img.id === editingImage.id ? {...img, url: newUrl} : img));
+                        if(selectedImage?.id === editingImage.id) setSelectedImage(prev => prev ? {...prev, url: newUrl} : null);
+                        setEditingImage(null);
+                    }}
+                />
+            )}
+            {liveEditingImage && (
+                <LiveImageEditorModal
+                    isOpen={!!liveEditingImage}
+                    image={liveEditingImage}
+                    filters={liveEditFilters}
+                    transform={liveEditTransform}
+                    onClose={() => setLiveEditingImage(null)}
+                    onReset={() => {
+                        setLiveEditFilters(initialFilters);
+                        setLiveEditTransform(initialTransforms);
+                    }}
+                    onSave={(newUrl) => {
+                         setGeneratedImages(prev => prev.map(img => img.id === liveEditingImage.id ? {...img, url: newUrl} : img));
+                        if(selectedImage?.id === liveEditingImage.id) setSelectedImage(prev => prev ? {...prev, url: newUrl} : null);
+                        setLiveEditingImage(null);
+                        sessionPromiseRef.current?.then(session => session.sendRealtimeInput({ text: "Live editing finished." }));
+                    }}
+                />
+            )}
+            {websitePreview && (
+                <WebsitePreviewModal
+                    preview={websitePreview}
+                    onClose={() => setWebsitePreview(null)}
+                />
+            )}
+            {shareContent && (
+                 <div className="modal-overlay" onClick={() => setShareContent(null)}>
+                    <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                             <h2 className="text-lg font-semibold">Share {shareContent.type}</h2>
+                            <button onClick={() => setShareContent(null)} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                        </header>
+                         <div className="p-6 text-center">
+                            {shareContent.type === 'image' ? (
+                                <img src={shareContent.content} alt={shareContent.prompt} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md" />
+                            ) : (
+                                <video src={shareContent.content} controls className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md"></video>
+                            )}
+                             <p className="text-sm text-text-color-muted mt-4">{shareContent.prompt}</p>
+                            <p className="text-xs text-yellow-400 mt-4">Web Share API is not available on this browser/device. You can download the file instead.</p>
+                        </div>
+                        <footer className="flex justify-end p-4 border-t border-border-color gap-2">
+                             <button onClick={() => setShareContent(null)} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Close</button>
+                             <a href={shareContent.content} download={`kaniska-creation.${shareContent.type === 'image' ? 'jpg' : 'mp4'}`} className="inline-block px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md no-underline">Download</a>
+                        </footer>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
-{/* --- FIX END: Fix truncated SVG tag and complete JSX structure --- */}
