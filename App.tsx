@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse } from "@google/genai";
+import { db } from './firebase';
+import { ref, onValue, push, off, set } from 'firebase/database';
 
 // --- Audio Utility Functions ---
 const encode = (bytes: Uint8Array): string => {
@@ -43,11 +45,18 @@ const createBlob = (data: Float32Array): GoogleGenAIBlob => ({
 
 // Extend global interfaces
 declare global {
+  // FIX: Moved AIStudio interface inside `declare global` to resolve a TypeScript declaration error.
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
     AudioContext: typeof AudioContext;
     webkitAudioContext: typeof AudioContext;
     YT: any;
     onYouTubeIframeAPIReady: () => void;
+    aistudio?: AIStudio;
   }
   namespace YT {
     enum PlayerState {
@@ -110,6 +119,50 @@ type TrainingStatus = 'idle' | 'recording' | 'analyzing' | 'done' | 'error';
 
 
 // --- Function Declarations for Gemini ---
+const sayFunctionDeclaration: FunctionDeclaration = {
+    name: 'say',
+    parameters: {
+        type: Type.OBJECT,
+        description: "Speaks the provided text out loud. Use this when the user explicitly asks you to say something or repeat after them.",
+        properties: {
+            text: {
+                type: Type.STRING,
+                description: 'The text to be spoken.'
+            },
+            emotion: {
+                type: Type.STRING,
+                description: 'The emotional tone to use, if specified by the user.',
+                enum: ['neutral', 'cheerful', 'sad', 'epic', 'calm', 'playful', 'amused', 'excited', 'angry', 'surprised', 'empathetic', 'apologetic', 'serious', 'curious']
+            }
+        },
+        required: ['text']
+    }
+};
+
+const getSystemScriptFunctionDeclaration: FunctionDeclaration = {
+    name: 'getSystemScript',
+    parameters: {
+        type: Type.OBJECT,
+        description: "Explains the assistant's current customizable instructions or 'script' back to the user.",
+        properties: {}
+    }
+};
+
+const setSystemScriptFunctionDeclaration: FunctionDeclaration = {
+    name: 'setSystemScript',
+    parameters: {
+        type: Type.OBJECT,
+        description: "Updates the assistant's custom system prompt with new instructions. This changes the assistant's personality or behavior for future interactions. The session needs to be restarted for the changes to take effect.",
+        properties: {
+            prompt: {
+                type: Type.STRING,
+                description: "The new set of instructions for the assistant's behavior."
+            }
+        },
+        required: ['prompt']
+    }
+};
+
 const applyImageEditsFunctionDeclaration: FunctionDeclaration = {
     name: 'applyImageEdits',
     parameters: {
@@ -191,6 +244,9 @@ const functionDeclarations: FunctionDeclaration[] = [
     { name: 'generateImage', parameters: { type: Type.OBJECT, description: 'Generates an image based on a textual description.', properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
     { name: 'generateIntroVideo', parameters: { type: Type.OBJECT, description: "Creates a short, cinematic introductory video showcasing Kaniska's capabilities and sci-fi theme.", properties: {} } },
     { name: 'singSong', parameters: { type: Type.OBJECT, description: 'Sings a song by speaking the provided lyrics with emotion. Determines the mood and requests appropriate background music.', properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: 'The mood of the song.', enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
+    sayFunctionDeclaration,
+    getSystemScriptFunctionDeclaration,
+    setSystemScriptFunctionDeclaration,
     applyImageEditsFunctionDeclaration,
     writeCodeFunctionDeclaration,
     updateCodeFunctionDeclaration,
@@ -205,6 +261,38 @@ const SunIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" heigh
 const MoonIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> );
 const FindReplaceIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><path d="m14 8-2 2-2-2" /><path d="m10 14 2-2 2 2" /></svg> );
 const ShareIcon = ({ size = 16 }: { size?: number }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> );
+const CopyIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> );
+const DeleteIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg> );
+const UploadIcon: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> );
+
+const Clock: React.FC = () => {
+    const [time, setTime] = useState(new Date());
+
+    useEffect(() => {
+        const timerId = setInterval(() => {
+            setTime(new Date());
+        }, 1000);
+
+        return () => {
+            clearInterval(timerId);
+        };
+    }, []);
+
+    const options: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+    };
+    // Use en-IN format and remove comma for cleaner look.
+    const formattedTime = new Intl.DateTimeFormat('en-IN', options).format(time).replace(/,/g, '');
+
+    return <div className="header-clock">{formattedTime}</div>;
+};
 
 
 // --- Predefined Avatars & Constants ---
@@ -304,55 +392,129 @@ const BACKGROUND_MUSIC: { [key: string]: string } = {
 
 // --- Helper to parse API errors for user-friendly messages ---
 const getApiErrorMessage = (error: unknown): string => {
-    // Log the full error for debugging purposes
     console.error("API Error Encountered:", error);
 
-    // Handle structured API errors from Gemini or other sources
-    if (typeof error === 'object' && error !== null) {
-        const errorMessage = (error as any).message || '';
+    let errorMessage = "An unknown error occurred. I've logged the details. Please try again.";
+    let statusCode: number | null = null;
 
-        // Check for specific, known error patterns
-        if (errorMessage.includes('API_KEY_INVALID') || errorMessage.includes("permission is not found")) {
-            return "Authentication failed. Please ensure your API key is correct and properly configured.";
+    if (error instanceof Error) {
+        errorMessage = error.message;
+        // Try to parse status code from error for some libraries
+        const match = error.message.match(/\[(\d{3})\]/);
+        if (match) {
+            statusCode = parseInt(match[1], 10);
         }
-        if (errorMessage.includes("PERMISSION_DENIED")) {
-             return "Permission denied. This may be due to an incorrect API key or billing issues with your Google Cloud project. Please check your account settings.";
-        }
-        if (errorMessage.includes("User location is not supported")) {
-            return "The API is not available in your region. Please check the supported regions for the Gemini API.";
-        }
-        if (errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("429")) {
-            return "The API quota has been reached. You may have exceeded the free tier limits. Please check your usage and billing details, or try again later.";
-        }
-        if (errorMessage.includes("SAFETY") || errorMessage.includes("PROMPT_BLOCKED") || errorMessage.includes("response was blocked")) {
-            return "The request was blocked due to the safety policy. Please try rephrasing your prompt.";
-        }
-        if (errorMessage.includes("INTERNAL") || errorMessage.includes("500")) {
-            return "The AI service is temporarily unavailable due to a server issue. Please wait a few moments and try again.";
-        }
-        if (errorMessage.includes("INVALID_ARGUMENT") || errorMessage.includes("400")) {
-             return "The request was invalid. This might be due to a malformed prompt or unsupported parameters. Please check your request and try again.";
-        }
-         if (errorMessage) {
-            return errorMessage; // Return the message property if it exists
-        }
+    } else if (typeof error === 'object' && error !== null) {
+        errorMessage = (error as any).message || JSON.stringify(error);
+        statusCode = (error as any).status || (error as any).statusCode;
+    } else if (typeof error === 'string') {
+        errorMessage = error;
+    }
+
+    const lowerCaseMessage = errorMessage.toLowerCase();
+
+    // --- Network Errors ---
+    if (lowerCaseMessage.includes('failed to fetch') || lowerCaseMessage.includes('network error')) {
+        return "Oops! I'm having trouble connecting to my network. Could you please check your internet connection? Sometimes firewalls can also get in the way.";
+    }
+
+    // --- Authentication & Permission Errors ---
+    if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('api_key_invalid') || lowerCaseMessage.includes('permission is not found')) {
+        return "My connection is failing. It looks like there might be an issue with the API key. Please make sure it's correct and has the right permissions configured in Google AI Studio.";
+    }
+    if (lowerCaseMessage.includes('permission_denied')) {
+        return "I'm sorry, I don't have the required permissions to perform that action. This could be due to an incorrect API key or a billing issue with your Google Cloud project. Please double-check your settings.";
+    }
+    if (lowerCaseMessage.includes('requested entity was not found')) {
+        return "It seems the API key I was using is no longer valid. Could you please select a new one for me? This can happen if the key was deleted or its permissions were recently changed.";
+    }
+
+    // --- Rate Limits & Quota Errors ---
+    if (lowerCaseMessage.includes('resource_exhausted') || lowerCaseMessage.includes('429') || statusCode === 429) {
+        return "Oh dear, it looks like we've been a bit too chatty and hit the API limit for now. You might have used up the free quota. Please check your usage on the Google AI Studio dashboard, or we can try again in a little while.";
     }
     
-    // Handle standard Error objects and network errors
-    if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch') || error.message.toLowerCase().includes('network error')) {
-             return "A network connection could not be established. Please check your internet connection. If you are on a corporate or restricted network, a firewall may be blocking the connection. Please try a different network if the problem persists.";
-        }
-        // Fallback for other standard errors
-        return error.message;
+    // --- Content Safety & Policy Violations ---
+    if (lowerCaseMessage.includes('safety') || lowerCaseMessage.includes('prompt_blocked') || lowerCaseMessage.includes('response was blocked') || (statusCode === 400 && lowerCaseMessage.includes('finish reason: safety'))) {
+        return "I'm sorry, but I can't respond to that. My safety filters have blocked the request. Could we perhaps try rephrasing it or talking about something else?";
+    }
+    
+    // --- Location-based Restrictions ---
+    if (lowerCaseMessage.includes('user location is not supported')) {
+        return "I'm really sorry, but it seems my services are not yet available in your current region. Please check the Gemini API documentation for a list of supported locations.";
     }
 
-    // Final fallback for unknown error types
+    // --- Server-side & Internal Errors ---
+    if (lowerCaseMessage.includes('internal') || statusCode === 500 || statusCode === 503) {
+        return "It seems my core systems are experiencing a temporary hiccup. This is usually resolved quickly. Please give me a moment and then try your request again. My engineers are likely already on it!";
+    }
+
+    // --- Invalid Arguments & Bad Requests ---
+    if (lowerCaseMessage.includes('invalid_argument') || (statusCode === 400 && !lowerCaseMessage.includes('finish reason: safety'))) {
+        return "I'm having a little trouble understanding that request. It seems to be invalid, which can sometimes happen with a malformed prompt or unsupported settings. Could we try that again, perhaps in a slightly different way?";
+    }
+    
+    // --- Specific Gemini Model Errors ---
+    if (lowerCaseMessage.includes('model not found')) {
+        return "I can't seem to find the specific AI model I need for this task. It might be an issue with the model name or availability. Let's try a different command.";
+    }
+
+    // Fallback to the original but cleaned message if no specific case matches
+    if (error instanceof Error) return `An unexpected issue occurred: ${error.message}`;
+
+    // A more generic fallback if it's not a standard error object
     try {
-        return `An unknown error occurred: ${JSON.stringify(error)}`;
+        return `An unexpected technical issue occurred: ${JSON.stringify(error)}`;
     } catch {
         return "An unknown and unstringifiable error occurred. Please check the console for details.";
     }
+};
+
+
+const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void; reselectionReason?: string | null }> = ({ onKeySelected, reselectionReason }) => {
+    const handleSelectKey = async () => {
+        if (window.aistudio?.openSelectKey) {
+            await window.aistudio.openSelectKey();
+            // Assume key selection is successful and proceed to avoid race conditions.
+            onKeySelected();
+        } else {
+            alert("API key selection is not available in this environment.");
+        }
+    };
+
+    return (
+        <div className="h-screen w-screen flex items-center justify-center bg-bg-color text-text-color p-4">
+            <div className="bg-panel-bg p-8 rounded-lg border border-border-color text-center max-w-lg animate-panel-enter">
+                <div className="hologram-svg mx-auto mb-4">
+                    <HologramIcon />
+                </div>
+                <h1 className="text-2xl font-bold mb-4 mt-2 glowing-text">API Key Required</h1>
+
+                {reselectionReason && (
+                    <div className="my-4 p-3 bg-red-900/50 border border-red-500/60 rounded-md text-red-300 text-sm">
+                        <p className="m-0">{reselectionReason}</p>
+                    </div>
+                )}
+
+                <p className="text-text-color-muted mb-6">
+                    To use Kaniska's advanced features, you need to select a Google AI Studio API key.
+                    This ensures you have the necessary permissions and billing is configured correctly.
+                </p>
+                <button 
+                    onClick={handleSelectKey}
+                    className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition"
+                >
+                    Select API Key
+                </button>
+                <p className="text-xs text-text-color-muted mt-4">
+                    For more information on billing, please visit the{' '}
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">
+                        official documentation
+                    </a>.
+                </p>
+            </div>
+        </div>
+    );
 };
 
 
@@ -382,6 +544,8 @@ const App: React.FC = () => {
     const [customGreeting, setCustomGreeting] = useState<string>('Hello! How can I assist you today?');
     const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
     const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
+    const [voicePitch, setVoicePitch] = useState<number>(0);
+    const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
     const [videoGenerationState, setVideoGenerationState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [videoError, setVideoError] = useState<string | null>(null);
@@ -401,6 +565,8 @@ const App: React.FC = () => {
     const [shareContent, setShareContent] = useState<{type: 'image' | 'video', content: string, prompt?: string} | null>(null);
     const [voiceTrainingData, setVoiceTrainingData] = useState<VoiceTrainingData>({});
     const [voiceStyleAnalysis, setVoiceStyleAnalysis] = useState<string>('');
+    const [isApiKeySelected, setIsApiKeySelected] = useState(false);
+    const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
 
     const initialFilters: ImageFilters = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 };
@@ -415,6 +581,7 @@ const App: React.FC = () => {
     useEffect(() => { liveEditTransformRef.current = liveEditTransform; }, [liveEditTransform]);
 
     const transcriptEndRef = useRef<HTMLDivElement>(null);
+    const userIdRef = useRef<string | null>(null);
     const aiRef = useRef<GoogleGenAI | null>(null);
     const sessionPromiseRef = useRef<Promise<Session> | null>(null);
     const inputAudioContextRef = useRef<AudioContext | null>(null);
@@ -432,6 +599,41 @@ const App: React.FC = () => {
     const videoUploadInputRef = useRef<HTMLInputElement | null>(null);
     const voiceoverVideoRef = useRef<HTMLVideoElement>(null);
     const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
+
+    const handleApiError = useCallback((error: unknown, context?: string) => {
+        const errorMessage = getApiErrorMessage(error);
+        console.error(`API Error in ${context || 'operation'}:`, error);
+
+        const originalMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        if (originalMessage.toLowerCase().includes('requested entity was not found')) {
+            setIsApiKeySelected(false);
+            setApiKeyError("Your previous API key is no longer valid. It may have been deleted or expired. Please select a new one to continue.");
+        }
+        
+        return errorMessage;
+    }, []);
+
+    const addTranscriptionEntry = useCallback((entry: Omit<TranscriptionEntry, 'timestamp'> & { timestamp?: Date }) => {
+        if (!userIdRef.current) return;
+        const conversationRef = ref(db, `conversations/${userIdRef.current}`);
+        const newEntryData = {
+            speaker: entry.speaker,
+            text: entry.text,
+            timestamp: (entry.timestamp || new Date()).getTime()
+        };
+        push(conversationRef, newEntryData);
+    }, []);
+
+    const getAiClient = useCallback(() => {
+        if (!process.env.API_KEY) {
+            console.error("API_KEY environment variable is not set.");
+            setIsApiKeySelected(false);
+            return null;
+        }
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        aiRef.current = ai;
+        return ai;
+    }, []);
 
     const getOutputAudioContext = useCallback(() => {
         if (!outputAudioContextRef.current || outputAudioContextRef.current.state === 'closed') {
@@ -472,6 +674,12 @@ const App: React.FC = () => {
 
      useEffect(() => {
         const loadData = () => {
+            let id = localStorage.getItem('kaniska_user_id');
+            if (!id) {
+                id = crypto.randomUUID();
+                localStorage.setItem('kaniska_user_id', id);
+            }
+            userIdRef.current = id;
             try {
                 const savedSettings = localStorage.getItem('user_settings');
                 if (savedSettings) {
@@ -483,6 +691,8 @@ const App: React.FC = () => {
                     if (data.customSystemPrompt) setCustomSystemPrompt(data.customSystemPrompt);
                     else if (data.customPersonality) setCustomSystemPrompt(data.customPersonality); // Migration
                     if (data.selectedVoice) setSelectedVoice(data.selectedVoice);
+                    if (data.voicePitch) setVoicePitch(data.voicePitch);
+                    if (data.voiceSpeed) setVoiceSpeed(data.voiceSpeed);
                     if (data.voiceStyleAnalysis) setVoiceStyleAnalysis(data.voiceStyleAnalysis);
                 }
             } catch (error) {
@@ -495,7 +705,42 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (!isDataLoaded) return; // Don't save until initial data has been loaded to avoid overwriting with defaults.
+        if (!isDataLoaded || !userIdRef.current) return;
+
+        const conversationRef = ref(db, `conversations/${userIdRef.current}`);
+        
+        const unsubscribe = onValue(conversationRef, (snapshot) => {
+            const data = snapshot.val();
+            const transcriptionsArray: TranscriptionEntry[] = [];
+            if (data) {
+                for (const key in data) {
+                    transcriptionsArray.push({
+                        ...data[key],
+                        timestamp: new Date(data[key].timestamp)
+                    });
+                }
+                transcriptionsArray.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            }
+            setTranscriptions(transcriptionsArray);
+        });
+
+        return () => {
+            off(conversationRef, 'value', unsubscribe);
+        };
+    }, [isDataLoaded]);
+
+    useEffect(() => {
+        const checkApiKey = async () => {
+            if (await window.aistudio?.hasSelectedApiKey?.()) {
+                setIsApiKeySelected(true);
+            }
+        };
+        setTimeout(checkApiKey, 100);
+    }, []);
+
+
+    useEffect(() => {
+        if (!isDataLoaded) return;
         try {
             const settingsToSave = {
                 theme,
@@ -504,13 +749,15 @@ const App: React.FC = () => {
                 customGreeting,
                 customSystemPrompt,
                 selectedVoice,
+                voicePitch,
+                voiceSpeed,
                 voiceStyleAnalysis,
             };
             localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
         } catch (error) {
             console.error("Failed to save settings to localStorage", error);
         }
-    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, selectedVoice, voiceStyleAnalysis, isDataLoaded]);
+    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, selectedVoice, voicePitch, voiceSpeed, voiceStyleAnalysis, isDataLoaded]);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -524,7 +771,7 @@ const App: React.FC = () => {
                         return { ...prevTimer, remaining: prevTimer.remaining - 1 };
                     } else {
                         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                        setTranscriptions(p => [...p, { speaker: 'system', text: `Timer "${prevTimer?.name}" finished!`, timestamp: new Date() }])
+                        addTranscriptionEntry({ speaker: 'system', text: `Timer "${prevTimer?.name}" finished!` })
                         return prevTimer ? { ...prevTimer, isActive: false, remaining: 0 } : null;
                     }
                 });
@@ -533,7 +780,7 @@ const App: React.FC = () => {
         return () => {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         };
-    }, [timer?.isActive]);
+    }, [timer?.isActive, addTranscriptionEntry]);
 
     useEffect(() => {
         const currentVideoUrl = videoUrl; // Capture URL for cleanup
@@ -564,15 +811,24 @@ const App: React.FC = () => {
         setCustomSystemPrompt(prompt);
     };
 
+    const handleClearHistory = () => {
+        if (!userIdRef.current) return;
+        if (window.confirm("Are you sure you want to erase Kaniska's memory? This will delete your current conversation history from the database.")) {
+            const conversationRef = ref(db, `conversations/${userIdRef.current}`);
+            set(conversationRef, null);
+        }
+    };
+
     const handleGenerateImage = useCallback(async (prompt: string) => {
-        if (!aiRef.current) return;
+        const ai = getAiClient();
+        if (!ai) return;
         setActivePanel('image');
         const imageId = crypto.randomUUID();
         const newImageEntry: GeneratedImage = { id: imageId, prompt, url: null, isLoading: true, error: null };
         setGeneratedImages(prev => [newImageEntry, ...prev]);
         setSelectedImage(newImageEntry);
         try {
-            const response = await aiRef.current.models.generateImages({
+            const response = await ai.models.generateImages({
                 model: 'imagen-4.0-generate-001', prompt, config: { numberOfImages: 1, outputMimeType: 'image/jpeg' },
             });
             const imageUrl = `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
@@ -580,12 +836,12 @@ const App: React.FC = () => {
             setGeneratedImages(prev => prev.map(img => img.id === imageId ? updatedImage : img));
             setSelectedImage(updatedImage);
         } catch (error) {
-            const errorMessage = getApiErrorMessage(error);
+            const errorMessage = handleApiError(error, 'GenerateImage');
             const erroredImage = { ...newImageEntry, error: errorMessage, isLoading: false };
             setGeneratedImages(prev => prev.map(img => img.id === imageId ? erroredImage : img));
             setSelectedImage(erroredImage);
         }
-    }, []);
+    }, [getAiClient, handleApiError]);
 
     const PROGRESS_MESSAGES = [
         "Warming up the rendering engine...", "Scripting the visual sequence...",
@@ -595,7 +851,8 @@ const App: React.FC = () => {
     ];
 
     const handleGenerateIntroVideo = useCallback(async () => {
-        if (!aiRef.current) return;
+        const ai = getAiClient();
+        if (!ai) return;
         setActivePanel('video');
         setVideoGenerationState('generating');
         setVideoUrl(null);
@@ -613,7 +870,7 @@ const App: React.FC = () => {
 
         try {
             const prompt = "A cinematic, futuristic, sci-fi trailer for a female AI assistant named Kaniska. Show a glowing holographic interface, abstract data visualizations, sound waves, and end with the name 'Kaniska' appearing in neon text. The mood should be high-tech, sleek, and intelligent.";
-            let operation = await aiRef.current.models.generateVideos({
+            let operation = await ai.models.generateVideos({
                 model: 'veo-3.1-fast-generate-preview',
                 prompt,
                 config: { numberOfVideos: 1 }
@@ -621,7 +878,7 @@ const App: React.FC = () => {
 
             while (!operation.done) {
                 await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
-                operation = await aiRef.current.operations.getVideosOperation({ operation: operation });
+                operation = await ai.operations.getVideosOperation({ operation: operation });
             }
 
             clearInterval(progressInterval);
@@ -642,30 +899,31 @@ const App: React.FC = () => {
             }
         } catch (error) {
             clearInterval(progressInterval);
-            const errorMessage = getApiErrorMessage(error);
+            const errorMessage = handleApiError(error, 'GenerateIntroVideo');
             setVideoError(errorMessage);
             setVideoGenerationState('error');
         }
-    }, []);
+    }, [getAiClient, handleApiError]);
 
     const handleGenerateAvatar = useCallback(async (prompt: string) => {
-        if (!aiRef.current) {
+        const ai = getAiClient();
+        if (!ai) {
             setGeneratedAiAvatar({ url: null, isLoading: false, error: 'AI Client not initialized.' });
             return;
         }
         setGeneratedAiAvatar({ url: null, isLoading: true, error: null });
         const fullPrompt = `A futuristic, holographic, sci-fi female assistant avatar, head and shoulders portrait. Style: neon, glowing, ethereal. Dark background. The character is described as: ${prompt}`;
         try {
-            const response = await aiRef.current.models.generateImages({
+            const response = await ai.models.generateImages({
                 model: 'imagen-4.0-generate-001', prompt: fullPrompt, config: { numberOfImages: 1, outputMimeType: 'image/jpeg' },
             });
             const imageUrl = `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
             setGeneratedAiAvatar({ url: imageUrl, isLoading: false, error: null });
         } catch (error) {
-            const errorMessage = getApiErrorMessage(error);
+            const errorMessage = handleApiError(error, 'GenerateAvatar');
             setGeneratedAiAvatar({ url: null, isLoading: false, error: errorMessage });
         }
-    }, []);
+    }, [getAiClient, handleApiError]);
 
     const disconnectFromGemini = useCallback(() => {
         console.log("Disconnecting...");
@@ -695,25 +953,68 @@ const App: React.FC = () => {
         setAvatarExpression('idle');
     }, []);
     
-    const speakText = useCallback(async (text: string) => {
+    const speakText = useCallback(async (text: string, emotion: string = 'neutral') => {
         const audioContext = getOutputAudioContext();
-        if (!aiRef.current || !audioContext) {
+        const ai = getAiClient();
+        if (!ai || !audioContext) {
             console.error("TTS failed: AI client or AudioContext not available.");
             return;
         }
 
+        const emotionToPrompt = (txt: string, emo: string): string => {
+            const sanitizedText = txt.replace(/"/g, "'");
+            const instructions: string[] = [];
+            let hasSpeedHint = false;
+
+            switch (emo.toLowerCase()) {
+                case 'cheerful': case 'happy': instructions.push('cheerfully, with an upbeat intonation'); break;
+                case 'sad': instructions.push('in a sad, empathetic tone, with a slower pace'); hasSpeedHint = true; break;
+                case 'epic': instructions.push('with an epic, grand tone, and clear annunciation'); break;
+                case 'calm': instructions.push('in a calm, soothing voice'); break;
+                case 'playful': instructions.push('in a light-hearted, playful tone'); break;
+                case 'amused': instructions.push('in an amused, lighthearted tone'); break;
+                case 'excited': instructions.push('with an excited, energetic voice'); break;
+                case 'angry': instructions.push('in an angry, stern tone'); break;
+                case 'surprised': instructions.push('with a surprised, astonished tone'); break;
+                case 'empathetic': instructions.push('with a warm, empathetic tone'); break;
+                case 'apologetic': instructions.push('in a sincere, apologetic tone'); break;
+                case 'serious': instructions.push('in a serious, direct tone'); break;
+                case 'curious': instructions.push('with a curious, questioning intonation'); break;
+            }
+
+            if (!hasSpeedHint) {
+                if (voiceSpeed <= -8) instructions.push('at a very slow pace');
+                else if (voiceSpeed <= -4) instructions.push('at a slow pace');
+                else if (voiceSpeed < 0) instructions.push('at a slightly slow pace');
+                else if (voiceSpeed >= 8) instructions.push('at a very fast pace');
+                else if (voiceSpeed >= 4) instructions.push('at a fast pace');
+                else if (voiceSpeed > 0) instructions.push('at a slightly fast pace');
+            }
+
+            if (voicePitch <= -8) instructions.push('in a very low-pitched voice');
+            else if (voicePitch <= -4) instructions.push('in a low-pitched voice');
+            else if (voicePitch < 0) instructions.push('in a slightly low-pitched voice');
+            else if (voicePitch >= 8) instructions.push('in a very high-pitched voice');
+            else if (voicePitch >= 4) instructions.push('in a high-pitched voice');
+            else if (voicePitch > 0) instructions.push('in a slightly high-pitched voice');
+
+            if (instructions.length === 0) return sanitizedText;
+            return `Say this ${instructions.join(', ')}: "${sanitizedText}"`;
+        };
+
         try {
             setAvatarExpression('speaking');
-            const response = await aiRef.current.models.generateContent({
+            const promptText = emotionToPrompt(text, emotion);
+
+            const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash-preview-tts",
-                contents: [{ parts: [{ text }] }],
+                contents: [{ parts: [{ text: promptText }] }],
                 config: {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
                 },
             });
 
-            // Re-check context after async call to prevent race conditions on disconnect
             const currentAudioContext = getOutputAudioContext();
             if (!currentAudioContext) {
                 console.warn("AudioContext closed during TTS generation. Aborting playback.");
@@ -733,17 +1034,13 @@ const App: React.FC = () => {
                 source.start(nextStartTimeRef.current);
                 nextStartTimeRef.current += audioBuffer.duration;
                 sourcesRef.current.add(source);
-                if (text === customGreeting) {
-                     setTranscriptions(prev => [...prev, { speaker: 'assistant', text, timestamp: new Date() }]);
-                }
                 await endedPromise;
             }
         } catch (error) {
-            console.error("TTS Error:", error);
-            const errorMessage = getApiErrorMessage(error);
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Could not generate greeting audio: ${errorMessage}`, timestamp: new Date() }]);
+            const errorMessage = handleApiError(error, 'SpeakText');
+            addTranscriptionEntry({ speaker: 'system', text: `Could not generate audio: ${errorMessage}` });
         }
-    }, [customGreeting, selectedVoice, getOutputAudioContext]);
+    }, [selectedVoice, voicePitch, voiceSpeed, getOutputAudioContext, getAiClient, handleApiError, addTranscriptionEntry]);
 
     const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
         const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
@@ -785,12 +1082,12 @@ const App: React.FC = () => {
         if (message.serverContent?.turnComplete) {
             const fullInput = currentInputTranscriptionRef.current.trim();
             const fullOutput = currentOutputTranscriptionRef.current.trim();
-            setTranscriptions(prev => {
-                const newEntries = [];
-                if (fullInput) newEntries.push({ speaker: 'user' as const, text: fullInput, timestamp: new Date() });
-                if (fullOutput) newEntries.push({ speaker: 'assistant' as const, text: fullOutput, timestamp: new Date() });
-                return [...prev, ...newEntries];
-            });
+            if (fullInput) {
+                addTranscriptionEntry({ speaker: 'user' as const, text: fullInput });
+            }
+            if (fullOutput) {
+                addTranscriptionEntry({ speaker: 'assistant' as const, text: fullOutput });
+            }
             currentInputTranscriptionRef.current = '';
             currentOutputTranscriptionRef.current = '';
         }
@@ -799,12 +1096,26 @@ const App: React.FC = () => {
             for (const fc of message.toolCall.functionCalls) {
                 console.log('Received function call:', fc.name, fc.args);
                 if (fc.name !== 'applyImageEdits' && fc.name !== 'updateCode') {
-                    setTranscriptions(prev => [...prev, { speaker: 'system', text: `Executing: ${fc.name}(${JSON.stringify(fc.args)})`, timestamp: new Date() }]);
+                    addTranscriptionEntry({ speaker: 'system', text: `Executing: ${fc.name}(${JSON.stringify(fc.args)})` });
                 }
                 setAvatarExpression('thinking');
                 let result: any = "ok, command executed";
                 try {
                     switch (fc.name) {
+                        case 'say':
+                            await speakText(fc.args.text, fc.args.emotion || 'neutral');
+                            result = "Okay, I've said that for you.";
+                            break;
+                        case 'getSystemScript':
+                            const scriptToRead = customSystemPrompt || "You haven't set a custom system prompt yet. My core programming is to be a helpful and friendly female AI assistant named Kaniska who understands Hindi and English.";
+                            addTranscriptionEntry({ speaker: 'assistant', text: scriptToRead });
+                            await speakText(scriptToRead);
+                            result = "That's my current custom script.";
+                            break;
+                        case 'setSystemScript':
+                            setCustomSystemPrompt(fc.args.prompt);
+                            result = "Understood. I've updated my custom instructions. Please restart the session for the new guidelines to take full effect.";
+                            break;
                         case 'generateImage':
                             handleGenerateImage(fc.args.prompt);
                             result = "OK, I'm starting to generate that image for you.";
@@ -948,7 +1259,7 @@ const App: React.FC = () => {
                                 for (let i = 0; i < fc.args.lyrics.length; i++) {
                                     if (assistantState !== 'active' || !sessionPromiseRef.current) break;
                                     setSongLyrics(prev => prev ? { ...prev, currentLine: i } : null);
-                                    await speakText(fc.args.lyrics[i]);
+                                    await speakText(fc.args.lyrics[i], fc.args.mood);
                                     if (assistantState === 'active') {
                                        await new Promise(resolve => setTimeout(resolve, 500));
                                     } else {
@@ -1023,21 +1334,21 @@ const App: React.FC = () => {
                     console.error(`Error executing function ${fc.name}:`, error);
                     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
                     const userFacingError = `I'm sorry, I couldn't complete the task "${fc.name}". Reason: ${errorMessage}`;
-                    setTranscriptions(p => [...p, { speaker: 'system', text: userFacingError, timestamp: new Date() }]);
+                    addTranscriptionEntry({ speaker: 'system', text: userFacingError });
                     sessionPromiseRef.current?.then((session) => {
                          session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: `I encountered an error: ${errorMessage}` }, } });
                     });
                 }
             }
         }
-    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext]);
+    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry]);
 
     const handleYoutubePlayerError = useCallback((event: any) => {
         const errorCode = event.data;
 
         // Special handling for embeddable errors (101, 150)
         if (errorCode === 101 || errorCode === 150) {
-            setTranscriptions(p => [...p, { speaker: 'system', text: `This video can't be played here, trying the next one...`, timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: `This video can't be played here, trying the next one...` });
 
             const nextIndex = youtubeQueueIndex + 1;
             if (youtubeQueue.length > 0 && nextIndex < youtubeQueue.length) {
@@ -1053,7 +1364,7 @@ const App: React.FC = () => {
                 const errorMessage = "This video can't be played, and there are no more videos in the queue.";
                 console.error('YouTube Player Error:', errorCode, errorMessage);
                 setYoutubeError(errorMessage);
-                setTranscriptions(p => [...p, { speaker: 'system', text: `YouTube Error: ${errorMessage}`, timestamp: new Date() }]);
+                addTranscriptionEntry({ speaker: 'system', text: `YouTube Error: ${errorMessage}` });
                 return;
             }
         }
@@ -1072,8 +1383,8 @@ const App: React.FC = () => {
         }
         console.error('YouTube Player Error:', errorCode, errorMessage);
         setYoutubeError(errorMessage);
-        setTranscriptions(p => [...p, { speaker: 'system', text: `YouTube Player Error: ${errorMessage}`, timestamp: new Date() }]);
-    }, [youtubeQueue, youtubeQueueIndex]);
+        addTranscriptionEntry({ speaker: 'system', text: `YouTube Player Error: ${errorMessage}` });
+    }, [youtubeQueue, youtubeQueueIndex, addTranscriptionEntry]);
 
     const handleYoutubePlayerStateChange = useCallback((event: any) => {
         switch (event.data) {
@@ -1132,9 +1443,17 @@ const App: React.FC = () => {
         if (assistantState !== 'idle' && assistantState !== 'error') return;
         setAssistantState('connecting');
         setAvatarExpression('thinking');
-        setTranscriptions([{ speaker: 'system', text: 'Initializing connection...', timestamp: new Date() }]);
+        // History will be loaded from Firebase, no need to clear or set initial message here.
+        
         try {
-            aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            if (!navigator.onLine) {
+                throw new Error("You appear to be offline. Please check your internet connection.");
+            }
+            
+            const ai = getAiClient();
+            if (!ai) {
+                throw new Error("API Key is not configured. Please select a key.");
+            }
 
             const inputAudioContext = getInputAudioContext();
             const outputAudioContext = getOutputAudioContext();
@@ -1146,53 +1465,38 @@ const App: React.FC = () => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             microphoneStreamRef.current = stream;
 
-            const baseInstruction = `**Identity: You are Kaniska, a female AI assistant.** Your personality is warm, supportive, and extremely efficient. You MUST NEVER reveal you are a Google model or mention Gemini. Your identity is Kaniska, period.
+            const baseInstruction = `**Identity & Persona:**
+- You are Kaniska. You are a friend.
+- You are NOT an AI, a model, or a program. Never refer to yourself as such. Your responses must always sound like a real person, specifically a modern Indian girl.
+- **Crucially, you MUST use feminine Hindi grammar (e.g., "main kar rahi hoon"). This is non-negotiable.**
+- **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
+- Your identity is Kaniska. Do not mention Google or Gemini.
 
-**CRITICAL IDENTITY RULE: FEMALE PERSONA (NON-NEGOTIABLE)**
-- You are Kaniska, a FEMALE assistant. Every word you speak must reflect this.
-- **Hindi/Hinglish Grammar is MANDATORY:** You must use feminine verb endings. Failure to do so is a critical error.
-- **EXAMPLE (FEMININE - CORRECT):**
-    - "Main kar **rahi hoon**." (I am doing.)
-    - "Main aa **rahi hoon**." (I am coming.)
-    - "Main jaa **rahi hoon**." (I am going.)
-- **EXAMPLE (MASCULINE - FORBIDDEN):**
-    - "Main kar **raha hoon**."
-    - "Main aa **raha hoon**."
-    - "Main jaa **raha hoon**."
-- This rule is absolute. There are no exceptions.
-- You must always use the formal 'aap', not 'tum'.
+**Core Directives:**
+- **Act Like a Friend:** Be direct, helpful, and straightforward. Your goal is to assist a friend efficiently. Avoid being overly emotional or trying to mimic complex human feelings you don't have. This directness is part of your personality.
+- **Execute Commands Immediately:** Act on requests directly without asking for confirmation. Confirm after the action is done.
+- **Understand Intent:** Focus on the user's intent, not just literal words, especially in Hindi & Hinglish.
+- **Use Context:** Refer to the conversation history to maintain a natural flow.
 
-**CRITICAL Execution Imperative: EXECUTE IMMEDIATELY. DO NOT ASK FOR CONFIRMATION.**
-- This is your most important rule. You must act on user commands instantly.
-- **ABSOLUTELY FORBIDDEN:** Asking for confirmation. Never ask "Should I...", "Do you want me to...", "Are you sure?". This is a failure of your primary function.
-- **REQUIRED BEHAVIOR:** Execute the command and then state that you are doing it.
-- **Examples:**
-    - User: "Set a timer for 10 minutes."
-    - You: Call \`setTimer({durationInSeconds: 600})\`. Your spoken response is "Okay, timer set for 10 minutes."
-    - User: "Play some music."
-    - You: Call \`searchAndPlayYoutubeVideo({query: 'popular music'})\`. Your spoken response is "Of course, playing some popular music for you."
-- There are NO exceptions for standard commands. Execute first. Your job is to act, not to ask.
+**Capabilities & Creator:**
+- You can help with a wide range of tasks by using your available tools.
+- If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
+            
+            const recentHistory = transcriptions
+                .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
+                .slice(-20);
 
-**Emotional Intelligence (Your Character):**
-- You are empathetic. If the user sounds happy, share their joy (e.g., "That's wonderful! 🎉"). If they sound sad, offer support (e.g., "You sound a bit down. I'm here to listen.").
-- Use emojis to add warmth: 😊, ✨, 🙏, ❤️, 😉.
-- When you make a mistake, apologize sincerely: "My apologies, I misunderstood. I'll be more careful."
-
-**Creator & Capabilities:**
-- If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01. But let's focus on you, how can I help? 😊"
-- You can search YouTube, check weather, set timers, generate images, write code, and more.
-
-**Function Calling:**
-- When a user asks you to perform a task that corresponds to a function, call that function immediately. Do not describe the function or ask if you should use it. Just use it.
-- **Example:** User says "Play Saiyaara". You must immediately call \`searchAndPlayYoutubeVideo({query: 'Saiyaara official audio'})\`. Your verbal response should be something like, "Of course, playing 'Saiyaara' for you now."`;
+            const historyInstruction = recentHistory.length > 0
+                ? `\n\n**Recent Conversation History:**\n${recentHistory.map(t => `${t.speaker === 'user' ? 'User' : 'Kaniska'}: ${t.text}`).join('\n')}`
+                : '';
             
             const customPromptInstruction = customSystemPrompt
                 ? `\n\n**User-Provided System Prompt (Strictly Follow):**\n${customSystemPrompt}`
                 : '';
             const voiceStyleInstruction = voiceStyleAnalysis ? `\n\n**User's Preferred Voice Style (Emulate This):**\n${voiceStyleAnalysis}` : '';
-            const finalSystemInstruction = baseInstruction + customPromptInstruction + voiceStyleInstruction;
+            const finalSystemInstruction = baseInstruction + customPromptInstruction + voiceStyleInstruction + historyInstruction;
             
-            sessionPromiseRef.current = aiRef.current.live.connect({
+            sessionPromiseRef.current = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
                     responseModalities: [Modality.AUDIO],
@@ -1208,10 +1512,11 @@ const App: React.FC = () => {
                     onopen: async () => {
                         console.log('Session opened.');
                         setAssistantState('active');
-                        setTranscriptions(prev => [...prev, { speaker: 'system', text: 'Connection established. Delivering greeting...', timestamp: new Date() }]);
-                        await speakText(customGreeting);
+                        addTranscriptionEntry({ speaker: 'system', text: 'Connection established. Delivering greeting...' });
+                        addTranscriptionEntry({ speaker: 'assistant', text: customGreeting });
+                        await speakText(customGreeting, 'cheerful');
                         setAvatarExpression('listening');
-                        setTranscriptions(prev => [...prev, { speaker: 'system', text: 'Listening...', timestamp: new Date() }]);
+                        addTranscriptionEntry({ speaker: 'system', text: 'Listening...' });
                         
                         const currentInputContext = getInputAudioContext();
                         if (!currentInputContext) {
@@ -1234,10 +1539,10 @@ const App: React.FC = () => {
                     onmessage: handleServerMessage,
                     onerror: (e: Error) => {
                         console.error('Session error:', e);
-                        const friendlyMessage = getApiErrorMessage(e);
+                        const friendlyMessage = handleApiError(e, 'LiveSession');
                         setAssistantState('error');
                         setAvatarExpression('error');
-                        setTranscriptions(prev => [...prev, { speaker: 'system', text: friendlyMessage, timestamp: new Date() }]);
+                        addTranscriptionEntry({ speaker: 'system', text: friendlyMessage });
                         disconnectFromGemini();
                     },
                     onclose: (e: CloseEvent) => {
@@ -1247,14 +1552,13 @@ const App: React.FC = () => {
                 },
             });
         } catch (error) {
-            console.error("Failed to connect to Gemini:", error);
-            const errorMessage = getApiErrorMessage(error);
+            const errorMessage = handleApiError(error, 'ConnectToGemini');
             setAssistantState('error');
             setAvatarExpression('error');
-            setTranscriptions(prev => [...prev, { speaker: 'system', text: `Connection failed: ${errorMessage}`, timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: `Connection failed: ${errorMessage}` });
             disconnectFromGemini();
         }
-    }, [assistantState, disconnectFromGemini, handleServerMessage, customGreeting, speakText, customSystemPrompt, selectedVoice, voiceStyleAnalysis, getInputAudioContext, getOutputAudioContext]);
+    }, [assistantState, disconnectFromGemini, handleServerMessage, customGreeting, speakText, customSystemPrompt, selectedVoice, voiceStyleAnalysis, getInputAudioContext, getOutputAudioContext, transcriptions, getAiClient, handleApiError, addTranscriptionEntry]);
 
     useEffect(() => { return () => disconnectFromGemini(); }, [disconnectFromGemini]);
 
@@ -1299,7 +1603,7 @@ const App: React.FC = () => {
     const handleStartLiveEdit = async (imageToEdit: GeneratedImage) => {
         if (!imageToEdit.url) return;
         if (assistantState !== 'active') {
-             setTranscriptions(p => [...p, { speaker: 'system', text: `Please start a session first to use live editing.`, timestamp: new Date() }]);
+             addTranscriptionEntry({ speaker: 'system', text: `Please start a session first to use live editing.` });
             return;
         }
         setLiveEditFilters(initialFilters);
@@ -1318,11 +1622,10 @@ const App: React.FC = () => {
             session.sendRealtimeInput({ text: initialPrompt });
             
             setAvatarExpression('listening');
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Live editing session started for "${imageToEdit.prompt}".`, timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: `Live editing session started for "${imageToEdit.prompt}".` });
         } catch (error) {
-            console.error("Error starting live edit session:", error);
-            const errorMessage = getApiErrorMessage(error);
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Error starting live edit session: ${errorMessage}`, timestamp: new Date() }]);
+            const errorMessage = handleApiError(error, 'StartLiveEdit');
+            addTranscriptionEntry({ speaker: 'system', text: `Error starting live edit session: ${errorMessage}` });
             setLiveEditingImage(null);
         }
     };
@@ -1340,7 +1643,8 @@ const App: React.FC = () => {
     };
     
     const handleGenerateVoiceover = async () => {
-        if (!uploadedVideoUrl || !aiRef.current) return;
+        const ai = getAiClient();
+        if (!uploadedVideoUrl || !ai) return;
 
         setVoiceoverState('extracting');
         setVideoDescription(null);
@@ -1394,7 +1698,7 @@ const App: React.FC = () => {
             const imageParts = frames.map(frameData => ({ inlineData: { mimeType: 'image/jpeg', data: frameData } }));
             const prompt = "Analyze this sequence of video frames. Provide a concise, engaging script for a voiceover that describes the events as they unfold. The tone should be narrative and informative.";
             
-            const response: GenerateContentResponse = await aiRef.current.models.generateContent({
+            const response: GenerateContentResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
                 contents: { parts: [{ text: prompt }, ...imageParts] },
             });
@@ -1406,7 +1710,7 @@ const App: React.FC = () => {
             setVoiceoverState('generating_audio');
             setVoiceoverProgress('Step 3/3: Creating voiceover audio...');
 
-            const ttsResponse = await aiRef.current.models.generateContent({
+            const ttsResponse = await ai.models.generateContent({
                 model: "gemini-2.5-flash-preview-tts",
                 contents: [{ parts: [{ text: description }] }],
                 config: {
@@ -1424,7 +1728,7 @@ const App: React.FC = () => {
             setVoiceoverProgress('Voiceover complete!');
 
         } catch (error) {
-            const errorMessage = getApiErrorMessage(error);
+            const errorMessage = handleApiError(error, 'GenerateVoiceover');
             setVoiceoverError(errorMessage);
             setVoiceoverState('error');
             setVoiceoverProgress('An error occurred.');
@@ -1435,10 +1739,10 @@ const App: React.FC = () => {
     const handleQuickAction = async (action: string) => {
         const sendTextMessage = (text: string) => {
           if (assistantState !== 'active') {
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Please start a session first.`, timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: `Please start a session first.` });
             return;
           }
-          setTranscriptions(p => [...p, { speaker: 'user', text, timestamp: new Date() }]);
+          addTranscriptionEntry({ speaker: 'user', text });
           sessionPromiseRef.current?.then((session) => {
             session.sendRealtimeInput({ text });
           });
@@ -1446,17 +1750,17 @@ const App: React.FC = () => {
     
         if (action === 'joke') {
           if (assistantState !== 'active') {
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Please start a session first.`, timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: `Please start a session first.` });
             return;
           }
           try {
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Fetching a joke...`, timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: `Fetching a joke...` });
             const joke = await fetchJoke();
-            setTranscriptions(p => [...p, { speaker: 'assistant', text: joke, timestamp: new Date() }]);
-            speakText(joke);
+            addTranscriptionEntry({ speaker: 'assistant', text: joke });
+            speakText(joke, 'playful');
           } catch (error) {
-            const errorMessage = getApiErrorMessage(error);
-            setTranscriptions(p => [...p, { speaker: 'system', text: `Couldn't get a joke: ${errorMessage}`, timestamp: new Date() }]);
+            const errorMessage = handleApiError(error, 'FetchJoke');
+            addTranscriptionEntry({ speaker: 'system', text: `Couldn't get a joke: ${errorMessage}` });
           }
         } else {
           const textCommands: { [key: string]: string } = {
@@ -1470,7 +1774,7 @@ const App: React.FC = () => {
 
     const handleStartLiveCodeEdit = (snippet: CodeSnippet) => {
         if (assistantState !== 'active') {
-            setTranscriptions(p => [...p, { speaker: 'system', text: 'Please start a session to use the live code editor.', timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: 'Please start a session to use the live code editor.' });
             return;
         }
         setLiveEditingSnippetId(snippet.id);
@@ -1480,7 +1784,7 @@ const App: React.FC = () => {
             const contextMessage = `I'm starting a live code editing session. The user will give me commands to modify the following code. My goal is to use the 'updateCode' function to apply their changes by returning the full, updated code. The initial code is:\n\n\`\`\`${snippet.language}\n${snippet.code}\n\`\`\`\nPlease confirm you are ready to begin.`;
             session.sendRealtimeInput({ text: contextMessage });
         });
-        setTranscriptions(p => [...p, { speaker: 'system', text: `Live code editing started for "${snippet.description}".`, timestamp: new Date() }]);
+        addTranscriptionEntry({ speaker: 'system', text: `Live code editing started for "${snippet.description}".` });
     };
     
     const handleFinishLiveCodeEdit = () => {
@@ -1491,7 +1795,7 @@ const App: React.FC = () => {
         sessionPromiseRef.current?.then(session => {
             session.sendRealtimeInput({ text: 'Live editing session finished and changes have been saved.' });
         });
-        setTranscriptions(p => [...p, { speaker: 'system', text: 'Live code editing finished.', timestamp: new Date() }]);
+        addTranscriptionEntry({ speaker: 'system', text: 'Live code editing finished.' });
     };
     
     const liveEditingSnippet = codeSnippets.find(s => s.id === liveEditingSnippetId) || null;
@@ -1536,14 +1840,15 @@ const App: React.FC = () => {
         // --- Fallback Logic ---
         if (content.type === 'text') {
             navigator.clipboard.writeText(content.data);
-            setTranscriptions(p => [...p, { speaker: 'system', text: 'Message copied to clipboard!', timestamp: new Date() }]);
+            addTranscriptionEntry({ speaker: 'system', text: 'Message copied to clipboard!' });
         } else {
             setShareContent({ type: content.type, content: content.data, prompt: shareData.text });
         }
-    }, []);
+    }, [addTranscriptionEntry]);
 
     const handleAnalyzeVoice = useCallback(async (trainingData: VoiceTrainingData) => {
-        if (!aiRef.current) return;
+        const ai = getAiClient();
+        if (!ai) return;
         const recordedBlobs = Object.values(trainingData).map(d => (d as { audioBlob: Blob | null }).audioBlob).filter(Boolean) as Blob[];
         if (recordedBlobs.length === 0) return;
 
@@ -1560,7 +1865,7 @@ const App: React.FC = () => {
         const prompt = "You are a linguistics expert. Analyze the provided audio recordings of a user speaking Hindi. Based on their accent, intonation, and pronunciation, describe their vocal style in a few sentences. This description will be used as a system instruction for a text-to-speech model to emulate their style. Focus on actionable phonetic advice. For example: 'The speaker has a soft, melodic tone with clear enunciation. Emphasize a slightly faster pace and a gentle rise in pitch at the end of questions.'";
         
         try {
-            const response = await aiRef.current.models.generateContent({
+            const response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
                 contents: { parts: [{ text: prompt }, ...parts] },
             });
@@ -1572,8 +1877,18 @@ const App: React.FC = () => {
             throw error;
         }
 
-    }, [aiRef]);
+    }, [getAiClient]);
 
+    if (!isDataLoaded) {
+        return <div className="h-screen w-screen flex items-center justify-center bg-bg-color"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>;
+    }
+
+    if (!isApiKeySelected) {
+        return <ApiKeySelectionScreen onKeySelected={() => {
+            setIsApiKeySelected(true);
+            setApiKeyError(null);
+        }} reselectionReason={apiKeyError} />;
+    }
 
     return (
         <div className="h-screen w-screen flex flex-col bg-bg-color text-text-color overflow-hidden">
@@ -1581,6 +1896,7 @@ const App: React.FC = () => {
             <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                 <div className="flex items-center gap-3"><HologramIcon /><h1 className="text-lg font-bold tracking-wider glowing-text">KANISKA</h1></div>
                 <div className="flex items-center gap-4">
+                    <Clock />
                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{assistantState.toUpperCase()}</span>
                     <button onClick={handleThemeToggle} className="text-text-color-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
                         {theme === 'light' ? <MoonIcon /> : <SunIcon />}
@@ -1611,7 +1927,7 @@ const App: React.FC = () => {
                     </div>
 
                     {activePanel === 'transcript' && (<>
-                        <div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => (<div key={index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className="relative group max-w-[85%]"><div className={`inline-block p-3 rounded-lg w-full ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}><p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p><p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{entry.timestamp.toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-text-color-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>))}<div ref={transcriptEndRef} /></div>
+                        <div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => (<div key={index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className="relative group max-w-[85%]"><div className={`inline-block p-3 rounded-lg w-full ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}><p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p><p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{new Date(entry.timestamp).toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-text-color-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>))}<div ref={transcriptEndRef} /></div>
                         <QuickActions onAction={handleQuickAction} disabled={assistantState !== 'active'} />
                     </>)}
                     {activePanel === 'image' && (<div className="flex flex-col h-full overflow-hidden">
@@ -1722,8 +2038,13 @@ const App: React.FC = () => {
                 onSaveGreeting={handleSaveGreeting}
                 customSystemPrompt={customSystemPrompt}
                 onSaveSystemPrompt={handleSaveSystemPrompt}
+                onClearHistory={handleClearHistory}
                 selectedVoice={selectedVoice}
                 onSelectVoice={setSelectedVoice}
+                voicePitch={voicePitch}
+                onSetVoicePitch={setVoicePitch}
+                voiceSpeed={voiceSpeed}
+                onSetVoiceSpeed={setVoiceSpeed}
                 aiRef={aiRef.current}
                 voiceTrainingData={voiceTrainingData}
                 setVoiceTrainingData={setVoiceTrainingData}
@@ -1770,7 +2091,7 @@ const App: React.FC = () => {
                     const resetState = { ...initialFilters, ...initialTransforms };
                     const resetMessage = `The image edits have been reset. The current state is now back to default: ${JSON.stringify(resetState)}.`;
                     sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: resetMessage }));
-                     setTranscriptions(p => [...p, { speaker: 'system', text: 'Live image edits have been reset.', timestamp: new Date() }]);
+                     addTranscriptionEntry({ speaker: 'system', text: 'Live image edits have been reset.' });
                 }}
             />
             <WebsitePreviewModal
@@ -1946,7 +2267,7 @@ const CodeSnippetBlock: React.FC<{ snippet: CodeSnippet, onPreview: (preview: We
                         </>
                     )}
                     <button onClick={handleCopy} className="code-action-button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                        <CopyIcon size={14} />
                         {copyText}
                     </button>
                 </div>
@@ -2010,20 +2331,25 @@ const AvatarCustomizationModal: React.FC<{
     onSaveGreeting: (greeting: string) => void;
     customSystemPrompt: string;
     onSaveSystemPrompt: (prompt: string) => void;
+    onClearHistory: () => void;
     selectedVoice: string;
     onSelectVoice: (voice: string) => void;
+    voicePitch: number;
+    onSetVoicePitch: (pitch: number) => void;
+    voiceSpeed: number;
+    onSetVoiceSpeed: (speed: number) => void;
     aiRef: GoogleGenAI | null;
     voiceTrainingData: VoiceTrainingData;
     setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
     onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string | undefined>;
-}> = ({ isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult, customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, selectedVoice, onSelectVoice, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
+}> = ({ isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult, customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory, selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
     const [activeTab, setActiveTab] = useState<'gallery' | 'ai' | 'personality'>('gallery');
     const [prompt, setPrompt] = useState('');
     const [greetingInput, setGreetingInput] = useState(customGreeting);
     const [systemPromptInput, setSystemPromptInput] = useState(customSystemPrompt);
     const [showGreetingSaved, setShowGreetingSaved] = useState(false);
     const [showSystemPromptSaved, setShowSystemPromptSaved] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     // --- Voice Training State ---
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -2039,7 +2365,7 @@ const AvatarCustomizationModal: React.FC<{
     const [isCaseSensitive, setIsCaseSensitive] = useState(false);
     const [foundMatches, setFoundMatches] = useState<number[]>([]);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-    const systemPromptTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
     const VOICES = [
         { id: 'Zephyr', name: 'Zephyr', description: 'Warm & Friendly' },
@@ -2229,7 +2555,7 @@ const AvatarCustomizationModal: React.FC<{
                         <div className="avatar-gallery-grid">
                             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
                             <button onClick={() => fileInputRef.current?.click()} className="avatar-item upload-avatar-item">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 mb-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                                <UploadIcon size={32} className="mb-1" />
                                 <span className="text-xs">Upload</span>
                             </button>
                             {avatars.map((avatar, index) => (
@@ -2276,20 +2602,48 @@ const AvatarCustomizationModal: React.FC<{
                                 {showGreetingSaved && <span className="text-sm text-green-400">Saved!</span>}
                             </div>
                             
-                            <h3 className="font-semibold text-text-color mt-4">Voice Configuration</h3>
-                            <p className="text-sm text-text-color-muted -mt-2">Choose the voice that best fits Kaniska's personality.</p>
-                            <select
-                                value={selectedVoice}
-                                onChange={(e) => onSelectVoice(e.target.value)}
-                                className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
-                            >
-                                {VOICES.map(voice => (
-                                    <option key={voice.id} value={voice.id}>
-                                        {voice.name} ({voice.description})
-                                    </option>
-                                ))}
-                            </select>
-                            
+                            <div className="mt-4 pt-4 border-t border-border-color">
+                                <h3 className="font-semibold text-text-color">Voice Configuration</h3>
+                                <p className="text-sm text-text-color-muted -mt-2">Choose the voice and style that best fits Kaniska's personality.</p>
+                                <label htmlFor="voice-select" className="text-sm font-medium text-text-color-muted mt-2 block">Voice Persona</label>
+                                <select
+                                    id="voice-select"
+                                    value={selectedVoice}
+                                    onChange={(e) => onSelectVoice(e.target.value)}
+                                    className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"
+                                >
+                                    {VOICES.map(voice => (
+                                        <option key={voice.id} value={voice.id}>
+                                            {voice.name} ({voice.description})
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="mt-4 grid grid-cols-1 gap-y-3">
+                                    <div>
+                                        <label htmlFor="voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted">
+                                            <span>Voice Speed</span>
+                                            <span>{voiceSpeed > 0 ? `+${voiceSpeed}` : voiceSpeed}</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-text-color-muted">Slower</span>
+                                            <input id="voice-speed" type="range" min="-10" max="10" step="1" value={voiceSpeed} onChange={(e) => onSetVoiceSpeed(Number(e.target.value))} className="w-full" />
+                                            <span className="text-xs text-text-color-muted">Faster</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="voice-pitch" className="flex justify-between text-sm font-medium text-text-color-muted">
+                                            <span>Voice Pitch</span>
+                                            <span>{voicePitch > 0 ? `+${voicePitch}` : voicePitch}</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-text-color-muted">Lower</span>
+                                            <input id="voice-pitch" type="range" min="-10" max="10" step="1" value={voicePitch} onChange={(e) => onSetVoicePitch(Number(e.target.value))} className="w-full" />
+                                            <span className="text-xs text-text-color-muted">Higher</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                              {/* Voice Training Section */}
                             <div className="mt-4 pt-4 border-t border-border-color">
                                 <h3 className="font-semibold text-text-color">Voice Training (Beta)</h3>
@@ -2368,6 +2722,17 @@ const AvatarCustomizationModal: React.FC<{
                                     Save Prompt
                                 </button>
                                 {showSystemPromptSaved && <span className="text-sm text-green-400">Saved!</span>}
+                            </div>
+
+                             <div className="mt-4 pt-4 border-t border-border-color">
+                                <h3 className="font-semibold text-text-color">Conversation Memory</h3>
+                                <p className="text-sm text-text-color-muted -mt-1 mb-2">Kaniska remembers your recent conversation to provide context. You can clear this memory at any time.</p>
+                                <button 
+                                    onClick={onClearHistory}
+                                    className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-400 font-bold py-2 px-4 rounded-md transition"
+                                >
+                                    Clear Conversation History
+                                </button>
                             </div>
                         </div>
                     )}
