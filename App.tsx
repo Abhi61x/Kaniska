@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -95,7 +92,7 @@ declare global {
 type Theme = 'light' | 'dark';
 type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
 type AvatarExpression = 'idle' | 'thinking' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
-type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; };
+type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; firebaseKey?: string; };
 type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics' | 'code' | 'liveEditor' | 'email';
 type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
 type WeatherData = { location: string; temperature: number; condition: string; humidity: number; windSpeed: number; };
@@ -516,7 +513,13 @@ const getApiErrorMessage = (error: unknown): string => {
 };
 
 
-const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void; reselectionReason?: string | null }> = ({ onKeySelected, reselectionReason }) => {
+const ApiKeySelectionScreen: React.FC<{
+    onKeySelected: () => void;
+    onKeySaved: (key: string) => void;
+    reselectionReason?: string | null;
+}> = ({ onKeySelected, onKeySaved, reselectionReason }) => {
+    const [apiKeyInput, setApiKeyInput] = useState('');
+
     const handleSelectKey = async () => {
         if (window.aistudio?.openSelectKey) {
             await window.aistudio.openSelectKey();
@@ -524,6 +527,12 @@ const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void; reselectionRe
             onKeySelected();
         } else {
             alert("API key selection is not available in this environment.");
+        }
+    };
+
+    const handleSaveKey = () => {
+        if (apiKeyInput.trim()) {
+            onKeySaved(apiKeyInput.trim());
         }
     };
 
@@ -542,17 +551,40 @@ const ApiKeySelectionScreen: React.FC<{ onKeySelected: () => void; reselectionRe
                 )}
 
                 <p className="text-text-color-muted mb-6">
-                    To use Kaniska's advanced features, you need to select a Google AI Studio API key.
-                    This ensures you have the necessary permissions and billing is configured correctly.
+                    To use Kaniska's advanced features, you need to provide a Gemini API key.
                 </p>
-                <button 
+                <button
                     onClick={handleSelectKey}
                     className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition"
                 >
-                    Select API Key
+                    Select Key via AI Studio
                 </button>
+
+                <div className="my-6 relative flex items-center">
+                    <div className="flex-grow border-t border-border-color"></div>
+                    <span className="flex-shrink mx-4 text-text-color-muted text-sm">OR</span>
+                    <div className="flex-grow border-t border-border-color"></div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                    <input
+                        type="password"
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Paste your Gemini API key here"
+                        className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"
+                    />
+                    <button
+                        onClick={handleSaveKey}
+                        disabled={!apiKeyInput.trim()}
+                        className="w-full bg-green-600/80 hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50"
+                    >
+                        Save & Use Key
+                    </button>
+                </div>
+
                 <p className="text-xs text-text-color-muted mt-4">
-                    For more information on billing, please visit the{' '}
+                    For more information on billing and API keys, please visit the{' '}
                     <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">
                         official documentation
                     </a>.
@@ -815,12 +847,15 @@ const App: React.FC = () => {
     const [shareContent, setShareContent] = useState<{type: 'image' | 'video', content: string, prompt?: string} | null>(null);
     const [voiceTrainingData, setVoiceTrainingData] = useState<VoiceTrainingData>({});
     const [voiceStyleAnalysis, setVoiceStyleAnalysis] = useState<string>('');
-    const [isApiKeySelected, setIsApiKeySelected] = useState(false);
+    const [isStudioKeySelected, setIsStudioKeySelected] = useState(false);
     const [apiKeyError, setApiKeyError] = useState<string | null>(null);
     const [isRecordingMessage, setIsRecordingMessage] = useState(false);
     const [emailRecipient, setEmailRecipient] = useState('');
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
+    const [userApiKey, setUserApiKey] = useState<string | null>(null);
+    const [isApiKeyLoading, setIsApiKeyLoading] = useState(true);
+    const [localAudioDownloads, setLocalAudioDownloads] = useState<Record<string, string>>({});
 
 
     const initialFilters: ImageFilters = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 };
@@ -856,19 +891,6 @@ const App: React.FC = () => {
     const messageMediaRecorderRef = useRef<MediaRecorder | null>(null);
     const messageAudioChunksRef = useRef<Blob[]>([]);
 
-    const handleApiError = useCallback((error: unknown, context?: string) => {
-        const errorMessage = getApiErrorMessage(error);
-        console.error(`API Error in ${context || 'operation'}:`, error);
-
-        const originalMessage = error instanceof Error ? error.message : JSON.stringify(error);
-        if (originalMessage.toLowerCase().includes('requested entity was not found')) {
-            setIsApiKeySelected(false);
-            setApiKeyError("Your previous API key is no longer valid. It may have been deleted or expired. Please select a new one to continue.");
-        }
-        
-        return errorMessage;
-    }, []);
-
     const addTranscriptionEntry = useCallback((entry: Omit<TranscriptionEntry, 'timestamp'> & { timestamp?: Date }) => {
         if (!userIdRef.current) return;
         const conversationRef = db.ref(`conversations/${userIdRef.current}`);
@@ -880,16 +902,41 @@ const App: React.FC = () => {
         conversationRef.push(newEntryData);
     }, []);
 
+    const handleApiError = useCallback((error: unknown, context?: string) => {
+        const errorMessage = getApiErrorMessage(error);
+        console.error(`API Error in ${context || 'operation'}:`, error);
+
+        const originalMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        if (originalMessage.toLowerCase().includes('requested entity was not found')) {
+            setIsStudioKeySelected(false);
+            setUserApiKey(null);
+            if (userIdRef.current) {
+                db.ref(`apiKeys/${userIdRef.current}`).remove();
+            }
+            setApiKeyError("Your API key is no longer valid. It may have been deleted. Please provide a new one.");
+        }
+        
+        addTranscriptionEntry({ speaker: 'system', text: `API Error: ${errorMessage}` });
+        return errorMessage;
+    }, [addTranscriptionEntry]);
+
     const getAiClient = useCallback(() => {
-        if (!process.env.API_KEY) {
+        const apiKey = userApiKey || process.env.API_KEY;
+        if (!apiKey) {
             console.error("API_KEY environment variable is not set.");
-            setIsApiKeySelected(false);
+            setIsStudioKeySelected(false);
+            setUserApiKey(null);
             return null;
         }
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        aiRef.current = ai;
-        return ai;
-    }, []);
+        try {
+            const ai = new GoogleGenAI({ apiKey: apiKey });
+            aiRef.current = ai;
+            return ai;
+        } catch (e) {
+            const errorMessage = handleApiError(e, 'getAiClient-init');
+            return null;
+        }
+    }, [userApiKey, handleApiError]);
 
     const getOutputAudioContext = useCallback(() => {
         if (!outputAudioContextRef.current || outputAudioContextRef.current.state === 'closed') {
@@ -936,6 +983,23 @@ const App: React.FC = () => {
                 localStorage.setItem('kaniska_user_id', id);
             }
             userIdRef.current = id;
+
+            const apiKeyRef = db.ref(`apiKeys/${id}`);
+            apiKeyRef.once('value').then(snapshot => {
+                const savedKey = snapshot.val();
+                if (savedKey) {
+                    setUserApiKey(savedKey);
+                } else {
+                    window.aistudio?.hasSelectedApiKey?.().then(hasKey => {
+                        if (hasKey) {
+                            setIsStudioKeySelected(true);
+                        }
+                    });
+                }
+            }).finally(() => {
+                setIsApiKeyLoading(false);
+            });
+
             try {
                 const savedSettings = localStorage.getItem('user_settings');
                 if (savedSettings) {
@@ -986,6 +1050,7 @@ const App: React.FC = () => {
             if (data) {
                 for (const key in data) {
                     transcriptionsArray.push({
+                        firebaseKey: key,
                         ...data[key],
                         timestamp: new Date(data[key].timestamp)
                     });
@@ -1001,15 +1066,6 @@ const App: React.FC = () => {
             conversationRef.off('value', onValueCallback);
         };
     }, [isDataLoaded]);
-
-    useEffect(() => {
-        const checkApiKey = async () => {
-            if (await window.aistudio?.hasSelectedApiKey?.()) {
-                setIsApiKeySelected(true);
-            }
-        };
-        setTimeout(checkApiKey, 100);
-    }, []);
 
 
     useEffect(() => {
@@ -1078,6 +1134,12 @@ const App: React.FC = () => {
              if (currentVoiceoverAudioUrl) URL.revokeObjectURL(currentVoiceoverAudioUrl);
         }
     }, [voiceoverAudioUrl]);
+
+    useEffect(() => {
+        return () => {
+            Object.values(localAudioDownloads).forEach(URL.revokeObjectURL);
+        };
+    }, [localAudioDownloads]);
 
     // Save YouTube playback state periodically
     useEffect(() => {
@@ -1182,7 +1244,7 @@ const App: React.FC = () => {
             const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
             if (downloadLink) {
                 setVideoProgressMessage('Downloading final video...');
-                const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                const videoResponse = await fetch(`${downloadLink}&key=${userApiKey || process.env.API_KEY}`);
                 if (!videoResponse.ok) {
                     throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
                 }
@@ -1199,7 +1261,7 @@ const App: React.FC = () => {
             setVideoError(errorMessage);
             setVideoGenerationState('error');
         }
-    }, [getAiClient, handleApiError]);
+    }, [getAiClient, handleApiError, userApiKey]);
 
     const handleGenerateAvatar = useCallback(async (prompt: string) => {
         const ai = getAiClient();
@@ -1493,7 +1555,7 @@ const App: React.FC = () => {
                                 result = "There is no active live code editing session.";
                             }
                             break;
-                         case 'searchAndPlayYoutubeVideo':
+                        case 'searchAndPlayYoutubeVideo':
                             try {
                                 const results = await searchYoutubeVideo(fc.args.query as string);
                                 setYoutubeQueue(results);
@@ -1697,7 +1759,7 @@ const App: React.FC = () => {
                 }
             }
         }
-    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail]);
+    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail, getAiClient]);
 
     const handleYoutubePlayerError = useCallback((event: any) => {
         const errorCode = event.data;
@@ -1842,7 +1904,7 @@ const App: React.FC = () => {
             
             const ai = getAiClient();
             if (!ai) {
-                throw new Error("API Key is not configured. Please select a key.");
+                throw new Error("API Key is not configured. Please provide a key.");
             }
 
             const inputAudioContext = getInputAudioContext();
@@ -1920,7 +1982,6 @@ const App: React.FC = () => {
                         const friendlyMessage = handleApiError(e, 'LiveSession');
                         setAssistantState('error');
                         setAvatarExpression('error');
-                        addTranscriptionEntry({ speaker: 'system', text: friendlyMessage });
                         disconnectFromGemini();
                     },
                     onclose: (e: CloseEvent) => {
@@ -1971,6 +2032,16 @@ const App: React.FC = () => {
         }
     };
 
+    const handleDownloadImage = (url: string, prompt: string) => {
+        const link = document.createElement('a');
+        link.href = url;
+        const fileName = prompt.substring(0, 50).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.download = `${fileName || 'kaniska-generated-image'}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const blobToBase64 = (blob: globalThis.Blob): Promise<string> => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
@@ -1979,12 +2050,29 @@ const App: React.FC = () => {
     });
     
     const processRecordedMessage = useCallback(async (blob: Blob) => {
-        const base64Data = await blobToBase64(blob);
-        const ai = getAiClient();
-        if (!ai) return;
+        const audioUrl = URL.createObjectURL(blob);
 
-        addTranscriptionEntry({ speaker: 'user', text: '[Audio Message]' });
+        if (userIdRef.current) {
+            const conversationRef = db.ref(`conversations/${userIdRef.current}`);
+            const newEntryRef = conversationRef.push({
+                speaker: 'user',
+                text: '[Audio Message]',
+                timestamp: new Date().getTime()
+            });
+            if (newEntryRef.key) {
+                setLocalAudioDownloads(prev => ({...prev, [newEntryRef.key!]: audioUrl}));
+            }
+        }
+        
         setAvatarExpression('thinking');
+        
+        const ai = getAiClient();
+        if (!ai) {
+             setAvatarExpression('error');
+             return;
+        }
+
+        const base64Data = await blobToBase64(blob);
 
         const history: Content[] = transcriptions
             .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
@@ -2340,15 +2428,25 @@ const App: React.FC = () => {
 
     }, [getAiClient]);
 
-    if (!isDataLoaded) {
+    if (!isDataLoaded || isApiKeyLoading) {
         return <div className="h-screen w-screen flex items-center justify-center bg-bg-color"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>;
     }
 
-    if (!isApiKeySelected) {
-        return <ApiKeySelectionScreen onKeySelected={() => {
-            setIsApiKeySelected(true);
-            setApiKeyError(null);
-        }} reselectionReason={apiKeyError} />;
+    if (!userApiKey && !isStudioKeySelected) {
+        return <ApiKeySelectionScreen
+            onKeySelected={() => {
+                setIsStudioKeySelected(true);
+                setApiKeyError(null);
+            }}
+            onKeySaved={(key) => {
+                if (userIdRef.current) {
+                    db.ref(`apiKeys/${userIdRef.current}`).set(key);
+                    setUserApiKey(key);
+                    setApiKeyError(null);
+                }
+            }}
+            reselectionReason={apiKeyError}
+        />;
     }
 
     return (
@@ -2399,12 +2497,26 @@ const App: React.FC = () => {
                     </div>
 
                     {activePanel === 'transcript' && (<>
-                        <div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => (<div key={index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className="relative group max-w-[85%]"><div className={`inline-block p-3 rounded-lg w-full ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}><p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p><p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{new Date(entry.timestamp).toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-text-color-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>))}<div ref={transcriptEndRef} /></div>
+                        <div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => {
+                             const downloadUrl = entry.firebaseKey ? localAudioDownloads[entry.firebaseKey] : undefined;
+                             return (<div key={entry.firebaseKey || index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className="relative group max-w-[85%]"><div className={`inline-block p-3 rounded-lg w-full ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}>
+                                {entry.text === '[Audio Message]' && downloadUrl ? (
+                                    <div className="flex flex-col items-start gap-2">
+                                        <span className="text-sm m-0 leading-relaxed whitespace-pre-wrap italic">[Audio Message]</span>
+                                        <a href={downloadUrl} download="kaniska-recording.webm" className="text-xs font-semibold text-primary-color hover:underline bg-primary-color/10 px-2 py-1 rounded-md border border-primary-color/30 no-underline">
+                                            Download Recording
+                                        </a>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p>
+                                )}
+                             <p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{new Date(entry.timestamp).toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-text-color-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>)
+                        })}<div ref={transcriptEndRef} /></div>
                         <QuickActions onAction={handleQuickAction} disabled={assistantState !== 'active'} />
                     </>)}
                     {activePanel === 'image' && (<div className="flex flex-col h-full overflow-hidden">
                         <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                        {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-text-color-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: `Check out this image I generated with Kaniska AI: "${selectedImage.prompt}"`, fileName: 'kaniska-image.jpg' })} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Share Image"><ShareIcon size={20} /></button><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-text-color-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
+                        {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-text-color-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: `Check out this image I generated with Kaniska AI: "${selectedImage.prompt}"`, fileName: 'kaniska-image.jpg' })} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Share Image"><ShareIcon size={20} /></button><button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Download Image"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-text-color-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
                     {activePanel === 'code' && (<CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />)}
                     {activePanel === 'liveEditor' && liveEditingSnippet && (
                         <LiveCodeEditorPanel
