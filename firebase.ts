@@ -1,4 +1,4 @@
-// FIX: Switched to Firebase v8 compat imports to resolve initialization error. The error indicates that the installed SDK version is not v9+.
+// Using Firebase v9 compat libraries to allow for the older v8 database syntax (e.g., db.ref()) with the v10+ SDK loaded in index.html.
 import firebase from "firebase/compat/app";
 import "firebase/compat/database";
 
@@ -15,11 +15,10 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-// FIX: Use Firebase v8 compat syntax for initialization, preventing re-initialization.
+// Use Firebase v9 compat syntax for initialization, preventing re-initialization.
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-
-// FIX: Use Firebase v8 compat syntax to get database instance.
+// Use Firebase v9 compat syntax to get database instance.
 export const db = firebase.database();

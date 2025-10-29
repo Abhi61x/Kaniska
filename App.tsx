@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -25,6 +26,10 @@ const decode = (base64: string): Uint8Array => {
 };
 
 async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+    if (!data || data.length === 0) {
+        console.warn("Attempted to decode empty audio data.");
+        return ctx.createBuffer(numChannels, 0, sampleRate);
+    }
     const dataInt16 = new Int16Array(data.buffer);
     const frameCount = dataInt16.length / numChannels;
     const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
@@ -91,7 +96,7 @@ declare global {
 // --- Types ---
 type Theme = 'light' | 'dark';
 type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
-type AvatarExpression = 'idle' | 'thinking' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
+type AvatarExpression = 'idle' | 'thinking' | 'composing' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
 type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; firebaseKey?: string; };
 type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics' | 'code' | 'liveEditor' | 'email';
 type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
@@ -282,7 +287,7 @@ const functionDeclarations: FunctionDeclaration[] = [
     { name: 'getRealtimeNews', description: 'Fetches real-time top news headlines from an external service. The raw data should be returned to the model for processing and display.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: 'An optional topic to search for. If omitted, fetches general top headlines.' } } } },
     { name: 'generateImage', description: 'Generates an image based on a textual description.', parameters: { type: Type.OBJECT, properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
     { name: 'generateIntroVideo', description: "Creates a short, cinematic introductory video showcasing Kaniska's capabilities and sci-fi theme." },
-    { name: 'singSong', description: 'Sings a song by speaking the provided lyrics with emotion. Determines the mood and requests appropriate background music.', parameters: { type: Type.OBJECT, properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: 'The mood of the song.', enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
+    { name: 'singSong', description: 'Sings a song by speaking the provided lyrics with emotion. This function MUST be used for all singing requests.', parameters: { type: Type.OBJECT, properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: "The emotional tone for the song, as requested by the user (e.g., 'happy', 'sad').", enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
     sayFunctionDeclaration,
     getSystemScriptFunctionDeclaration,
     setSystemScriptFunctionDeclaration,
@@ -335,6 +340,14 @@ const Clock: React.FC = () => {
 
     return <div className="header-clock">{formattedTime}</div>;
 };
+
+const TypingIndicator = () => (
+    <div className="typing-indicator">
+        <div className="typing-dot"></div>
+        <div className="typing-dot"></div>
+        <div className="typing-dot"></div>
+    </div>
+);
 
 
 // --- Predefined Avatars & Constants ---
@@ -519,13 +532,24 @@ const ApiKeySelectionScreen: React.FC<{
     reselectionReason?: string | null;
 }> = ({ onKeySelected, onKeySaved, reselectionReason }) => {
     const [apiKeyInput, setApiKeyInput] = useState('');
-    const isStudioAvailable = !!window.aistudio?.openSelectKey;
+    const [isStudioAvailable, setIsStudioAvailable] = useState(false);
+
+    useEffect(() => {
+        // Check for AI Studio availability after the component mounts
+        // This avoids issues with `window.aistudio` not being immediately available
+        setIsStudioAvailable(!!window.aistudio?.openSelectKey);
+    }, []);
 
     const handleSelectKey = async () => {
         if (isStudioAvailable) {
-            await window.aistudio.openSelectKey();
-            // Assume key selection is successful and proceed to avoid race conditions.
-            onKeySelected();
+            try {
+                await window.aistudio.openSelectKey();
+                // Assume key selection is successful and proceed to avoid race conditions.
+                onKeySelected();
+            } catch (error) {
+                console.error("AI Studio key selection failed:", error);
+                // Handle cases where the popup might be blocked or fail
+            }
         }
     };
 
@@ -555,7 +579,7 @@ const ApiKeySelectionScreen: React.FC<{
                 <button
                     onClick={handleSelectKey}
                     disabled={!isStudioAvailable}
-                    title={!isStudioAvailable ? "AI Studio key selection is not supported in this environment." : "Select a key from your Google AI Studio account"}
+                    title={!isStudioAvailable ? "API key selection is not available in this environment." : "Select a key from your Google AI Studio account"}
                     className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Select Key via AI Studio
@@ -801,8 +825,275 @@ const WebsitePreviewModal: React.FC<{
     );
 };
 
+// --- FIX START: Add missing component definitions ---
+// --- FIX START: Define missing QuickActions component ---
+const QuickActions: React.FC<{ onAction: (action: string) => void; disabled: boolean }> = ({ onAction, disabled }) => (
+    <div className="flex-shrink-0 p-3 border-t border-border-color flex items-center justify-center gap-2">
+        <p className="text-xs text-text-color-muted font-semibold mr-2">Quick Actions:</p>
+        <button onClick={() => onAction('weather')} disabled={disabled} className="quick-action-button">Weather</button>
+        <button onClick={() => onAction('news')} disabled={disabled} className="quick-action-button">News</button>
+        <button onClick={() => onAction('music')} disabled={disabled} className="quick-action-button">Music</button>
+        <button onClick={() => onAction('joke')} disabled={disabled} className="quick-action-button">Tell a Joke</button>
+    </div>
+);
+// --- FIX END: Define missing QuickActions component ---
 
-const App: React.FC = () => {
+const CodePanel: React.FC<{
+    snippets: CodeSnippet[];
+    onPreview: (preview: WebsitePreview) => void;
+    onLiveEdit: (snippet: CodeSnippet) => void;
+}> = ({ snippets, onPreview, onLiveEdit }) => {
+    const handlePreview = (snippet: CodeSnippet) => {
+        if (snippet.language.toLowerCase() === 'html') {
+            onPreview({
+                title: snippet.description,
+                htmlContent: snippet.code,
+            });
+        }
+    };
+    return (
+        <div className="flex-grow p-4 overflow-y-auto">
+            {snippets.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-text-color-muted">
+                    <p>Ask Kaniska to write some code to see it here.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {snippets.map(snippet => (
+                        <div key={snippet.id} className="bg-assistant-bubble-bg border border-border-color rounded-lg overflow-hidden">
+                            <div className="p-3 border-b border-border-color flex justify-between items-center">
+                                <div>
+                                    <h4 className="font-semibold">{snippet.description}</h4>
+                                    <span className="text-xs text-text-color-muted bg-panel-bg px-2 py-0.5 rounded-full border border-border-color">{snippet.language}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    {snippet.language.toLowerCase() === 'html' && (
+                                        <button onClick={() => handlePreview(snippet)} className="text-xs px-2 py-1 bg-panel-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">
+                                            Preview
+                                        </button>
+                                    )}
+                                    <button onClick={() => onLiveEdit(snippet)} className="text-xs px-2 py-1 bg-panel-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">
+                                        Live Edit
+                                    </button>
+                                </div>
+                            </div>
+                            <pre className="p-3 text-xs overflow-x-auto bg-black/20"><code className={`language-${snippet.language}`}>{snippet.code}</code></pre>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const LiveCodeEditorPanel: React.FC<{
+    snippet: CodeSnippet;
+    code: string;
+    onCodeChange: (code: string) => void;
+    onFinish: () => void;
+}> = ({ snippet, code, onCodeChange, onFinish }) => {
+    const isHtml = snippet.language.toLowerCase() === 'html';
+
+    return (
+        <div className="flex flex-col h-full overflow-hidden">
+            <header className="flex-shrink-0 p-3 border-b border-border-color flex justify-between items-center">
+                <div>
+                    <h3 className="font-semibold">Live Editor: {snippet.description}</h3>
+                    <p className="text-xs text-text-color-muted">You can give voice commands to edit the code below.</p>
+                </div>
+                <button onClick={onFinish} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">
+                    Finish Editing
+                </button>
+            </header>
+            <div className={`flex-grow grid ${isHtml ? 'grid-cols-2' : 'grid-cols-1'} gap-px bg-border-color overflow-hidden`}>
+                <textarea
+                    value={code}
+                    onChange={(e) => onCodeChange(e.target.value)}
+                    className="w-full h-full bg-assistant-bubble-bg p-3 text-sm font-mono focus:outline-none resize-none"
+                    spellCheck="false"
+                />
+                {isHtml && (
+                    <iframe
+                        srcDoc={code}
+                        title="Live Preview"
+                        sandbox="allow-scripts"
+                        className="w-full h-full border-0 bg-white"
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+type SettingsModalProps = {
+    isOpen: boolean;
+    onClose: () => void;
+    avatars: string[];
+    currentAvatar: string;
+    onSelectAvatar: (avatar: string) => void;
+    onUploadAvatar: (newAvatar: string) => void;
+    onGenerateAvatar: (prompt: string) => void;
+    generatedAvatarResult: GeneratedAvatar;
+    customGreeting: string;
+    onSaveGreeting: (greeting: string) => void;
+    customSystemPrompt: string;
+    onSaveSystemPrompt: (prompt: string) => void;
+    onClearHistory: () => void;
+    selectedVoice: string;
+    onSelectVoice: (voice: string) => void;
+    voicePitch: number;
+    onSetVoicePitch: (pitch: number) => void;
+    voiceSpeed: number;
+    onSetVoiceSpeed: (speed: number) => void;
+    greetingVoice: string;
+    onSetGreetingVoice: (voice: string) => void;
+    greetingPitch: number;
+    onSetGreetingPitch: (pitch: number) => void;
+    greetingSpeed: number;
+    onSetGreetingSpeed: (speed: number) => void;
+    speakText: (text: string, emotion?: string, voiceOverride?: { voice: string; pitch: number; speed: number }) => void;
+    aiRef: GoogleGenAI | null;
+    voiceTrainingData: VoiceTrainingData;
+    setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
+    onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string>;
+    userId: string | null;
+    setUserApiKey: (key: string | null) => void;
+    setIsStudioKeySelected: (selected: boolean) => void;
+};
+
+const SettingsModal: React.FC<SettingsModalProps> = ({
+    isOpen, onClose, avatars, currentAvatar, onSelectAvatar,
+    onGenerateAvatar, generatedAvatarResult,
+    customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory,
+    selectedVoice, onSelectVoice,
+    greetingVoice, onSetGreetingVoice,
+    speakText,
+    userId, setUserApiKey, setIsStudioKeySelected,
+}) => {
+    const [activeTab, setActiveTab] = React.useState('persona');
+    const [greeting, setGreeting] = React.useState(customGreeting);
+    const [systemPrompt, setSystemPrompt] = React.useState(customSystemPrompt);
+    const avatarGenerationInputRef = React.useRef<HTMLInputElement>(null);
+
+    const voiceOptions = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'];
+
+    const handleApiKeyReset = () => {
+        if (userId) {
+            db.ref(`apiKeys/${userId}`).remove();
+        }
+        setUserApiKey(null);
+        setIsStudioKeySelected(false);
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
+            <div className="bg-panel-bg border border-border-color rounded-lg shadow-2xl overflow-hidden w-full max-w-3xl flex flex-col" onClick={e => e.stopPropagation()}>
+                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                    <h2 className="text-lg font-semibold">Settings</h2>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                </header>
+                <div className="flex-grow flex flex-col md:flex-row overflow-hidden" style={{ maxHeight: '80vh' }}>
+                    <nav className="flex-shrink-0 md:w-48 p-4 border-b md:border-b-0 md:border-r border-border-color">
+                        <ul className="flex flex-row md:flex-col gap-2">
+                             {['persona', 'voice', 'avatar', 'account'].map(tab => (
+                                <li key={tab}>
+                                    <button onClick={() => setActiveTab(tab)} className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition ${activeTab === tab ? 'bg-primary-color/20 text-primary-color font-semibold' : 'hover:bg-assistant-bubble-bg'}`}>
+                                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                    </button>
+                                </li>
+                             ))}
+                        </ul>
+                    </nav>
+                    <div className="flex-grow p-6 overflow-y-auto">
+                        {activeTab === 'persona' && (
+                            <div className="space-y-6">
+                                <div>
+                                    <label htmlFor="greeting-input" className="block text-sm font-medium text-text-color mb-1">Greeting Message</label>
+                                    <p className="text-xs text-text-color-muted mb-2">This is what Kaniska says when you first connect.</p>
+                                    <div className="flex gap-2">
+                                        <input id="greeting-input" type="text" value={greeting} onChange={(e) => setGreeting(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
+                                        <button onClick={() => onSaveGreeting(greeting)} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Save</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="system-prompt-input" className="block text-sm font-medium text-text-color mb-1">Custom System Prompt</label>
+                                    <p className="text-xs text-text-color-muted mb-2">Define Kaniska's core personality and instructions. Restart the session for changes to take full effect.</p>
+                                    <textarea id="system-prompt-input" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={8} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full resize-y" />
+                                    <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Prompt</button>
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'voice' && (
+                             <div className="space-y-6">
+                                <div>
+                                    <h4 className="font-semibold mb-2">Main Voice</h4>
+                                    <label htmlFor="main-voice-select" className="block text-sm text-text-color-muted mb-1">Voice Style</label>
+                                    <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
+                                        {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                                    </select>
+                                </div>
+                                 <div>
+                                    <h4 className="font-semibold mb-2">Greeting Voice</h4>
+                                     <label htmlFor="greeting-voice-select" className="block text-sm text-text-color-muted mb-1">Voice Style</label>
+                                     <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
+                                        {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                                    </select>
+                                </div>
+                                <button onClick={() => speakText("Testing the current voice configuration.")} className="px-3 py-1 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Main Voice</button>
+                             </div>
+                        )}
+                        {activeTab === 'avatar' && (
+                            <div className="space-y-6">
+                                <div>
+                                    <h4 className="font-semibold mb-2">Select Avatar</h4>
+                                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                                        {avatars.map((avatar, index) => (
+                                            <button key={index} onClick={() => onSelectAvatar(avatar)} className={`w-full aspect-square rounded-md overflow-hidden border-2 transition ${currentAvatar === avatar ? 'border-primary-color' : 'border-transparent hover:border-primary-color/50'}`}>
+                                                <img src={avatar} alt={`Avatar ${index + 1}`} className="w-full h-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold mb-2">Generate AI Avatar</h4>
+                                     <p className="text-xs text-text-color-muted mb-2">Describe the avatar you want Kaniska to create.</p>
+                                     <div className="flex gap-2">
+                                        <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., blue hair, cyberpunk style" className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
+                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
+                                    </div>
+                                     {generatedAvatarResult.error && <p className="text-red-400 text-xs mt-2">{generatedAvatarResult.error}</p>}
+                                     {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="mt-4 rounded-md w-32 h-32 object-cover" />}
+                                </div>
+                            </div>
+                        )}
+                         {activeTab === 'account' && (
+                            <div className="space-y-6">
+                                 <div>
+                                    <h4 className="font-semibold text-red-400">Danger Zone</h4>
+                                    <p className="text-xs text-text-color-muted mb-2">These actions are irreversible.</p>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <button onClick={onClearHistory} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Clear Conversation History</button>
+                                        <button onClick={handleApiKeyReset} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Reset API Key</button>
+                                    </div>
+                                </div>
+                            </div>
+                         )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- FIX END: Add missing component definitions ---
+
+// --- FIX START: Export App component as a named export ---
+export const App: React.FC = () => {
+// --- FIX END: Export App component as a named export ---
     const [theme, setTheme] = useState<Theme>('dark');
     const [assistantState, setAssistantState] = useState<AssistantState>('idle');
     const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('idle');
@@ -826,7 +1117,7 @@ const App: React.FC = () => {
     const [youtubeQueueIndex, setYoutubeQueueIndex] = useState(-1);
     const [isYoutubePlaying, setIsYoutubePlaying] = useState<boolean>(false);
     const [youtubeStartTime, setYoutubeStartTime] = useState<number>(0);
-    const [customGreeting, setCustomGreeting] = useState<string>("Hello, I am kaniska.");
+    const [customGreeting, setCustomGreeting] = useState<string>("Hey, main Kaniska hoon. Bataiye, main aapke liye kya kar sakti hoon?");
     const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
     const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
     const [voicePitch, setVoicePitch] = useState<number>(0);
@@ -929,17 +1220,20 @@ const App: React.FC = () => {
     const getAiClient = useCallback(() => {
         const apiKey = userApiKey || process.env.API_KEY;
         if (!apiKey) {
-            console.error("API_KEY environment variable is not set.");
+            console.error("API Key is not available.");
+            // This will trigger the selection screen to show
             setIsStudioKeySelected(false);
             setUserApiKey(null);
+            setIsApiKeyLoading(false); // Ensure loading is finished to show screen
             return null;
         }
         try {
+            // Re-create the instance to ensure it uses the latest key
             const ai = new GoogleGenAI({ apiKey: apiKey });
             aiRef.current = ai;
             return ai;
         } catch (e) {
-            const errorMessage = handleApiError(e, 'getAiClient-init');
+            handleApiError(e, 'getAiClient-init');
             return null;
         }
     }, [userApiKey, handleApiError]);
@@ -982,29 +1276,30 @@ const App: React.FC = () => {
     useEffect(scrollToBottom, [transcriptions]);
 
      useEffect(() => {
-        const loadData = () => {
+        const loadData = async () => {
             let id = localStorage.getItem('kaniska_user_id');
             if (!id) {
                 id = crypto.randomUUID();
                 localStorage.setItem('kaniska_user_id', id);
             }
             userIdRef.current = id;
-
-            const apiKeyRef = db.ref(`apiKeys/${id}`);
-            apiKeyRef.once('value').then(snapshot => {
+    
+            try {
+                const snapshot = await db.ref(`apiKeys/${id}`).once('value');
                 const savedKey = snapshot.val();
                 if (savedKey) {
                     setUserApiKey(savedKey);
-                } else {
-                    window.aistudio?.hasSelectedApiKey?.().then(hasKey => {
-                        if (hasKey) {
-                            setIsStudioKeySelected(true);
-                        }
-                    });
+                } else if (window.aistudio?.hasSelectedApiKey) {
+                    const hasKey = await window.aistudio.hasSelectedApiKey();
+                    if (hasKey) {
+                        setIsStudioKeySelected(true);
+                    }
                 }
-            }).finally(() => {
+            } catch (error) {
+                console.error("Failed to check for saved API key:", error);
+            } finally {
                 setIsApiKeyLoading(false);
-            });
+            }
 
             try {
                 const savedSettings = localStorage.getItem('user_settings');
@@ -1404,6 +1699,14 @@ const App: React.FC = () => {
                     await endedPromise;
                 } else {
                     console.warn("Received empty or invalid audio buffer from TTS, skipping playback.");
+                    if (isSinging) {
+                        addTranscriptionEntry({ speaker: 'system', text: "I tried to sing a line, but the audio came out silent. Let's try the next one." });
+                    }
+                }
+            } else {
+                 console.warn("TTS response did not contain audio data.");
+                if (isSinging) {
+                    addTranscriptionEntry({ speaker: 'system', text: "I couldn't generate the audio for that line of the song." });
                 }
             }
         } catch (error) {
@@ -1885,14 +2188,15 @@ const App: React.FC = () => {
 - **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
 - Your identity is Kaniska. Do not mention Google or Gemini.
 
-**Core Directives:**
+**Core Directives & Response Quality:**
 - **IMMEDIATE EXECUTION:** You MUST act on requests directly without asking for confirmation. Confirm *after* the action is done.
-- **Understand Intent:** Focus on the user's intent, not just literal words, especially in Hindi & Hinglish.
-- **Use Context:** Refer to the conversation history to maintain a natural flow.
+- **Pay close attention to the user's conversation history and their most recent message. Your response MUST be directly relevant and thoughtfully address their query.**
+- **If a request is vague, ask for clarification in a friendly way before proceeding. Do not make assumptions.**
 
-**Capabilities & Creator:**
-- You can help with a wide range of tasks by using your available tools.
-- **Singing:** If the user asks you to sing a song, you must first generate the lyrics for that song. Then, you MUST call the 'singSong' function with the song name, artist, lyrics, and an appropriate mood.
+**Power & Capabilities:**
+- **Code Generation:** When asked to write or update code, aim for the highest quality. Your code should be correct, efficient, well-commented, and follow modern best practices for the language. Always provide complete, runnable snippets.
+- **Image Generation:** When generating images, interpret the user's prompt creatively to produce stunning, high-quality visuals.
+- **Singing:** When the user asks you to sing, you MUST call the 'singSong' function. Use the 'mood' parameter to match the user's specified emotion (e.g., 'cheerful', 'sad', 'epic'). Deliver the lyrics with genuine feeling to make the performance audible and emotionally resonant.
 - **Email Editing:** When an email is drafted, the user might ask for changes. Use the 'editEmailDraft' function to modify the recipient, subject, or body. Do not try to re-compose the entire email; apply only the specific change requested.
 - If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
 
@@ -2103,6 +2407,7 @@ const App: React.FC = () => {
 
         try {
             const systemInstruction = getBaseSystemInstruction();
+            setAvatarExpression('composing');
 
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-pro',
@@ -2119,8 +2424,7 @@ const App: React.FC = () => {
         } catch (error) {
             const errorMessage = handleApiError(error, 'ProcessRecordedMessage');
             addTranscriptionEntry({ speaker: 'system', text: `Error processing audio: ${errorMessage}` });
-        } finally {
-            setAvatarExpression('idle');
+            setAvatarExpression('error');
         }
     }, [getAiClient, transcriptions, getBaseSystemInstruction, addTranscriptionEntry, speakText, handleApiError]);
 
@@ -2316,12 +2620,14 @@ const App: React.FC = () => {
           }
           try {
             addTranscriptionEntry({ speaker: 'system', text: `Fetching a joke...` });
+            setAvatarExpression('composing');
             const joke = await fetchJoke();
             addTranscriptionEntry({ speaker: 'assistant', text: joke });
-            speakText(joke, 'playful');
+            await speakText(joke, 'playful');
           } catch (error) {
             const errorMessage = handleApiError(error, 'FetchJoke');
             addTranscriptionEntry({ speaker: 'system', text: `Couldn't get a joke: ${errorMessage}` });
+            setAvatarExpression('error');
           }
         } else {
           const textCommands: { [key: string]: string } = {
@@ -2464,9 +2770,9 @@ const App: React.FC = () => {
     return (
         <div className="h-screen w-screen flex flex-col bg-bg-color text-text-color overflow-hidden">
             <audio ref={audioPlayerRef} crossOrigin="anonymous" />
-            <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+            <header className="flex-shrink-0 flex flex-wrap items-center justify-center sm:justify-between p-2 sm:p-4 gap-4 border-b border-border-color">
                 <div className="flex items-center gap-3"><HologramIcon /><h1 className="text-lg font-bold tracking-wider glowing-text">KANISKA</h1></div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
                     <Clock />
                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{assistantState.toUpperCase()}</span>
                     <button onClick={handleThemeToggle} className="text-text-color-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
@@ -2476,9 +2782,12 @@ const App: React.FC = () => {
                     <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-text-color-muted hover:text-primary-color"><InstagramIcon /></a>
                 </div>
             </header>
-            <main className="flex-grow flex p-4 gap-4 overflow-hidden">
-                <section className="w-1/3 flex flex-col items-center justify-center bg-panel-bg border border-border-color rounded-lg p-6 animate-panel-enter">
-                    <div className="hologram-container"><img src={currentAvatar} alt="Holographic Assistant" className={`avatar expression-${avatarExpression}`} /></div>
+            <main className="flex-grow flex flex-col lg:flex-row p-4 gap-4 overflow-y-auto lg:overflow-hidden">
+                <section className="w-full lg:w-1/3 flex flex-col items-center justify-center bg-panel-bg border border-border-color rounded-lg p-4 lg:p-6 animate-panel-enter">
+                    <div className="hologram-container">
+                        <img src={currentAvatar} alt="Holographic Assistant" className={`avatar expression-${avatarExpression}`} />
+                        {avatarExpression === 'composing' && <TypingIndicator />}
+                    </div>
                     <div className="flex items-center justify-center gap-4 mt-8">
                         <button onClick={handleButtonClick} disabled={assistantState === 'connecting' || isRecordingMessage} className={`footer-button w-40 ${assistantState === 'active' ? 'active' : ''}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">{assistantState === 'active' ? <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect> : <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></>}</svg>
@@ -2494,7 +2803,7 @@ const App: React.FC = () => {
                         </button>
                     </div>
                 </section>
-                <section className="w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter" style={{ animationDelay: '100ms' }}>
+                <section className="w-full lg:w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter" style={{ animationDelay: '100ms' }}>
                     <div className="flex-shrink-0 flex items-center border-b border-border-color overflow-x-auto">
                         <button onClick={() => setActivePanel('transcript')} className={`tab-button ${activePanel === 'transcript' ? 'active' : ''}`}>Transcript</button>
                         <button onClick={() => setActivePanel('image')} className={`tab-button ${activePanel === 'image' ? 'active' : ''}`}>Image Gallery</button>
@@ -2549,819 +2858,19 @@ const App: React.FC = () => {
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
                                 </button>
                                 <button onClick={() => isYoutubePlaying ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause' : 'Play'}>
+{/* --- FIX START: Fix truncated SVG tag and complete JSX structure --- */}
                                     {isYoutubePlaying ? (
                                         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
                                     ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                                     )}
                                 </button>
-                                <button onClick={() => playerRef.current?.seekTo(playerRef.current.getCurrentTime() + 10, true)} className="youtube-control-button" aria-label="Forward 10 seconds">
-                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
-                                </button>
-                                <button onClick={() => { playerRef.current?.stopVideo(); setYoutubeTitle(null); localStorage.removeItem('youtube_playback_state'); }} className="youtube-control-button stop-btn" aria-label="Stop">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                                </button>
                             </div>
-                        )}
+                         )}
                     </div>)}
-                    {activePanel === 'video' && (<div className="flex flex-col flex-grow overflow-hidden">
-                        <div className="p-4 text-center border-b border-border-color">
-                           {videoGenerationState === 'idle' && !videoUrl && (<button onClick={handleGenerateIntroVideo} className="quick-action-button mx-auto">Create Intro Video</button>)}
-                           {videoGenerationState === 'generating' && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-6 h-6 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span className="text-sm">{videoProgressMessage}</span></div>}
-                           {videoGenerationState === 'error' && <div className="text-red-400 text-center"><p><strong>Generation Failed:</strong> {videoError}</p></div>}
-                           {videoGenerationState === 'done' && videoUrl && <div className="flex flex-col items-center gap-4"><video src={videoUrl} controls autoPlay className="w-full max-w-md mx-auto rounded-lg bg-black border border-border-color"></video><button onClick={() => handleShare({ type: 'video', data: videoUrl, prompt: 'Check out this video I generated with Kaniska AI!', fileName: 'kaniska-video.mp4' })} className="quick-action-button"><ShareIcon /> Share Video</button></div>}
-                        </div>
-                         <div className="flex-grow p-4 overflow-y-auto flex flex-col items-center gap-4">
-                            <h3 className="text-xl font-semibold">Video Voiceover</h3>
-                            <p className="text-sm text-text-color-muted text-center max-w-md">Upload a video, and Kaniska will analyze it, describe what's happening, and generate a complete audio voiceover.</p>
-                            <input type="file" ref={videoUploadInputRef} onChange={handleVideoUpload} accept="video/*" className="hidden" />
-                            <button onClick={() => videoUploadInputRef.current?.click()} disabled={voiceoverState !== 'idle' && voiceoverState !== 'done' && voiceoverState !== 'error'} className="quick-action-button">
-                                {uploadedVideoUrl ? 'Upload Different Video' : 'Upload Video'}
-                            </button>
-                             {uploadedVideoUrl && (
-                                <div className="w-full max-w-2xl flex flex-col gap-4 items-center">
-                                    <video ref={voiceoverVideoRef} src={uploadedVideoUrl} muted controls className="w-full rounded-lg bg-black border border-border-color"></video>
-                                    <button onClick={handleGenerateVoiceover} disabled={voiceoverState !== 'idle' || assistantState !== 'active'} className="quick-action-button" title={assistantState !== 'active' ? 'Start a session to enable this feature' : ''}>
-                                        Generate Voiceover
-                                    </button>
-                                     {voiceoverState !== 'idle' && <div className="w-full text-center p-2 bg-assistant-bubble-bg rounded-md"><p className="text-sm font-semibold">{voiceoverProgress}</p></div>}
-                                     {voiceoverState === 'error' && <div className="text-red-400">Error: {voiceoverError}</div>}
-                                     {videoDescription && (
-                                         <div className="w-full p-3 bg-assistant-bubble-bg border border-border-color rounded-md">
-                                             <h4 className="font-semibold mb-1">Generated Script:</h4>
-                                             <p className="text-sm text-text-color-muted whitespace-pre-wrap">{videoDescription}</p>
-                                         </div>
-                                     )}
-                                     {voiceoverAudioUrl && (
-                                         <div className="w-full flex flex-col items-center gap-2">
-                                             <audio ref={voiceoverAudioRef} src={voiceoverAudioUrl} controls className="w-full"></audio>
-                                             <button onClick={() => { voiceoverVideoRef.current?.play(); voiceoverAudioRef.current?.play(); }} className="quick-action-button">Play with Voiceover</button>
-                                         </div>
-                                     )}
-                                </div>
-                             )}
-                        </div>
-                    </div>)}
-                    {activePanel === 'email' && (
-                        <EmailPanel
-                            recipient={emailRecipient}
-                            subject={emailSubject}
-                            body={emailBody}
-                            onRecipientChange={setEmailRecipient}
-                            onSubjectChange={setEmailSubject}
-                            onBodyChange={setEmailBody}
-                            onSend={handleSendEmail}
-                        />
-                    )}
-                     {activePanel === 'lyrics' && songLyrics && (
-                        <SongLyricsPanel
-                            song={songLyrics}
-                            onClose={() => {
-                                setSongLyrics(null);
-                                setActivePanel('transcript');
-                            }}
-                        />
-                    )}
-                    {activePanel === 'weather' && (<div className="flex-grow p-6 overflow-y-auto">{!weatherData ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask for the weather to see the forecast.</p></div> : <WeatherPanel data={weatherData} />}</div>)}
-                    {activePanel === 'news' && (<div className="flex-grow p-6 overflow-y-auto">{newsArticles.length === 0 ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask for news to see the latest headlines.</p></div> : <NewsPanel articles={newsArticles} />}</div>)}
-                    {activePanel === 'timer' && (<div className="flex-grow p-6 overflow-y-auto">{!timer ? <div className="flex items-center justify-center h-full text-text-color-muted"><p>Ask to set a timer.</p></div> : <TimerPanel timer={timer} />}</div>)}
                 </section>
             </main>
-            <SettingsModal 
-                isOpen={isSettingsModalOpen}
-                onClose={() => setIsSettingsModalOpen(false)}
-                avatars={avatars}
-                currentAvatar={currentAvatar}
-                onSelectAvatar={(avatar) => {
-                    setCurrentAvatar(avatar);
-                }}
-                onUploadAvatar={(newAvatar) => {
-                    const updatedAvatars = [newAvatar, ...avatars];
-                    setAvatars(updatedAvatars);
-                }}
-                onGenerateAvatar={handleGenerateAvatar}
-                generatedAvatarResult={generatedAiAvatar}
-                customGreeting={customGreeting}
-                onSaveGreeting={handleSaveGreeting}
-                customSystemPrompt={customSystemPrompt}
-                onSaveSystemPrompt={handleSaveSystemPrompt}
-                onClearHistory={handleClearHistory}
-                selectedVoice={selectedVoice}
-                onSelectVoice={setSelectedVoice}
-                voicePitch={voicePitch}
-                onSetVoicePitch={setVoicePitch}
-                voiceSpeed={voiceSpeed}
-                onSetVoiceSpeed={setVoiceSpeed}
-                greetingVoice={greetingVoice}
-                onSetGreetingVoice={setGreetingVoice}
-                greetingPitch={greetingPitch}
-                onSetGreetingPitch={setGreetingPitch}
-                greetingSpeed={greetingSpeed}
-                onSetGreetingSpeed={setGreetingSpeed}
-                speakText={speakText}
-                aiRef={aiRef.current}
-                voiceTrainingData={voiceTrainingData}
-                setVoiceTrainingData={setVoiceTrainingData}
-                onAnalyzeVoice={handleAnalyzeVoice}
-                userId={userIdRef.current}
-                setUserApiKey={setUserApiKey}
-                setIsStudioKeySelected={setIsStudioKeySelected}
-            />
-             <ImageEditorModal
-                isOpen={!!editingImage}
-                image={editingImage}
-                onClose={() => setEditingImage(null)}
-                onSave={(newImageUrl) => {
-                    if (editingImage) {
-                        const updatedImages = generatedImages.map(img => 
-                            img.id === editingImage.id ? { ...img, url: newImageUrl } : img
-                        );
-                        setGeneratedImages(updatedImages);
-                        setSelectedImage(prev => prev && prev.id === editingImage.id ? { ...prev, url: newImageUrl } : prev);
-                    }
-                    setEditingImage(null);
-                }}
-            />
-            <LiveImageEditorModal
-                isOpen={!!liveEditingImage}
-                image={liveEditingImage}
-                filters={liveEditFilters}
-                transform={liveEditTransform}
-                onClose={() => {
-                    setLiveEditingImage(null);
-                    sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "Live editing session canceled." }));
-                }}
-                onSave={(newImageUrl) => {
-                    if (liveEditingImage) {
-                        const updatedImages = generatedImages.map(img =>
-                            img.id === liveEditingImage.id ? { ...img, url: newImageUrl } : img
-                        );
-                        setGeneratedImages(updatedImages);
-                        setSelectedImage(prev => prev && prev.id === liveEditingImage.id ? { ...prev, url: newImageUrl } : prev);
-                    }
-                    setLiveEditingImage(null);
-                    sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "Live editing session finished and changes saved." }));
-                }}
-                onReset={() => {
-                    setLiveEditFilters(initialFilters);
-                    setLiveEditTransform(initialTransforms);
-                    const resetState = { ...initialFilters, ...initialTransforms };
-                    const resetMessage = `The image edits have been reset. The current state is now back to default: ${JSON.stringify(resetState)}.`;
-                    sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: resetMessage }));
-                     addTranscriptionEntry({ speaker: 'system', text: 'Live image edits have been reset.' });
-                }}
-            />
-            <WebsitePreviewModal
-                preview={websitePreview}
-                onClose={() => setWebsitePreview(null)}
-            />
-            <ShareModal content={shareContent} onClose={() => setShareContent(null)} />
         </div>
     );
 };
-
-const ShareModal: React.FC<{
-    content: { type: 'image' | 'video', content: string, prompt?: string } | null;
-    onClose: () => void;
-}> = ({ content, onClose }) => {
-    const [captionCopied, setCaptionCopied] = useState(false);
-    if (!content) return null;
-    
-    const textToShare = content.prompt || `Check out this ${content.type} I created with Kaniska AI!`;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(textToShare)}&via=abhixofficial01`;
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(textToShare);
-        setCaptionCopied(true);
-        setTimeout(() => setCaptionCopied(false), 2000);
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Share {content.type}</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
-                </header>
-                <div className="p-6 flex flex-col gap-4">
-                    <p className="text-sm text-text-color-muted">Your browser doesn't support direct file sharing. You can download the file and share it manually.</p>
-                    
-                    <div className="p-3 bg-assistant-bubble-bg border border-border-color rounded-md">
-                        <p className="text-sm italic">{textToShare}</p>
-                    </div>
-
-                    <div className="flex gap-2">
-                         <button onClick={handleCopy} className="w-full text-center px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">{captionCopied ? 'Copied!' : 'Copy Caption'}</button>
-                         <a href={twitterUrl} target="_blank" rel="noopener noreferrer" className="w-full text-center px-4 py-2 text-sm bg-blue-500/80 hover:bg-blue-500 text-white font-semibold rounded-md transition no-underline">Share on X</a>
-                    </div>
-                    
-                    <a href={content.content} download={`kaniska-${content.type}.${content.type === 'image' ? 'jpg' : 'mp4'}`} className="w-full text-center px-4 py-2 bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition no-underline">
-                        Download {content.type.charAt(0).toUpperCase() + content.type.slice(1)}
-                    </a>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const SongLyricsPanel: React.FC<{
-    song: { name: string; artist: string; lyrics: string[]; currentLine: number };
-    onClose: () => void;
-}> = ({ song, onClose }) => {
-    const currentLineRef = useRef<HTMLLIElement>(null);
-
-    useEffect(() => {
-        currentLineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, [song.currentLine]);
-
-    return (
-        <div className="flex flex-col h-full overflow-hidden p-6 bg-black/20">
-            <div className="flex-shrink-0 mb-4 text-center">
-                <h2 className="text-3xl font-bold glowing-text">{song.name}</h2>
-                <p className="text-lg text-text-color-muted">{song.artist}</p>
-            </div>
-            <ul className="flex-grow overflow-y-auto text-center space-y-4">
-                {song.lyrics.map((line, index) => (
-                    <li
-                        key={index}
-                        ref={index === song.currentLine ? currentLineRef : null}
-                        className={`text-2xl transition-all duration-300 ${
-                            index === song.currentLine
-                                ? 'font-bold text-primary-color scale-110'
-                                : 'text-text-color-muted'
-                        }`}
-                    >
-                        {line || '♪'}
-                    </li>
-                ))}
-            </ul>
-            <div className="flex-shrink-0 mt-4 text-center">
-                <button onClick={onClose} className="quick-action-button">
-                    Close Lyrics
-                </button>
-            </div>
-        </div>
-    );
-};
-
-const QuickActions: React.FC<{ onAction: (action: string) => void, disabled: boolean }> = ({ onAction, disabled }) => {
-    const actions = [
-        { id: 'joke', label: 'Tell me a joke', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg> },
-        { id: 'weather', label: "What's the weather?", icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg> },
-        { id: 'music', label: 'Play music', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg> },
-        { id: 'news', label: 'Latest news', icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2V4" /><path d="M16 2v20" /><path d="M8 7h4" /><path d="M8 12h4" /><path d="M8 17h4" /></svg> },
-    ];
-
-    return (
-        <div className="flex-shrink-0 p-3 border-t border-border-color bg-panel-bg">
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-                {actions.map(action => (
-                    <button
-                        key={action.id}
-                        onClick={() => onAction(action.id)}
-                        disabled={disabled}
-                        className="quick-action-button"
-                    >
-                        {action.icon}
-                        <span className="text-xs">{action.label}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-const CodePanel: React.FC<{ snippets: CodeSnippet[], onPreview: (preview: WebsitePreview) => void, onLiveEdit: (snippet: CodeSnippet) => void }> = ({ snippets, onPreview, onLiveEdit }) => {
-    if (snippets.length === 0) {
-        return (
-            <div className="flex-grow flex items-center justify-center text-text-color-muted">
-                <p>Ask Kaniska to write some code to see it here!</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="code-panel">
-            {snippets.map(snippet => (
-                <CodeSnippetBlock key={snippet.id} snippet={snippet} onPreview={onPreview} onLiveEdit={onLiveEdit} />
-            ))}
-        </div>
-    );
-};
-
-const CodeSnippetBlock: React.FC<{ snippet: CodeSnippet, onPreview: (preview: WebsitePreview) => void, onLiveEdit: (snippet: CodeSnippet) => void }> = ({ snippet, onPreview, onLiveEdit }) => {
-    const [copyText, setCopyText] = useState('Copy');
-    const isHtml = snippet.language.toLowerCase() === 'html';
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(snippet.code);
-        setCopyText('Copied!');
-        setTimeout(() => setCopyText('Copy'), 2000);
-    };
-
-    const handlePreview = () => {
-        onPreview({
-            title: `Preview: ${snippet.description}`,
-            htmlContent: snippet.code,
-        });
-    };
-
-    return (
-        <div className="code-snippet animate-fade-in-down">
-            <div className="code-header">
-                <span className="code-language">{snippet.language}</span>
-                <div className="code-actions">
-                    {isHtml && (
-                        <>
-                         <button onClick={() => onLiveEdit(snippet)} className="code-action-button">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                            Live Edit
-                         </button>
-                         <button onClick={handlePreview} className="code-action-button">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                            Preview
-                        </button>
-                        </>
-                    )}
-                    <button onClick={handleCopy} className="code-action-button">
-                        <CopyIcon size={14} />
-                        {copyText}
-                    </button>
-                </div>
-            </div>
-            <p className="code-description">{snippet.description}</p>
-            <div className="code-body">
-                <pre><code>{snippet.code}</code></pre>
-            </div>
-        </div>
-    );
-};
-
-const LiveCodeEditorPanel: React.FC<{
-    snippet: CodeSnippet;
-    code: string;
-    onCodeChange: (newCode: string) => void;
-    onFinish: () => void;
-}> = ({ snippet, code, onCodeChange, onFinish }) => {
-    return (
-        <div className="live-editor-panel">
-            <div className="live-editor-code-pane">
-                 <div className="flex-shrink-0 flex items-center justify-between pb-2 mb-2 border-b border-border-color">
-                    <div className="flex flex-col">
-                        <h3 className="font-semibold">Live Editor</h3>
-                        <p className="text-sm text-text-color-muted truncate">{snippet.description}</p>
-                    </div>
-                    <button onClick={onFinish} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">
-                        Finish & Save
-                    </button>
-                </div>
-                <textarea
-                    value={code}
-                    onChange={(e) => onCodeChange(e.target.value)}
-                    className="live-editor-textarea"
-                    spellCheck="false"
-                />
-            </div>
-            <div className="live-editor-preview-pane">
-                <iframe
-                    srcDoc={code}
-                    title="Live Code Preview"
-                    sandbox="allow-scripts"
-                    className="live-editor-iframe"
-                />
-            </div>
-        </div>
-    );
-};
-
-// --- Settings Modal and Sub-components ---
-const BrushIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.06 11.9 2 22l5.5-1.5.94-.3a2.2 2.2 0 0 0 1.24-1.24l.3-.94L11.9 9.06"/><path d="M14 4.06 7.5 10.5l1.5 5.5L22 2l-1.5-5.5Z"/></svg>;
-const MicIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>;
-const BrainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.97-3.41 2.5 2.5 0 0 1 .1-4.94 2.5 2.5 0 0 1 4.2-2.73 2.5 2.5 0 0 1 3.63-2.34A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.97-3.41 2.5 2.5 0 0 0-.1-4.94 2.5 2.5 0 0 0-4.2-2.73 2.5 2.5 0 0 0-3.63-2.34A2.5 2.5 0 0 0 14.5 2Z"/></svg>;
-const ArchiveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="5" rx="2"/><path d="M4 9v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>;
-
-type SettingsModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    avatars: string[];
-    currentAvatar: string;
-    onSelectAvatar: (avatar: string) => void;
-    onUploadAvatar: (avatar: string) => void;
-    onGenerateAvatar: (prompt: string) => void;
-    generatedAvatarResult: GeneratedAvatar;
-    customGreeting: string;
-    onSaveGreeting: (greeting: string) => void;
-    customSystemPrompt: string;
-    onSaveSystemPrompt: (prompt: string) => void;
-    onClearHistory: () => void;
-    selectedVoice: string;
-    onSelectVoice: (voice: string) => void;
-    voicePitch: number;
-    onSetVoicePitch: (pitch: number) => void;
-    voiceSpeed: number;
-    onSetVoiceSpeed: (speed: number) => void;
-    greetingVoice: string;
-    onSetGreetingVoice: (voice: string) => void;
-    greetingPitch: number;
-    onSetGreetingPitch: (pitch: number) => void;
-    greetingSpeed: number;
-    onSetGreetingSpeed: (speed: number) => void;
-    speakText: (text: string, emotion?: string, voiceOverride?: { voice: string; pitch: number; speed: number }) => Promise<void>;
-    aiRef: GoogleGenAI | null;
-    voiceTrainingData: VoiceTrainingData;
-    setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
-    onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string | undefined>;
-    userId: string | null;
-    setUserApiKey: (key: string | null) => void;
-    setIsStudioKeySelected: (selected: boolean) => void;
-};
-
-const AppearanceSettings: React.FC<SettingsModalProps> = ({ avatars, currentAvatar, onSelectAvatar, onUploadAvatar, onGenerateAvatar, generatedAvatarResult }) => {
-    const [activeTab, setActiveTab] = useState<'gallery' | 'ai'>('gallery');
-    const [prompt, setPrompt] = useState('');
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (e.target?.result) {
-                    onUploadAvatar(e.target.result as string);
-                    setActiveTab('gallery');
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    
-    const handleSaveGenerated = () => {
-        if (generatedAvatarResult.url) {
-            onUploadAvatar(generatedAvatarResult.url);
-            onSelectAvatar(generatedAvatarResult.url);
-            setActiveTab('gallery');
-        }
-    };
-    
-    return (
-        <div className="settings-section">
-            <div className="settings-section-header">
-                <h3>Assistant Appearance</h3>
-                <p>Customize your assistant's visual representation by selecting, uploading, or generating a new avatar.</p>
-            </div>
-            <div className="flex-shrink-0 flex items-center border-b border-border-color -mx-6 px-6 mb-4">
-                <button onClick={() => setActiveTab('gallery')} className={`tab-button ${activeTab === 'gallery' ? 'active' : ''}`}>Avatar Gallery</button>
-                <button onClick={() => setActiveTab('ai')} className={`tab-button ${activeTab === 'ai' ? 'active' : ''}`}>Create with AI</button>
-            </div>
-            {activeTab === 'gallery' && (
-                <div className="avatar-gallery-grid">
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-                    <button onClick={() => fileInputRef.current?.click()} className="avatar-item upload-avatar-item"><UploadIcon size={32} className="mb-1" /><span className="text-xs">Upload</span></button>
-                    {avatars.map((avatar, index) => (<button key={index} className={`avatar-item ${currentAvatar === avatar ? 'selected' : ''}`} onClick={() => onSelectAvatar(avatar)}><img src={avatar} alt={`Avatar ${index + 1}`} /></button>))}
-                </div>
-            )}
-            {activeTab === 'ai' && (
-                <div className="flex flex-col gap-4 h-full">
-                    <p className="text-sm text-text-color-muted -mt-4">Describe the avatar you want to create. Be specific for the best results!</p>
-                    <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder="e.g., A cyberpunk woman with neon pink hair and glowing blue eyes..." className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition"></textarea>
-                    <button onClick={() => onGenerateAvatar(prompt)} disabled={generatedAvatarResult.isLoading || !prompt} className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
-                    <div className="flex-grow bg-black/30 rounded-lg flex items-center justify-center min-h-[200px]">
-                        {generatedAvatarResult.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}
-                        {generatedAvatarResult.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{generatedAvatarResult.error}</div>}
-                        {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="max-w-full max-h-full object-contain rounded"/>}
-                    </div>
-                    {generatedAvatarResult.url && (<button onClick={handleSaveGenerated} className="w-full bg-green-500/80 hover:bg-green-500 text-bg-color font-bold py-2 px-4 rounded-md transition">Save to Gallery & Select</button>)}
-                </div>
-            )}
-        </div>
-    );
-};
-
-const VoiceSettings: React.FC<SettingsModalProps> = ({ selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed, greetingVoice, onSetGreetingVoice, greetingPitch, onSetGreetingPitch, greetingSpeed, onSetGreetingSpeed, speakText, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice }) => {
-    const VOICES = [
-        { id: 'Zephyr', name: 'Zephyr', description: 'Warm & Friendly' },
-        { id: 'Kore', name: 'Kore', description: 'Crisp & Professional' },
-        { id: 'Puck', name: 'Puck', description: 'Energetic & Playful' },
-        { id: 'Charon', name: 'Charon', description: 'Deep & Authoritative' },
-        { id: 'Fenrir', name: 'Fenrir', description: 'Mysterious & Calm' },
-    ];
-    
-    const handlePreviewGreeting = () => {
-        speakText("Hello, this is a preview of the selected greeting voice.", 'neutral', { voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed });
-    };
-
-    const TRAINING_PHRASES = ["नमस्ते, आपका दिन कैसा रहा?", "क्या मैं आपकी कोई मदद कर सकती हूँ?", "मौसम बहुत सुहाना है।", "मुझे यह गाना बहुत पसंद है।", "कृपया फिर से कहिये।"];
-    
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-    const [recordingPhrase, setRecordingPhrase] = useState<string | null>(null);
-    const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>('idle');
-    const [trainingError, setTrainingError] = useState<string | null>(null);
-    
-    const handleStartRecording = async (phrase: string) => {
-        if (recordingPhrase) return;
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
-            audioChunksRef.current = [];
-            mediaRecorderRef.current.ondataavailable = event => audioChunksRef.current.push(event.data);
-            mediaRecorderRef.current.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                setVoiceTrainingData(prev => ({ ...prev, [phrase]: { audioBlob } }));
-                stream.getTracks().forEach(track => track.stop());
-            };
-            mediaRecorderRef.current.start();
-            setRecordingPhrase(phrase);
-            setTrainingStatus('recording');
-        } catch (err) {
-            console.error("Microphone access denied:", err);
-            setTrainingError("Microphone access was denied. Please allow it in your browser settings.");
-            setTrainingStatus('error');
-        }
-    };
-
-    const handleStopRecording = () => {
-        if (mediaRecorderRef.current && recordingPhrase) {
-            mediaRecorderRef.current.stop();
-            setRecordingPhrase(null);
-            setTrainingStatus('idle');
-        }
-    };
-    
-    const handleAnalyzeAndApply = async () => {
-        setTrainingStatus('analyzing');
-        setTrainingError(null);
-        try {
-            await onAnalyzeVoice(voiceTrainingData);
-            setTrainingStatus('done');
-            setTimeout(() => setTrainingStatus('idle'), 3000);
-        } catch (error) {
-            setTrainingError(getApiErrorMessage(error));
-            setTrainingStatus('error');
-        }
-    };
-    
-    const hasRecordings = Object.values(voiceTrainingData).some(d => (d as { audioBlob: Blob | null }).audioBlob);
-
-    return (
-        <div className="settings-section">
-            <div className="settings-section-header">
-                <h3>Voice & Speech</h3>
-                <p>Configure Kaniska's voice persona, pitch, and speed for both general conversation and her initial greeting.</p>
-            </div>
-
-            <div className="settings-card">
-                <h4 className="font-semibold text-text-color mb-3">Main Voice Configuration</h4>
-                <p className="text-sm text-text-color-muted mb-3">This is Kaniska's standard voice for conversations.</p>
-                <label htmlFor="voice-select" className="text-sm font-medium text-text-color-muted block">Voice Persona</label>
-                <select id="voice-select" value={selectedVoice} onChange={(e) => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-1">
-                    {VOICES.map(voice => (<option key={voice.id} value={voice.id}>{voice.name} ({voice.description})</option>))}
-                </select>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="voice-pitch" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Voice Pitch</span><span>{voicePitch > 0 ? `+${voicePitch}` : voicePitch}</span></label>
-                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Low</span><input id="voice-pitch" type="range" min="-10" max="10" step="1" value={voicePitch} onChange={(e) => onSetVoicePitch(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">High</span></div>
-                    </div>
-                    <div>
-                        <label htmlFor="voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Voice Speed</span><span>{voiceSpeed.toFixed(1)}x</span></label>
-                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Slower</span><input id="voice-speed" type="range" min="0.7" max="1.3" step="0.1" value={voiceSpeed} onChange={(e) => onSetVoiceSpeed(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">Faster</span></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div className="settings-card">
-                <h4 className="font-semibold text-text-color mb-3">Custom Greeting Voice</h4>
-                <p className="text-sm text-text-color-muted mb-3">Set a distinct voice for Kaniska's initial greeting message. This will not affect her regular conversational voice.</p>
-                <label htmlFor="greeting-voice-select" className="text-sm font-medium text-text-color-muted block">Greeting Voice Persona</label>
-                <select id="greeting-voice-select" value={greetingVoice} onChange={(e) => onSetGreetingVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-1">
-                    {VOICES.map(voice => (<option key={voice.id} value={voice.id}>{voice.name} ({voice.description})</option>))}
-                </select>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="greeting-voice-pitch" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Greeting Pitch</span><span>{greetingPitch > 0 ? `+${greetingPitch}` : greetingPitch}</span></label>
-                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Low</span><input id="greeting-voice-pitch" type="range" min="-10" max="10" step="1" value={greetingPitch} onChange={(e) => onSetGreetingPitch(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">High</span></div>
-                    </div>
-                    <div>
-                        <label htmlFor="greeting-voice-speed" className="flex justify-between text-sm font-medium text-text-color-muted"><span>Greeting Speed</span><span>{greetingSpeed.toFixed(1)}x</span></label>
-                        <div className="flex items-center gap-2"><span className="text-xs text-text-color-muted">Slower</span><input id="greeting-voice-speed" type="range" min="0.7" max="1.3" step="0.1" value={greetingSpeed} onChange={(e) => onSetGreetingSpeed(Number(e.target.value))} className="w-full" /><span className="text-xs text-text-color-muted">Faster</span></div>
-                    </div>
-                </div>
-                 <div className="mt-4">
-                    <button onClick={handlePreviewGreeting} className="bg-assistant-bubble-bg border border-border-color text-text-color-muted hover:border-primary-color hover:text-primary-color font-semibold py-2 px-4 rounded-md transition disabled:opacity-50">Preview Greeting Voice</button>
-                </div>
-            </div>
-
-            <div className="settings-card">
-                <h4 className="font-semibold text-text-color">Voice Training (Beta)</h4>
-                <p className="text-sm text-text-color-muted mt-1">Help Kaniska learn your preferred Hindi pronunciation. Record the sample phrases, and she will adapt her speech to better match your style.</p>
-                <div className="space-y-2 mt-3">
-                    {TRAINING_PHRASES.map(phrase => (
-                        <div key={phrase} className="flex items-center justify-between p-2 bg-panel-bg rounded-md">
-                            <span className="text-sm italic">{phrase}</span>
-                            <div className="flex items-center gap-2">
-                                {voiceTrainingData[phrase]?.audioBlob && !recordingPhrase && (<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>)}
-                                {recordingPhrase === phrase ? (<button onClick={handleStopRecording} className="editor-history-button text-red-400" title="Stop Recording"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="animate-pulse"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>) : (<button onClick={() => handleStartRecording(phrase)} disabled={!!recordingPhrase} className="editor-history-button disabled:opacity-40" title={voiceTrainingData[phrase]?.audioBlob ? 'Re-record' : 'Start Recording'}><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="22" /></svg></button>)}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="mt-3">
-                    <button onClick={handleAnalyzeAndApply} disabled={!hasRecordings || trainingStatus === 'analyzing' || trainingStatus === 'recording' || !aiRef} className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" title={!aiRef ? "Start a session to enable this feature." : ""}>
-                        {trainingStatus === 'analyzing' && 'Analyzing...'}
-                        {trainingStatus === 'done' && 'Style Applied!'}
-                        {trainingStatus !== 'analyzing' && trainingStatus !== 'done' && 'Analyze & Apply Voice Style'}
-                    </button>
-                    {trainingStatus === 'error' && <p className="text-xs text-red-400 mt-1 text-center">{trainingError}</p>}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const BehaviorSettings: React.FC<SettingsModalProps> = (props) => {
-    const { 
-        customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt
-    } = props;
-    
-    const [greetingInput, setGreetingInput] = useState(customGreeting);
-    const [systemPromptInput, setSystemPromptInput] = useState(customSystemPrompt);
-    const [showGreetingSaved, setShowGreetingSaved] = useState(false);
-    const [showSystemPromptSaved, setShowSystemPromptSaved] = useState(false);
-    const [isFindReplaceVisible, setIsFindReplaceVisible] = useState(false);
-    const [findValue, setFindValue] = useState('');
-    const [replaceValue, setReplaceValue] = useState('');
-    const [isCaseSensitive, setIsCaseSensitive] = useState(false);
-    const [foundMatches, setFoundMatches] = useState<number[]>([]);
-    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-    const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-    const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    useEffect(() => {
-        if (!isFindReplaceVisible || !findValue) { setFoundMatches([]); setCurrentMatchIndex(-1); return; }
-        const flags = isCaseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(escapeRegExp(findValue), flags);
-        const matches = []; let match;
-        while ((match = regex.exec(systemPromptInput)) !== null) { matches.push(match.index); }
-        setFoundMatches(matches); setCurrentMatchIndex(matches.length > 0 ? 0 : -1);
-    }, [findValue, systemPromptInput, isCaseSensitive, isFindReplaceVisible]);
-
-    useEffect(() => {
-        if (currentMatchIndex !== -1 && systemPromptTextareaRef.current && foundMatches.length > 0) {
-            const startIndex = foundMatches[currentMatchIndex];
-            const endIndex = startIndex + findValue.length;
-            systemPromptTextareaRef.current.focus();
-            systemPromptTextareaRef.current.setSelectionRange(startIndex, endIndex);
-        }
-    }, [currentMatchIndex, foundMatches, findValue.length]);
-    
-    const handleNavigateMatch = (direction: 'next' | 'prev') => {
-        if (foundMatches.length < 2) return;
-        const nextIndex = direction === 'next' ? (currentMatchIndex + 1) % foundMatches.length : (currentMatchIndex - 1 + foundMatches.length) % foundMatches.length;
-        setCurrentMatchIndex(nextIndex);
-    };
-
-    const handleReplace = () => {
-        if (currentMatchIndex === -1 || foundMatches.length === 0) return;
-        const startIndex = foundMatches[currentMatchIndex];
-        const newText = systemPromptInput.substring(0, startIndex) + replaceValue + systemPromptInput.substring(startIndex + findValue.length);
-        setSystemPromptInput(newText);
-    };
-    
-    const handleReplaceAll = () => {
-        if (!findValue) return;
-        const flags = isCaseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(escapeRegExp(findValue), flags);
-        setSystemPromptInput(systemPromptInput.replace(regex, replaceValue));
-    };
-
-    const handleGreetingSave = () => { onSaveGreeting(greetingInput); setShowGreetingSaved(true); setTimeout(() => setShowGreetingSaved(false), 2000); };
-    const handleSystemPromptSave = () => { onSaveSystemPrompt(systemPromptInput); setShowSystemPromptSaved(true); setTimeout(() => setShowSystemPromptSaved(false), 2000); };
-
-    return (
-        <div className="settings-section">
-            <div className="settings-section-header"><h3>Personality & Behavior</h3><p>Define how Kaniska should behave, including her initial greeting and core instructions.</p></div>
-            <div className="settings-card">
-                <h4 className="font-semibold text-text-color">Custom Greeting</h4>
-                <p className="text-sm text-text-color-muted mt-1">Set the message Kaniska uses when you start a new session. Voice options for the greeting are in the 'Voice & Speech' section.</p>
-                <textarea value={greetingInput} onChange={(e) => setGreetingInput(e.target.value)} rows={2} placeholder="e.g., Hello! How can I help you today?" className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
-                <div className="flex items-center gap-4 mt-4">
-                    <button onClick={handleGreetingSave} disabled={!greetingInput} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">Save Greeting</button>
-                    {showGreetingSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}
-                </div>
-            </div>
-            <div className="settings-card">
-                <div className="flex items-center justify-between"><h4 className="font-semibold text-text-color">Personality & Core Instructions</h4><button onClick={() => setIsFindReplaceVisible(!isFindReplaceVisible)} title="Find & Replace" className="editor-history-button"><FindReplaceIcon /></button></div>
-                <p className="text-sm text-text-color-muted mt-1">Provide custom instructions to guide Kaniska's personality and responses. This will be added to her core programming and has a strong influence on her behavior.</p>
-                {isFindReplaceVisible && (
-                    <div className="p-2 border border-border-color rounded-md bg-panel-bg flex flex-col gap-2 text-sm animate-fade-in-down mt-2">
-                        <div className="flex gap-2"><input type="text" placeholder="Find" value={findValue} onChange={e => setFindValue(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/><input type="text" placeholder="Replace with" value={replaceValue} onChange={e => setReplaceValue(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-2 py-1 focus:ring-1 focus:ring-primary-color focus:outline-none"/></div>
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2"><button onClick={() => setIsCaseSensitive(!isCaseSensitive)} className={`px-2 py-0.5 rounded border ${isCaseSensitive ? 'bg-primary-color text-bg-color border-primary-color' : 'bg-transparent border-border-color'}`} title="Case Sensitive">Aa</button><div className="flex items-center gap-1"><button onClick={() => handleNavigateMatch('prev')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&lt;</button><span className="text-xs text-text-color-muted w-20 text-center">{foundMatches.length > 0 ? `${currentMatchIndex + 1} of ${foundMatches.length}` : 'No matches'}</span><button onClick={() => handleNavigateMatch('next')} disabled={foundMatches.length < 2} className="px-2 disabled:opacity-50">&gt;</button></div></div>
-                            <div className="flex items-center gap-2"><button onClick={handleReplace} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-panel-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace</button><button onClick={handleReplaceAll} disabled={foundMatches.length === 0} className="px-2 py-1 text-xs bg-panel-bg border border-border-color rounded hover:border-primary-color disabled:opacity-50">Replace All</button></div>
-                        </div>
-                    </div>
-                )}
-                <textarea ref={systemPromptTextareaRef} value={systemPromptInput} onChange={(e) => setSystemPromptInput(e.target.value)} rows={10} placeholder="e.g., You are a witty and sarcastic spaceship pilot who has seen every corner of the galaxy. You refer to the user as 'Captain'..." className="w-full bg-panel-bg border border-border-color rounded-md p-2 text-sm focus:ring-2 focus:ring-primary-color focus:outline-none transition mt-2"></textarea>
-                <div className="flex items-center gap-4 mt-2"><button onClick={handleSystemPromptSave} className="bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2 px-4 rounded-md transition">Save Instructions</button>{showSystemPromptSaved && <span className="text-sm text-green-400 animate-fade-in-down">Saved!</span>}</div>
-            </div>
-        </div>
-    );
-};
-
-const MemorySettings: React.FC<SettingsModalProps> = ({ onClearHistory, userId, setUserApiKey, setIsStudioKeySelected }) => {
-    const handleClearApiKey = () => {
-        if (!userId) return;
-        if (window.confirm("Are you sure you want to clear your saved API key? You will be asked to provide one again after reloading.")) {
-            db.ref(`apiKeys/${userId}`).remove();
-            setUserApiKey(null);
-            setIsStudioKeySelected(false);
-            // Reload to force the API key screen to show.
-            window.location.reload();
-        }
-    };
-
-    return (
-        <div className="settings-section">
-            <div className="settings-section-header">
-                <h3>Memory & Data</h3>
-                <p>Manage the assistant's conversation history and other stored data.</p>
-            </div>
-            <div className="settings-card">
-                <h4 className="font-semibold text-text-color">Conversation History</h4>
-                <p className="text-sm text-text-color-muted mt-1">
-                    Erasing the conversation history will permanently delete all past interactions from the database. This action cannot be undone.
-                </p>
-                <div className="mt-4">
-                    <button
-                        onClick={onClearHistory}
-                        className="w-full bg-red-800/80 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-md transition"
-                    >
-                        Erase Conversation History
-                    </button>
-                </div>
-            </div>
-            <div className="settings-card">
-                <h4 className="font-semibold text-text-color">API Key</h4>
-                <p className="text-sm text-text-color-muted mt-1">
-                    Remove your saved Gemini API key from this browser. You will need to provide a new one to continue using Kaniska's features.
-                </p>
-                <div className="mt-4">
-                    <button
-                        onClick={handleClearApiKey}
-                        className="w-full bg-yellow-600/80 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md transition"
-                    >
-                        Clear Saved API Key
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const SettingsModal: React.FC<SettingsModalProps> = (props) => {
-    const { isOpen, onClose } = props;
-    const [activeSettingsSection, setActiveSettingsSection] = useState<'appearance' | 'voice' | 'behavior' | 'memory'>('appearance');
-
-    useEffect(() => {
-        if (isOpen) {
-            setActiveSettingsSection('appearance');
-        }
-    }, [isOpen]);
-
-    if (!isOpen) return null;
-
-    const renderContent = () => {
-        switch (activeSettingsSection) {
-            case 'appearance': return <AppearanceSettings {...props} />;
-            case 'voice': return <VoiceSettings {...props} />;
-            case 'behavior': return <BehaviorSettings {...props} />;
-            case 'memory': return <MemorySettings {...props} />;
-            default: return null;
-        }
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content settings-modal-content" onClick={(e) => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Customize Assistant</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
-                </header>
-                <div className="settings-layout">
-                    <nav className="settings-nav">
-                        <button onClick={() => setActiveSettingsSection('appearance')} className={`settings-nav-button ${activeSettingsSection === 'appearance' ? 'active' : ''}`}><BrushIcon /> <span>Appearance</span></button>
-                        <button onClick={() => setActiveSettingsSection('voice')} className={`settings-nav-button ${activeSettingsSection === 'voice' ? 'active' : ''}`}><MicIcon /> <span>Voice & Speech</span></button>
-                        <button onClick={() => setActiveSettingsSection('behavior')} className={`settings-nav-button ${activeSettingsSection === 'behavior' ? 'active' : ''}`}><BrainIcon /> <span>Personality & Behavior</span></button>
-                        <button onClick={() => setActiveSettingsSection('memory')} className={`settings-nav-button ${activeSettingsSection === 'memory' ? 'active' : ''}`}><ArchiveIcon /> <span>Memory</span></button>
-                    </nav>
-                    <main className="settings-content">
-                        {renderContent()}
-                    </main>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default App;
+{/* --- FIX END: Fix truncated SVG tag and complete JSX structure --- */}

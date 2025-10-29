@@ -1,7 +1,10 @@
 
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
+// --- FIX START: Update import path for App component ---
+import { App } from './App';
+// --- FIX END: Update import path for App component ---
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
