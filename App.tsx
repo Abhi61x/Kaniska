@@ -991,12 +991,15 @@ type SettingsModalProps = {
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
-    isOpen, onClose, avatars, currentAvatar, onSelectAvatar,
+    isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar,
     onGenerateAvatar, generatedAvatarResult,
     customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory,
     selectedVoice, onSelectVoice,
+    voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed,
     greetingVoice, onSetGreetingVoice,
-    speakText, apiKeys, onSaveApiKeys, onResetGeminiKey
+    greetingPitch, onSetGreetingPitch, greetingSpeed, onSetGreetingSpeed,
+    speakText, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice, userId,
+    apiKeys, onSaveApiKeys, onResetGeminiKey
 }) => {
     const [activeTab, setActiveTab] = React.useState('persona');
     const [greeting, setGreeting] = React.useState(customGreeting);
@@ -1063,6 +1066,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
                                         {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
+                                    <div className="mt-4 space-y-3">
+                                        <div>
+                                            <label htmlFor="main-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{voicePitch}</span></label>
+                                            <input id="main-voice-pitch" type="range" min="-20" max="20" value={voicePitch} onChange={e => onSetVoicePitch(Number(e.target.value))} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="main-voice-speed" className="flex justify-between text-sm text-muted mb-1"><span>Speed</span> <span>{voiceSpeed.toFixed(2)}x</span></label>
+                                            <input id="main-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={voiceSpeed} onChange={e => onSetVoiceSpeed(Number(e.target.value))} />
+                                        </div>
+                                    </div>
                                 </div>
                                  <div>
                                     <h4 className="font-semibold mb-2">Greeting Voice</h4>
@@ -1070,6 +1083,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                      <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
                                         {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
+                                    <div className="mt-4 space-y-3">
+                                        <div>
+                                            <label htmlFor="greeting-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{greetingPitch}</span></label>
+                                            <input id="greeting-voice-pitch" type="range" min="-20" max="20" value={greetingPitch} onChange={e => onSetGreetingPitch(Number(e.target.value))} />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="greeting-voice-speed" className="flex justify-between text-sm text-muted mb-1"><span>Speed</span> <span>{greetingSpeed.toFixed(2)}x</span></label>
+                                            <input id="greeting-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={greetingSpeed} onChange={e => onSetGreetingSpeed(Number(e.target.value))} />
+                                        </div>
+                                    </div>
                                 </div>
                                 <button onClick={() => speakText("Testing the current voice configuration.")} className="px-3 py-1 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Main Voice</button>
                              </div>
@@ -1594,6 +1617,7 @@ export const App: React.FC = () => {
             const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
             if (downloadLink) {
                 setVideoProgressMessage('Downloading final video...');
+                // FIX: Use `apiKeys.gemini` instead of the undefined `apiKey`.
                 const videoResponse = await fetch(`${downloadLink}&key=${apiKeys.gemini || process.env.API_KEY}`);
                 if (!videoResponse.ok) {
                     throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
@@ -2785,9 +2809,9 @@ export const App: React.FC = () => {
 
     const handleAnalyzeVoice = useCallback(async (trainingData: VoiceTrainingData) => {
         const ai = getAiClient();
-        if (!ai) return;
+        if (!ai) return "";
         const recordedBlobs = Object.values(trainingData).map(d => (d as { audioBlob: Blob | null }).audioBlob).filter(Boolean) as Blob[];
-        if (recordedBlobs.length === 0) return;
+        if (recordedBlobs.length === 0) return "";
 
         const parts = await Promise.all(recordedBlobs.map(async (blob, index) => {
             const base64Data = await blobToBase64(blob);
@@ -2835,7 +2859,7 @@ export const App: React.FC = () => {
         if (youtubeQueue.length > 0 && youtubeQueueIndex < youtubeQueue.length - 1) {
             const newIndex = youtubeQueueIndex + 1;
             setYoutubeQueueIndex(newIndex);
-            const nextVideo = youtubeQueue[newIndex];
+            const nextVideo = youtubeQueue[nextIndex];
             setYoutubeTitle(nextVideo.title);
             setYoutubeError(null);
             if (playerRef.current) {
@@ -3015,7 +3039,6 @@ export const App: React.FC = () => {
                             <button onClick={handleStop} className="youtube-control-button stop-btn">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
                             </button>
-                            {/* FIX: Corrected function name from handleNext to handleNextVideo and completed the button element. */}
                             <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
                             </button>
@@ -3044,4 +3067,153 @@ export const App: React.FC = () => {
                             <div className="flex flex-col sm:flex-row gap-4 items-start">
                                 <div className="flex-shrink-0 w-full sm:w-48">
                                     <video ref={voiceoverVideoRef} src={uploadedVideoUrl || ''} controls muted className={`w-full aspect-video rounded-md bg-black ${!uploadedVideoUrl ? 'hidden' : ''}`}></video>
-                                    <button onClick={() => videoUploadInputRef.current?.click()} className="w-full mt-2 px-3 py-1.5 text-sm bg-primary-color/20 text-primary-color border
+                                    <button onClick={() => videoUploadInputRef.current?.click()} className="w-full mt-2 px-3 py-1.5 text-sm bg-primary-color/20 text-primary-color border border-primary-color/50 hover:bg-primary-color/30 transition">Upload Video</button>
+                                    <input type="file" ref={videoUploadInputRef} onChange={handleVideoUpload} accept="video/*" className="hidden" />
+                                </div>
+                                <div className="flex-grow">
+                                    <button onClick={handleGenerateVoiceover} disabled={!uploadedVideoUrl || voiceoverState === 'extracting' || voiceoverState === 'describing' || voiceoverState === 'generating_audio'} className="w-full mb-2 px-3 py-1.5 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition disabled:opacity-50">
+                                        {voiceoverState === 'idle' && 'Generate Voiceover'}
+                                        {voiceoverState === 'extracting' && 'Extracting frames...'}
+                                        {voiceoverState === 'describing' && 'Generating script...'}
+                                        {voiceoverState === 'generating_audio' && 'Creating audio...'}
+                                        {voiceoverState === 'done' && 'Re-generate Voiceover'}
+                                        {voiceoverState === 'error' && 'Retry Voiceover'}
+                                    </button>
+                                    {voiceoverState !== 'idle' && <p className="text-xs text-muted text-center">{voiceoverProgress}</p>}
+                                    {voiceoverError && <p className="text-xs text-red-400 mt-2">{voiceoverError}</p>}
+                                    {videoDescription && (
+                                        <div className="mt-2 p-2 bg-black/20 rounded-md text-xs max-h-24 overflow-y-auto">
+                                            <h5 className="font-semibold text-muted">Generated Script:</h5>
+                                            <p className="whitespace-pre-wrap">{videoDescription}</p>
+                                        </div>
+                                    )}
+                                    {voiceoverAudioUrl && (
+                                        <div className="mt-2">
+                                            <audio ref={voiceoverAudioRef} src={voiceoverAudioUrl} controls className="w-full"></audio>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>)}
+                    {activePanel === 'lyrics' && songLyrics && (
+                        <div className="flex-grow flex flex-col items-center justify-center p-4 text-center overflow-y-auto">
+                            <h3 className="text-xl font-bold">{songLyrics.name}</h3>
+                            <p className="text-md text-muted mb-6">{songLyrics.artist}</p>
+                            <div className="space-y-2 max-w-lg">
+                                {songLyrics.lyrics.map((line, index) => (
+                                    <p key={index} className={`transition-all duration-300 text-lg ${index === songLyrics.currentLine ? 'text-primary-color font-bold scale-110' : 'text-muted'}`}>{line}</p>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {activePanel === 'email' && (
+                        <EmailPanel 
+                            recipient={emailRecipient} 
+                            subject={emailSubject} 
+                            body={emailBody}
+                            onRecipientChange={setEmailRecipient}
+                            onSubjectChange={setEmailSubject}
+                            onBodyChange={setEmailBody}
+                            onSend={handleSendEmail}
+                        />
+                    )}
+                    {activePanel === 'weather' && weatherData && <WeatherPanel data={weatherData} />}
+                    {activePanel === 'news' && newsArticles.length > 0 && <NewsPanel articles={newsArticles} />}
+                    {activePanel === 'timer' && timer && <TimerPanel timer={timer} />}
+                </section>
+            </main>
+            <ImageEditorModal
+                isOpen={!!editingImage}
+                image={editingImage}
+                onClose={() => setEditingImage(null)}
+                onSave={(newUrl) => {
+                    if (editingImage) {
+                        const updatedImage = { ...editingImage, url: newUrl };
+                        setGeneratedImages(prev => prev.map(img => img.id === editingImage.id ? updatedImage : img));
+                        if (selectedImage?.id === editingImage.id) setSelectedImage(updatedImage);
+                    }
+                    setEditingImage(null);
+                }}
+            />
+            <LiveImageEditorModal
+                isOpen={!!liveEditingImage}
+                image={liveEditingImage}
+                filters={liveEditFilters}
+                transform={liveEditTransform}
+                onClose={() => {
+                    sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "Finish live editing." }));
+                    setLiveEditingImage(null);
+                }}
+                onSave={(newUrl) => {
+                    if (liveEditingImage) {
+                        const updatedImage = { ...liveEditingImage, url: newUrl };
+                        setGeneratedImages(prev => prev.map(img => img.id === liveEditingImage.id ? updatedImage : img));
+                        if (selectedImage?.id === liveEditingImage.id) setSelectedImage(updatedImage);
+                    }
+                    setLiveEditingImage(null);
+                }}
+                onReset={() => {
+                    setLiveEditFilters(initialFilters);
+                    setLiveEditTransform(initialTransforms);
+                }}
+            />
+            <WebsitePreviewModal preview={websitePreview} onClose={() => setWebsitePreview(null)} />
+            <SettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                avatars={avatars}
+                currentAvatar={currentAvatar}
+                onSelectAvatar={setCurrentAvatar}
+                onUploadAvatar={(newAvatar) => setAvatars(prev => [newAvatar, ...prev])}
+                onGenerateAvatar={handleGenerateAvatar}
+                generatedAvatarResult={generatedAiAvatar}
+                customGreeting={customGreeting}
+                onSaveGreeting={handleSaveGreeting}
+                customSystemPrompt={customSystemPrompt}
+                onSaveSystemPrompt={handleSaveSystemPrompt}
+                onClearHistory={handleClearHistory}
+                selectedVoice={selectedVoice}
+                onSelectVoice={setSelectedVoice}
+                voicePitch={voicePitch}
+                onSetVoicePitch={setVoicePitch}
+                voiceSpeed={voiceSpeed}
+                onSetVoiceSpeed={setVoiceSpeed}
+                greetingVoice={greetingVoice}
+                onSetGreetingVoice={setGreetingVoice}
+                greetingPitch={greetingPitch}
+                onSetGreetingPitch={setGreetingPitch}
+                greetingSpeed={greetingSpeed}
+                onSetGreetingSpeed={setGreetingSpeed}
+                speakText={speakText}
+                aiRef={aiRef.current}
+                voiceTrainingData={voiceTrainingData}
+                setVoiceTrainingData={setVoiceTrainingData}
+                onAnalyzeVoice={handleAnalyzeVoice}
+                userId={userIdRef.current}
+                apiKeys={apiKeys}
+                onSaveApiKeys={handleSaveApiKeys}
+                onResetGeminiKey={handleResetApiKeys}
+            />
+            {shareContent && (
+                <div className="modal-overlay" onClick={() => setShareContent(null)}>
+                    <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <header className="flex items-center justify-between p-4 border-b border-border-color">
+                            <h2 className="text-lg font-semibold">Share Content</h2>
+                            <button onClick={() => setShareContent(null)} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
+                        </header>
+                        <div className="p-6 text-center">
+                            {shareContent.type === 'image' && <img src={shareContent.content} alt={shareContent.prompt} className="max-w-full max-h-[50vh] object-contain mx-auto rounded-md mb-4" />}
+                            {shareContent.type === 'video' && <video src={shareContent.content} controls className="max-w-full max-h-[50vh] object-contain mx-auto rounded-md mb-4" />}
+                            <p className="text-sm text-muted mb-4">{shareContent.prompt}</p>
+                            <p className="text-xs">Web Share API not available. You can download the content to share it.</p>
+                        </div>
+                        <footer className="flex justify-end p-4 border-t border-border-color gap-2">
+                            <button onClick={() => setShareContent(null)} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Close</button>
+                        </footer>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
