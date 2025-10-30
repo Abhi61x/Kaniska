@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -318,6 +319,11 @@ const ShareIcon = ({ size = 16 }: { size?: number }) => ( <svg xmlns="http://www
 const CopyIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> );
 const DeleteIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg> );
 const UploadIcon: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> );
+const UserCircleIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/></svg>);
+const MicVocalIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 8V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4"/><path d="M8 18.5a2.5 2.5 0 1 0 5 0"/><path d="M12 14v4.5"/><path d="m16 12-4 4-4-4"/><path d="M16 8h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"/></svg>);
+const ImageIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>);
+const KeyIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>);
+const SlidersIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="4" x2="4" y1="21" y2="14" /><line x1="4" x2="4" y1="10" y2="3" /><line x1="12" x2="12" y1="21" y2="12" /><line x1="12" x2="12" y1="8" y2="3" /><line x1="20" x2="20" y1="21" y2="16" /><line x1="20" x2="20" y1="12" y2="3" /><line x1="2" x2="6" y1="14" y2="14" /><line x1="10" x2="14" y1="8" y2="8" /><line x1="18" x2="22" y1="16" y2="16" /></svg>);
 
 const Clock: React.FC = () => {
     const [time, setTime] = useState(new Date());
@@ -361,7 +367,7 @@ const TypingIndicator = () => (
 const PREDEFINED_AVATARS = [
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", // Default blank
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARTSURBVHhe7ZxLUdswFIBzL3M3s9PuwK6A2AGxA6IDsAPCBkQHpAPSAcEO2A5wOiA6oOywQ3YEdmB2eC4lpTSpM9I5SfL/gScl0qS/9/PeFxCCEEP4j4Y+4tBDjLPIY7w/g4t4Xp/hKj7lV/yKD/AHPtQvD/AL/sJ9+AD34T58hPvwEd7yP5fxfJ/gYzyNl/G8nmQG8Dq+wuv4Ql/hVXyBb/CVPuAP/IHP8A1+wTf4A7/hHnyCb/BvfIAP8C+8wzt4V59hB/hLgD/y/f4Gz/ArvsCveE+f4Ad8gS/wFf4GgD/gZ/gU3+BrfIAP8HWe4wY8w0d4ip/xFR7g93yD3/A1nuAdfIZP8Bn+gK/wA/6Bf+AtvIX38A7e4R08w5/wM3yKH/ApPsA/eA+/4338jnfxUaTxo+gD3sbv+B4f40f8jI/xI/6Bf+Jd/A7fxu/4Ht/jR/yMH/Ej/sA/+Bd/g7fxO34n8A3e4x38iI/xI37GD/gD/+J3/A5v43f8jm/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BXf42M8jBfxsv4Y4iK/xRfwCv4ir8A/cKj8G94V/4Gv9LXeA3f43N8jY/yMt7Gx/gef8dP+Avv4k8QQghh/AdkR3/1mP+TCAAAAABJRU5kJggg==",
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wVfxV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/B3/B3/AJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/AJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/B/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8TbeAEv4if8T7+L7+KVBCCEIQ4X0vhcc/mdft9/QAAAAASUVORK5CYII=",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wV/wV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/B3/B3/AJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/AJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/B/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8TbeAEv4if8T7+L7+KVBCCEIQ4X0vhcc/mdft9/QAAAAASUVORK5CYII=",
 ];
 
 
@@ -994,8 +1000,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar,
     onGenerateAvatar, generatedAvatarResult,
     customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory,
-    selectedVoice, onSelectVoice,
-    voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed,
+    selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed,
     greetingVoice, onSetGreetingVoice,
     greetingPitch, onSetGreetingPitch, greetingSpeed, onSetGreetingSpeed,
     speakText, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice, userId,
@@ -1006,6 +1011,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [systemPrompt, setSystemPrompt] = React.useState(customSystemPrompt);
     const [localApiKeys, setLocalApiKeys] = useState(apiKeys);
     const avatarGenerationInputRef = React.useRef<HTMLInputElement>(null);
+    const avatarUploadInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setLocalApiKeys(apiKeys);
@@ -1017,56 +1023,82 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         onSaveApiKeys(localApiKeys);
         alert("API Keys saved!");
     };
+    
+    const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (typeof e.target?.result === 'string') {
+                    onUploadAvatar(e.target.result);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
-            <div className="bg-panel-bg border border-border-color rounded-lg shadow-2xl overflow-hidden w-full max-w-3xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content settings-modal-content" onClick={e => e.stopPropagation()}>
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                     <h2 className="text-lg font-semibold">Settings</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-text-color transition">&times;</button>
                 </header>
-                <div className="flex-grow flex flex-col md:flex-row overflow-hidden" style={{ maxHeight: '80vh' }}>
-                    <nav className="flex-shrink-0 md:w-48 p-4 border-b md:border-b-0 md:border-r border-border-color">
-                        <ul className="flex flex-row md:flex-col gap-2">
-                             {['persona', 'voice', 'avatar', 'apiKeys', 'account'].map(tab => (
-                                <li key={tab}>
-                                    <button onClick={() => setActiveTab(tab)} className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition ${activeTab === tab ? 'bg-primary-color/20 text-primary-color font-semibold' : 'hover:bg-assistant-bubble-bg'}`}>
-                                        {tab.charAt(0).toUpperCase() + tab.slice(1).replace('Api', 'API ')}
-                                    </button>
-                                </li>
-                             ))}
-                        </ul>
+                <div className="settings-layout">
+                    <nav className="settings-nav">
+                        <button onClick={() => setActiveTab('persona')} className={`settings-nav-button ${activeTab === 'persona' ? 'active' : ''}`}>
+                            <UserCircleIcon /><span>Persona</span>
+                        </button>
+                        <button onClick={() => setActiveTab('voice')} className={`settings-nav-button ${activeTab === 'voice' ? 'active' : ''}`}>
+                            <MicVocalIcon /><span>Voice</span>
+                        </button>
+                        <button onClick={() => setActiveTab('avatar')} className={`settings-nav-button ${activeTab === 'avatar' ? 'active' : ''}`}>
+                            <ImageIcon /><span>Avatar</span>
+                        </button>
+                        <button onClick={() => setActiveTab('apiKeys')} className={`settings-nav-button ${activeTab === 'apiKeys' ? 'active' : ''}`}>
+                            <KeyIcon /><span>API Keys</span>
+                        </button>
+                        <button onClick={() => setActiveTab('account')} className={`settings-nav-button ${activeTab === 'account' ? 'active' : ''}`}>
+                            <SlidersIcon /><span>Account & Data</span>
+                        </button>
                     </nav>
-                    <div className="flex-grow p-6 overflow-y-auto">
+                    <div className="settings-content">
                         {activeTab === 'persona' && (
-                            <div className="space-y-6">
-                                <div>
-                                    <label htmlFor="greeting-input" className="block text-sm font-medium mb-1">Greeting Message</label>
-                                    <p className="text-xs text-muted mb-2">This is what Kaniska says when you first connect.</p>
+                            <section className="settings-section">
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Greeting Message</h3>
+                                        <p>This is what Kaniska says when you first connect.</p>
+                                    </div>
                                     <div className="flex gap-2">
-                                        <input id="greeting-input" type="text" value={greeting} onChange={(e) => setGreeting(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onSaveGreeting(greeting)} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Save</button>
+                                        <input id="greeting-input" type="text" value={greeting} onChange={(e) => setGreeting(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
+                                        <button onClick={() => onSaveGreeting(greeting)} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Save</button>
                                     </div>
                                 </div>
-                                <div>
-                                    <label htmlFor="system-prompt-input" className="block text-sm font-medium mb-1">Custom System Prompt</label>
-                                    <p className="text-xs text-muted mb-2">Define Kaniska's core personality and instructions. Restart the session for changes to take full effect.</p>
-                                    <textarea id="system-prompt-input" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={8} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full resize-y" />
-                                    <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Prompt</button>
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Custom System Prompt</h3>
+                                        <p>Define Kaniska's core personality and instructions. A restart is needed for changes to take full effect.</p>
+                                    </div>
+                                    <textarea id="system-prompt-input" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={8} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full resize-y" />
+                                    <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Prompt</button>
                                 </div>
-                            </div>
+                            </section>
                         )}
                         {activeTab === 'voice' && (
-                             <div className="space-y-6">
-                                <div>
-                                    <h4 className="font-semibold mb-2">Main Voice</h4>
-                                    <label htmlFor="main-voice-select" className="block text-sm text-muted mb-1">Voice Style</label>
-                                    <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
+                            <section className="settings-section">
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Main Voice</h3>
+                                        <p>The primary voice used for most responses.</p>
+                                    </div>
+                                    <label htmlFor="main-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
+                                    <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
                                         {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
-                                    <div className="mt-4 space-y-3">
+                                    <div className="mt-4 space-y-4">
                                         <div>
                                             <label htmlFor="main-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{voicePitch}</span></label>
                                             <input id="main-voice-pitch" type="range" min="-20" max="20" value={voicePitch} onChange={e => onSetVoicePitch(Number(e.target.value))} />
@@ -1076,14 +1108,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             <input id="main-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={voiceSpeed} onChange={e => onSetVoiceSpeed(Number(e.target.value))} />
                                         </div>
                                     </div>
+                                    <button onClick={() => speakText("Testing the main voice configuration.", "neutral", { voice: selectedVoice, pitch: voicePitch, speed: voiceSpeed })} className="mt-4 px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Voice</button>
                                 </div>
-                                 <div>
-                                    <h4 className="font-semibold mb-2">Greeting Voice</h4>
-                                     <label htmlFor="greeting-voice-select" className="block text-sm text-muted mb-1">Voice Style</label>
-                                     <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Greeting Voice</h3>
+                                        <p>A separate voice for the initial greeting message.</p>
+                                    </div>
+                                    <label htmlFor="greeting-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
+                                    <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
                                         {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
-                                    <div className="mt-4 space-y-3">
+                                    <div className="mt-4 space-y-4">
                                         <div>
                                             <label htmlFor="greeting-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{greetingPitch}</span></label>
                                             <input id="greeting-voice-pitch" type="range" min="-20" max="20" value={greetingPitch} onChange={e => onSetGreetingPitch(Number(e.target.value))} />
@@ -1093,66 +1129,86 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             <input id="greeting-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={greetingSpeed} onChange={e => onSetGreetingSpeed(Number(e.target.value))} />
                                         </div>
                                     </div>
+                                    <button onClick={() => speakText("Testing the greeting voice configuration.", "cheerful", { voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed })} className="mt-4 px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Voice</button>
                                 </div>
-                                <button onClick={() => speakText("Testing the current voice configuration.")} className="px-3 py-1 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Main Voice</button>
-                             </div>
+                            </section>
                         )}
                         {activeTab === 'avatar' && (
-                            <div className="space-y-6">
-                                <div>
-                                    <h4 className="font-semibold mb-2">Select Avatar</h4>
-                                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                            <section className="settings-section">
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Avatar Gallery</h3>
+                                        <p>Choose a predefined avatar or upload your own.</p>
+                                    </div>
+                                    <input type="file" ref={avatarUploadInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
+                                    <div className="avatar-gallery-grid">
                                         {avatars.map((avatar, index) => (
-                                            <button key={index} onClick={() => onSelectAvatar(avatar)} className={`w-full aspect-square rounded-md overflow-hidden border-2 transition ${currentAvatar === avatar ? 'border-primary-color' : 'border-transparent hover:border-primary-color/50'}`}>
-                                                <img src={avatar} alt={`Avatar ${index + 1}`} className="w-full h-full object-cover" />
-                                            </button>
+                                            <div key={index} onClick={() => onSelectAvatar(avatar)} className={`avatar-item ${currentAvatar === avatar ? 'selected' : ''}`}>
+                                                <img src={avatar} alt={`Avatar ${index + 1}`} />
+                                            </div>
                                         ))}
+                                        <div onClick={() => avatarUploadInputRef.current?.click()} className="avatar-item upload-avatar-item">
+                                            <UploadIcon />
+                                            <span className="text-xs mt-1">Upload</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <h4 className="font-semibold mb-2">Generate AI Avatar</h4>
-                                     <p className="text-xs text-muted mb-2">Describe the avatar you want Kaniska to create.</p>
-                                     <div className="flex gap-2">
-                                        <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., blue hair, cyberpunk style" className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Generate AI Avatar</h3>
+                                        <p>Describe the avatar you want Kaniska to create for herself.</p>
                                     </div>
-                                     {generatedAvatarResult.error && <p className="text-red-400 text-xs mt-2">{generatedAvatarResult.error}</p>}
-                                     {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="mt-4 rounded-md w-32 h-32 object-cover" />}
+                                    <div className="flex gap-2">
+                                        <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., blue hair, cyberpunk style" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
+                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
+                                    </div>
+                                    {generatedAvatarResult.error && <p className="text-red-400 text-xs mt-2">{generatedAvatarResult.error}</p>}
+                                    {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="mt-4 rounded-md w-32 h-32 object-cover" />}
                                 </div>
-                            </div>
+                            </section>
                         )}
                          {activeTab === 'apiKeys' && (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Gemini API Key</label>
-                                    <input type="password" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(p => ({...p, gemini: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Visual Crossing Weather Key</label>
-                                    <input type="password" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(p => ({...p, weather: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">GNews API Key</label>
-                                    <input type="password" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(p => ({...p, news: e.target.value}))} placeholder="From gnews.io" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">YouTube Data API v3 Key</label>
-                                    <input type="password" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                </div>
-                                <button onClick={handleApiKeySave} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Keys</button>
-                            </div>
-                         )}
-                         {activeTab === 'account' && (
-                            <div className="space-y-6">
-                                 <div>
-                                    <h4 className="font-semibold text-red-400">Danger Zone</h4>
-                                    <p className="text-xs text-muted mb-2">These actions are irreversible.</p>
-                                    <div className="flex flex-col sm:flex-row gap-2">
-                                        <button onClick={onClearHistory} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Clear Conversation History</button>
-                                        <button onClick={onResetGeminiKey} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Reset API Keys</button>
+                            <section className="settings-section">
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>API Keys</h3>
+                                        <p>Manage the API keys required for Kaniska's features. Keys are saved to a local database for your convenience.</p>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Gemini API Key <span className="text-red-400">(Required)</span></label>
+                                            <input type="password" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(p => ({...p, gemini: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Visual Crossing Weather Key</label>
+                                            <input type="password" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(p => ({...p, weather: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">GNews API Key</label>
+                                            <input type="password" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(p => ({...p, news: e.target.value}))} placeholder="From gnews.io" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">YouTube Data API v3 Key</label>
+                                            <input type="password" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                        </div>
+                                        <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Keys</button>
                                     </div>
                                 </div>
-                            </div>
+                            </section>
+                         )}
+                         {activeTab === 'account' && (
+                            <section className="settings-section">
+                                 <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3 className="text-red-400">Danger Zone</h3>
+                                        <p>These actions are destructive and cannot be undone.</p>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <button onClick={onClearHistory} className="px-4 py-2 text-sm bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 font-semibold rounded-md transition">Clear Conversation History</button>
+                                        <button onClick={onResetGeminiKey} className="px-4 py-2 text-sm bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 font-semibold rounded-md transition">Reset All API Keys</button>
+                                    </div>
+                                </div>
+                            </section>
                          )}
                     </div>
                 </div>
@@ -2859,7 +2915,7 @@ export const App: React.FC = () => {
         if (youtubeQueue.length > 0 && youtubeQueueIndex < youtubeQueue.length - 1) {
             const newIndex = youtubeQueueIndex + 1;
             setYoutubeQueueIndex(newIndex);
-            const nextVideo = youtubeQueue[nextIndex];
+            const nextVideo = youtubeQueue[newIndex];
             setYoutubeTitle(nextVideo.title);
             setYoutubeError(null);
             if (playerRef.current) {
