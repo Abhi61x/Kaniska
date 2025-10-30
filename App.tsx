@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -622,22 +623,22 @@ const ApiKeySelectionScreen: React.FC<{
                             Select Key via AI Studio & Continue
                         </button>
                         <div className="my-3 relative flex items-center"><div className="flex-grow border-t border-border-color"></div><span className="flex-shrink mx-4 text-muted text-xs">OR</span><div className="flex-grow border-t border-border-color"></div></div>
-                        <input type="password" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder="Paste your Gemini API key here" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                        <input type="text" spellCheck="false" autoComplete="off" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder="Paste your Gemini API key here" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                     </div>
                      <div>
                         <h2 className="text-lg font-semibold mb-2">Optional Keys</h2>
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-sm font-medium text-muted mb-1">Visual Crossing Weather Key</label>
-                                <input type="password" value={weatherKeyInput} onChange={(e) => setWeatherKeyInput(e.target.value)} placeholder="For weather forecasts" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                <input type="text" spellCheck="false" autoComplete="off" value={weatherKeyInput} onChange={(e) => setWeatherKeyInput(e.target.value)} placeholder="For weather forecasts" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-muted mb-1">GNews API Key</label>
-                                <input type="password" value={newsKeyInput} onChange={(e) => setNewsKeyInput(e.target.value)} placeholder="For news headlines (from gnews.io)" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                <input type="text" spellCheck="false" autoComplete="off" value={newsKeyInput} onChange={(e) => setNewsKeyInput(e.target.value)} placeholder="For news headlines (from gnews.io)" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-muted mb-1">YouTube Data API v3 Key</label>
-                                <input type="password" value={youtubeKeyInput} onChange={(e) => setYoutubeKeyInput(e.target.value)} placeholder="For YouTube search" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                <label className="block text-sm font-medium text-muted mb-1">Google Cloud API Key</label>
+                                <input type="text" spellCheck="false" autoComplete="off" value={youtubeKeyInput} onChange={(e) => setYoutubeKeyInput(e.target.value)} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                             </div>
                         </div>
                     </div>
@@ -1177,19 +1178,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Gemini API Key <span className="text-red-400">(Required)</span></label>
-                                            <input type="password" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(p => ({...p, gemini: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(p => ({...p, gemini: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Visual Crossing Weather Key</label>
-                                            <input type="password" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(p => ({...p, weather: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(p => ({...p, weather: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">GNews API Key</label>
-                                            <input type="password" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(p => ({...p, news: e.target.value}))} placeholder="From gnews.io" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(p => ({...p, news: e.target.value}))} placeholder="From gnews.io" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">YouTube Data API v3 Key</label>
-                                            <input type="password" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <label className="block text-sm font-medium mb-1">Google Cloud API Key</label>
+                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
                                         <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Keys</button>
                                     </div>
@@ -2001,7 +2002,7 @@ export const App: React.FC = () => {
                             break;
                         case 'searchAndPlayYoutubeVideo':
                             if (!apiKeys.youtube) {
-                                result = "The YouTube API key is missing. Please add it in the settings to use this feature.";
+                                result = "The Google Cloud API key is missing. Please add it in the settings to use this feature.";
                                 addTranscriptionEntry({ speaker: 'system', text: result });
                                 break;
                             }
