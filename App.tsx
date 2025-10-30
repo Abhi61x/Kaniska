@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -118,6 +119,13 @@ type CodeSnippet = { id: string; language: string; code: string; description: st
 type WebsitePreview = { title: string; htmlContent: string; } | null;
 type VoiceTrainingData = Record<string, { audioBlob: Blob | null }>;
 type TrainingStatus = 'idle' | 'recording' | 'analyzing' | 'done' | 'error';
+type ApiKeys = {
+    gemini: string | null;
+    weather: string | null;
+    news: string | null;
+    youtube: string | null;
+};
+type OptionalApiKeys = Omit<ApiKeys, 'gemini'>;
 
 
 // --- Function Declarations for Gemini ---
@@ -358,9 +366,8 @@ const PREDEFINED_AVATARS = [
 
 
 // --- API Interaction ---
-const searchYoutubeVideo = async (query: string): Promise<{ videoId: string; title: string }[]> => {
-    const YOUTUBE_API_KEY = 'AIzaSyDIREa8VurDLF5nZZ4YhYr9eF8fn8y1y8M';
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}&type=video&videoEmbeddable=true&maxResults=10`;
+const searchYoutubeVideo = async (query: string, apiKey: string): Promise<{ videoId: string; title: string }[]> => {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${apiKey}&type=video&videoEmbeddable=true&maxResults=10`;
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -380,40 +387,59 @@ const searchYoutubeVideo = async (query: string): Promise<{ videoId: string; tit
     }));
 };
 
-const fetchWeatherData = async (location: string): Promise<WeatherData> => {
-    const apiKey = "d2669fde921745a5b8465046251510";
-    
-    const response = await fetch(`https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(location)}`);
+const fetchWeatherData = async (location: string, apiKey: string): Promise<WeatherData> => {
+    const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(location)}?unitGroup=metric&key=${apiKey}&contentType=json`;
+
+    const response = await fetch(url);
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `Failed to fetch weather for ${location}`);
+        // Visual Crossing returns error text directly, not always JSON
+        const errorText = await response.text();
+        throw new Error(errorText || `Failed to fetch weather for ${location}. Status: ${response.status}`);
     }
     const data = await response.json();
+
+    if (!data.currentConditions) {
+        throw new Error(`Could not find current weather conditions for ${location}.`);
+    }
+
+    const current = data.currentConditions;
+
     return {
-        location: data.location.name,
-        temperature: Math.round(data.current.temp_c),
-        condition: data.current.condition.text,
-        humidity: data.current.humidity,
-        windSpeed: Math.round(data.current.wind_kph),
+        location: data.resolvedAddress,
+        temperature: Math.round(current.temp),
+        condition: current.conditions,
+        humidity: current.humidity,
+        windSpeed: Math.round(current.windspeed),
     };
 };
 
-const fetchNewsData = async (query?: string): Promise<{ title: string; summary: string }[]> => {
-    const apiKey = "8c466b35fff14195a8976e3424cf96df";
-    const newsApiUrl = `https://newsapi.org/v2/top-headlines?country=us&pageSize=5&apiKey=${apiKey}` + (query ? `&q=${encodeURIComponent(query)}` : '');
+const fetchNewsData = async (apiKey: string, query?: string): Promise<{ title: string; summary: string }[]> => {
+    const baseUrl = 'https://gnews.io/api/v4/';
+    const endpoint = query ? 'search' : 'top-headlines';
+    let gnewsApiUrl = `${baseUrl}${endpoint}?lang=en&country=us&max=5&apikey=${apiKey}`;
+
+    if (query) {
+        gnewsApiUrl += `&q=${encodeURIComponent(query)}`;
+    } else {
+        gnewsApiUrl += `&category=general`;
+    }
     
-    // Use a CORS proxy to bypass client-side restrictions of NewsAPI's free plan
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(newsApiUrl)}`;
+    // GNews's free plan has CORS restrictions, so a proxy is still needed for client-side requests.
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gnewsApiUrl)}`;
 
     const response = await fetch(proxyUrl);
     if (!response.ok) {
-        throw new Error(`Failed to fetch news headlines via proxy. Status: ${response.status}`);
+        throw new Error(`Failed to fetch news headlines from GNews via proxy. Status: ${response.status}`);
     }
     
     const newsData = await response.json();
 
-    if (newsData.status !== 'ok') {
-        throw new Error(`News API Error: ${newsData.message || 'Unknown error'}`);
+    if (newsData.errors) {
+        throw new Error(`GNews API Error: ${newsData.errors.join(', ')}`);
+    }
+
+    if (!newsData.articles || newsData.articles.length === 0) {
+        return [];
     }
 
     return newsData.articles.map((article: any) => ({
@@ -421,6 +447,7 @@ const fetchNewsData = async (query?: string): Promise<{ title: string; summary: 
         summary: article.description || 'No summary available.',
     }));
 };
+
 
 const fetchJoke = async (): Promise<string> => {
     // Using a public joke API that doesn't require keys, making it reliable and easy to use.
@@ -526,97 +553,95 @@ const getApiErrorMessage = (error: unknown): string => {
 
 
 const ApiKeySelectionScreen: React.FC<{
-    onKeySelected: () => void;
-    onKeySaved: (key: string) => void;
+    onKeysSaved: (keys: ApiKeys) => void;
+    onStudioKeySelected: (optionalKeys: OptionalApiKeys) => void;
     reselectionReason?: string | null;
-}> = ({ onKeySelected, onKeySaved, reselectionReason }) => {
-    const [apiKeyInput, setApiKeyInput] = useState('');
+}> = ({ onKeysSaved, onStudioKeySelected, reselectionReason }) => {
+    const [geminiKeyInput, setGeminiKeyInput] = useState('');
+    const [weatherKeyInput, setWeatherKeyInput] = useState('');
+    const [newsKeyInput, setNewsKeyInput] = useState('');
+    const [youtubeKeyInput, setYoutubeKeyInput] = useState('');
     const [isStudioAvailable, setIsStudioAvailable] = useState(false);
 
     useEffect(() => {
-        // Check for AI Studio availability after the component mounts
-        // This avoids issues with `window.aistudio` not being immediately available
         setIsStudioAvailable(!!window.aistudio?.openSelectKey);
     }, []);
 
-    const handleSelectKey = async () => {
+    const handleSelectKeyWithStudio = async () => {
         if (isStudioAvailable) {
             try {
                 await window.aistudio.openSelectKey();
-                // Assume key selection is successful and proceed to avoid race conditions.
-                onKeySelected();
+                onStudioKeySelected({
+                    weather: weatherKeyInput.trim() || null,
+                    news: newsKeyInput.trim() || null,
+                    youtube: youtubeKeyInput.trim() || null,
+                });
             } catch (error) {
                 console.error("AI Studio key selection failed:", error);
-                // Handle cases where the popup might be blocked or fail
             }
         }
     };
 
-    const handleSaveKey = () => {
-        if (apiKeyInput.trim()) {
-            onKeySaved(apiKeyInput.trim());
+    const handleSaveKeys = () => {
+        if (geminiKeyInput.trim()) {
+            onKeysSaved({
+                gemini: geminiKeyInput.trim(),
+                weather: weatherKeyInput.trim() || null,
+                news: newsKeyInput.trim() || null,
+                youtube: youtubeKeyInput.trim() || null,
+            });
         }
     };
 
     return (
         <div className="h-screen w-screen flex items-center justify-center bg-bg-color text-text-color p-4">
-            <div className="bg-panel-bg p-8 rounded-lg border border-border-color text-center max-w-lg animate-panel-enter">
-                <div className="hologram-svg mx-auto mb-4">
-                    <HologramIcon />
-                </div>
-                <h1 className="text-2xl font-bold mb-4 mt-2 glowing-text">API Key Required</h1>
+            <div className="bg-panel-bg p-8 rounded-lg border border-border-color text-center max-w-xl w-full animate-panel-enter">
+                <div className="hologram-svg mx-auto mb-4"><HologramIcon /></div>
+                <h1 className="text-2xl font-bold mb-2 glowing-text">API Keys Required</h1>
+                <p className="text-muted mb-6 text-sm">
+                    Kaniska requires a Gemini API key to function. You can also provide optional keys to unlock more features.
+                </p>
 
                 {reselectionReason && (
-                    <div className="my-4 p-3 bg-red-900/50 border border-red-500/60 rounded-md text-red-300 text-sm">
-                        <p className="m-0">{reselectionReason}</p>
+                    <div className="my-4 p-3 bg-red-900/50 border border-red-500/60 rounded-md text-red-300 text-sm text-left">
+                        <p className="font-bold">Please update your key</p>
+                        <p className="m-0 text-xs">{reselectionReason}</p>
                     </div>
                 )}
+                
+                <div className="text-left space-y-4">
+                    <div>
+                        <h2 className="text-lg font-semibold mb-2">Gemini API Key <span className="text-red-400 text-sm font-normal">(Required)</span></h2>
+                        <button onClick={handleSelectKeyWithStudio} disabled={!isStudioAvailable} title={!isStudioAvailable ? "Not available in this environment" : "Select key from AI Studio"} className="w-full mb-2 bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            Select Key via AI Studio & Continue
+                        </button>
+                        <div className="my-3 relative flex items-center"><div className="flex-grow border-t border-border-color"></div><span className="flex-shrink mx-4 text-muted text-xs">OR</span><div className="flex-grow border-t border-border-color"></div></div>
+                        <input type="password" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder="Paste your Gemini API key here" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                    </div>
+                     <div>
+                        <h2 className="text-lg font-semibold mb-2">Optional Keys</h2>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium text-muted mb-1">Visual Crossing Weather Key</label>
+                                <input type="password" value={weatherKeyInput} onChange={(e) => setWeatherKeyInput(e.target.value)} placeholder="For weather forecasts" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-muted mb-1">GNews API Key</label>
+                                <input type="password" value={newsKeyInput} onChange={(e) => setNewsKeyInput(e.target.value)} placeholder="For news headlines (from gnews.io)" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-muted mb-1">YouTube Data API v3 Key</label>
+                                <input type="password" value={youtubeKeyInput} onChange={(e) => setYoutubeKeyInput(e.target.value)} placeholder="For YouTube search" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                <p className="text-text-color-muted mb-6">
-                    To use Kaniska's advanced features, you need to provide a Gemini API key.
-                </p>
-                <button
-                    onClick={handleSelectKey}
-                    disabled={!isStudioAvailable}
-                    title={!isStudioAvailable ? "API key selection is not available in this environment." : "Select a key from your Google AI Studio account"}
-                    className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    Select Key via AI Studio
+                <button onClick={handleSaveKeys} disabled={!geminiKeyInput.trim()} className="w-full mt-6 bg-green-600/80 hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50">
+                    Save Manually Pasted Keys & Use
                 </button>
-                 {!isStudioAvailable && (
-                    <p className="text-xs text-yellow-400 mt-2">
-                        AI Studio selection is not available. Please paste a key directly.
-                    </p>
-                )}
-
-                <div className="my-6 relative flex items-center">
-                    <div className="flex-grow border-t border-border-color"></div>
-                    <span className="flex-shrink mx-4 text-text-color-muted text-sm">OR</span>
-                    <div className="flex-grow border-t border-border-color"></div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                    <input
-                        type="password"
-                        value={apiKeyInput}
-                        onChange={(e) => setApiKeyInput(e.target.value)}
-                        placeholder="Paste your Gemini API key here"
-                        className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"
-                    />
-                    <button
-                        onClick={handleSaveKey}
-                        disabled={!apiKeyInput.trim()}
-                        className="w-full bg-green-600/80 hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50"
-                    >
-                        Save & Use Key
-                    </button>
-                </div>
-
-                <p className="text-xs text-text-color-muted mt-4">
-                    Your key is saved securely in a database for this browser. For more information on billing, visit the{' '}
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">
-                        official documentation
-                    </a>.
+                <p className="text-xs text-muted mt-4">
+                    Your keys are saved securely in a database for this browser. For info on billing, visit the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">official documentation</a>.
                 </p>
             </div>
         </div>
@@ -639,7 +664,7 @@ const NewsPanel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => (
         {articles.map((article, index) => (
             <div key={index} className="border-b border-border-color pb-2">
                 <h4 className="font-semibold">{article.title}</h4>
-                <p className="text-sm text-text-color-muted">{article.summary}</p>
+                <p className="text-sm text-muted">{article.summary}</p>
             </div>
         ))}
     </div>
@@ -675,7 +700,7 @@ const EmailPanel: React.FC<{
     return (
         <div className="flex-grow flex flex-col p-4 gap-4 overflow-y-auto">
             <div className="flex items-center gap-2">
-                <label htmlFor="email-to" className="font-semibold text-text-color-muted">To:</label>
+                <label htmlFor="email-to" className="font-semibold text-muted">To:</label>
                 <input
                     id="email-to"
                     type="email"
@@ -686,7 +711,7 @@ const EmailPanel: React.FC<{
                 />
             </div>
             <div className="flex items-center gap-2">
-                <label htmlFor="email-subject" className="font-semibold text-text-color-muted">Subject:</label>
+                <label htmlFor="email-subject" className="font-semibold text-muted">Subject:</label>
                 <input
                     id="email-subject"
                     type="text"
@@ -736,11 +761,11 @@ const ImageEditorModal: React.FC<{
             <div className="modal-content w-full max-w-2xl" onClick={e => e.stopPropagation()}>
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                     <h2 className="text-lg font-semibold">Manual Image Editor</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
                 </header>
                 <div className="p-6">
                     <img src={image.url} alt={image.prompt} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md" />
-                    <p className="text-center text-text-color-muted mt-4">Manual editing controls would appear here.</p>
+                    <p className="text-center text-muted mt-4">Manual editing controls would appear here.</p>
                 </div>
                  <footer className="flex justify-end p-4 border-t border-border-color gap-2">
                     <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Cancel</button>
@@ -778,13 +803,13 @@ const LiveImageEditorModal: React.FC<{
             <div className="modal-content w-full max-w-4xl" onClick={e => e.stopPropagation()}>
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                     <h2 className="text-lg font-semibold">Live Image Editor</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
                 </header>
                  <div className="p-6 text-center">
                     <div className="w-full h-[60vh] bg-black/30 flex items-center justify-center rounded-lg overflow-hidden">
                         <img src={image.url} alt={image.prompt} style={imageStyle} className="max-w-full max-h-full object-contain transition-all duration-300" />
                     </div>
-                    <p className="text-sm text-text-color-muted mt-2">Use your voice to apply edits in real-time!</p>
+                    <p className="text-sm text-muted mt-2">Use your voice to apply edits in real-time!</p>
                 </div>
                  <footer className="flex justify-between p-4 border-t border-border-color gap-2">
                     <button onClick={onReset} className="px-4 py-2 text-sm bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded-md hover:bg-yellow-500/30">Reset Edits</button>
@@ -809,7 +834,7 @@ const WebsitePreviewModal: React.FC<{
             <div className="modal-content w-[90vw] h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                     <h2 className="text-lg font-semibold truncate">{preview.title}</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
                 </header>
                 <div className="flex-grow">
                     <iframe
@@ -824,12 +849,18 @@ const WebsitePreviewModal: React.FC<{
     );
 };
 
-const QuickActions: React.FC<{ onAction: (action: string) => void; disabled: boolean }> = ({ onAction, disabled }) => (
+const QuickActions: React.FC<{ 
+    onAction: (action: string) => void; 
+    disabled: boolean;
+    isWeatherEnabled: boolean;
+    isNewsEnabled: boolean;
+    isYoutubeEnabled: boolean;
+}> = ({ onAction, disabled, isWeatherEnabled, isNewsEnabled, isYoutubeEnabled }) => (
     <div className="flex-shrink-0 p-3 border-t border-border-color flex items-center justify-center gap-2">
-        <p className="text-xs text-text-color-muted font-semibold mr-2">Quick Actions:</p>
-        <button onClick={() => onAction('weather')} disabled={disabled} className="quick-action-button">Weather</button>
-        <button onClick={() => onAction('news')} disabled={disabled} className="quick-action-button">News</button>
-        <button onClick={() => onAction('music')} disabled={disabled} className="quick-action-button">Music</button>
+        <p className="text-xs text-muted font-semibold mr-2">Quick Actions:</p>
+        <button onClick={() => onAction('weather')} disabled={disabled || !isWeatherEnabled} title={!isWeatherEnabled ? "Requires Visual Crossing Weather Key in Settings" : ""} className="quick-action-button">Weather</button>
+        <button onClick={() => onAction('news')} disabled={disabled || !isNewsEnabled} title={!isNewsEnabled ? "Requires GNews API Key in Settings" : ""} className="quick-action-button">News</button>
+        <button onClick={() => onAction('music')} disabled={disabled || !isYoutubeEnabled} title={!isYoutubeEnabled ? "Requires YouTube API Key in Settings" : ""} className="quick-action-button">Music</button>
         <button onClick={() => onAction('joke')} disabled={disabled} className="quick-action-button">Tell a Joke</button>
     </div>
 );
@@ -850,7 +881,7 @@ const CodePanel: React.FC<{
     return (
         <div className="flex-grow p-4 overflow-y-auto">
             {snippets.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-text-color-muted">
+                <div className="flex items-center justify-center h-full text-muted">
                     <p>Ask Kaniska to write some code to see it here.</p>
                 </div>
             ) : (
@@ -860,7 +891,7 @@ const CodePanel: React.FC<{
                             <div className="p-3 border-b border-border-color flex justify-between items-center">
                                 <div>
                                     <h4 className="font-semibold">{snippet.description}</h4>
-                                    <span className="text-xs text-text-color-muted bg-panel-bg px-2 py-0.5 rounded-full border border-border-color">{snippet.language}</span>
+                                    <span className="text-xs text-muted bg-panel-bg px-2 py-0.5 rounded-full border border-border-color">{snippet.language}</span>
                                 </div>
                                 <div className="flex gap-2">
                                     {snippet.language.toLowerCase() === 'html' && (
@@ -895,7 +926,7 @@ const LiveCodeEditorPanel: React.FC<{
             <header className="flex-shrink-0 p-3 border-b border-border-color flex justify-between items-center">
                 <div>
                     <h3 className="font-semibold">Live Editor: {snippet.description}</h3>
-                    <p className="text-xs text-text-color-muted">You can give voice commands to edit the code below.</p>
+                    <p className="text-xs text-muted">You can give voice commands to edit the code below.</p>
                 </div>
                 <button onClick={onFinish} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">
                     Finish Editing
@@ -954,8 +985,9 @@ type SettingsModalProps = {
     setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
     onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string>;
     userId: string | null;
-    setUserApiKey: (key: string | null) => void;
-    setIsStudioKeySelected: (selected: boolean) => void;
+    apiKeys: ApiKeys;
+    onSaveApiKeys: (keys: ApiKeys) => void;
+    onResetGeminiKey: () => void;
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -964,23 +996,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory,
     selectedVoice, onSelectVoice,
     greetingVoice, onSetGreetingVoice,
-    speakText,
-    userId, setUserApiKey, setIsStudioKeySelected,
+    speakText, apiKeys, onSaveApiKeys, onResetGeminiKey
 }) => {
     const [activeTab, setActiveTab] = React.useState('persona');
     const [greeting, setGreeting] = React.useState(customGreeting);
     const [systemPrompt, setSystemPrompt] = React.useState(customSystemPrompt);
+    const [localApiKeys, setLocalApiKeys] = useState(apiKeys);
     const avatarGenerationInputRef = React.useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setLocalApiKeys(apiKeys);
+    }, [apiKeys, isOpen]);
 
     const voiceOptions = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'];
 
-    const handleApiKeyReset = () => {
-        if (userId) {
-            db.ref(`apiKeys/${userId}`).remove();
-        }
-        setUserApiKey(null);
-        setIsStudioKeySelected(false);
-        onClose();
+    const handleApiKeySave = () => {
+        onSaveApiKeys(localApiKeys);
+        alert("API Keys saved!");
     };
 
     if (!isOpen) return null;
@@ -990,15 +1022,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="bg-panel-bg border border-border-color rounded-lg shadow-2xl overflow-hidden w-full max-w-3xl flex flex-col" onClick={e => e.stopPropagation()}>
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
                     <h2 className="text-lg font-semibold">Settings</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
                 </header>
                 <div className="flex-grow flex flex-col md:flex-row overflow-hidden" style={{ maxHeight: '80vh' }}>
                     <nav className="flex-shrink-0 md:w-48 p-4 border-b md:border-b-0 md:border-r border-border-color">
                         <ul className="flex flex-row md:flex-col gap-2">
-                             {['persona', 'voice', 'avatar', 'account'].map(tab => (
+                             {['persona', 'voice', 'avatar', 'apiKeys', 'account'].map(tab => (
                                 <li key={tab}>
                                     <button onClick={() => setActiveTab(tab)} className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition ${activeTab === tab ? 'bg-primary-color/20 text-primary-color font-semibold' : 'hover:bg-assistant-bubble-bg'}`}>
-                                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                        {tab.charAt(0).toUpperCase() + tab.slice(1).replace('Api', 'API ')}
                                     </button>
                                 </li>
                              ))}
@@ -1008,16 +1040,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         {activeTab === 'persona' && (
                             <div className="space-y-6">
                                 <div>
-                                    <label htmlFor="greeting-input" className="block text-sm font-medium text-text-color mb-1">Greeting Message</label>
-                                    <p className="text-xs text-text-color-muted mb-2">This is what Kaniska says when you first connect.</p>
+                                    <label htmlFor="greeting-input" className="block text-sm font-medium mb-1">Greeting Message</label>
+                                    <p className="text-xs text-muted mb-2">This is what Kaniska says when you first connect.</p>
                                     <div className="flex gap-2">
                                         <input id="greeting-input" type="text" value={greeting} onChange={(e) => setGreeting(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
                                         <button onClick={() => onSaveGreeting(greeting)} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Save</button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="system-prompt-input" className="block text-sm font-medium text-text-color mb-1">Custom System Prompt</label>
-                                    <p className="text-xs text-text-color-muted mb-2">Define Kaniska's core personality and instructions. Restart the session for changes to take full effect.</p>
+                                    <label htmlFor="system-prompt-input" className="block text-sm font-medium mb-1">Custom System Prompt</label>
+                                    <p className="text-xs text-muted mb-2">Define Kaniska's core personality and instructions. Restart the session for changes to take full effect.</p>
                                     <textarea id="system-prompt-input" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={8} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full resize-y" />
                                     <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Prompt</button>
                                 </div>
@@ -1027,14 +1059,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                              <div className="space-y-6">
                                 <div>
                                     <h4 className="font-semibold mb-2">Main Voice</h4>
-                                    <label htmlFor="main-voice-select" className="block text-sm text-text-color-muted mb-1">Voice Style</label>
+                                    <label htmlFor="main-voice-select" className="block text-sm text-muted mb-1">Voice Style</label>
                                     <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
                                         {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
                                 </div>
                                  <div>
                                     <h4 className="font-semibold mb-2">Greeting Voice</h4>
-                                     <label htmlFor="greeting-voice-select" className="block text-sm text-text-color-muted mb-1">Voice Style</label>
+                                     <label htmlFor="greeting-voice-select" className="block text-sm text-muted mb-1">Voice Style</label>
                                      <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full">
                                         {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
@@ -1056,7 +1088,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </div>
                                 <div>
                                     <h4 className="font-semibold mb-2">Generate AI Avatar</h4>
-                                     <p className="text-xs text-text-color-muted mb-2">Describe the avatar you want Kaniska to create.</p>
+                                     <p className="text-xs text-muted mb-2">Describe the avatar you want Kaniska to create.</p>
                                      <div className="flex gap-2">
                                         <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., blue hair, cyberpunk style" className="bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
                                         <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
@@ -1066,14 +1098,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </div>
                             </div>
                         )}
+                         {activeTab === 'apiKeys' && (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Gemini API Key</label>
+                                    <input type="password" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(p => ({...p, gemini: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Visual Crossing Weather Key</label>
+                                    <input type="password" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(p => ({...p, weather: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">GNews API Key</label>
+                                    <input type="password" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(p => ({...p, news: e.target.value}))} placeholder="From gnews.io" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">YouTube Data API v3 Key</label>
+                                    <input type="password" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                </div>
+                                <button onClick={handleApiKeySave} className="px-3 py-1 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Keys</button>
+                            </div>
+                         )}
                          {activeTab === 'account' && (
                             <div className="space-y-6">
                                  <div>
                                     <h4 className="font-semibold text-red-400">Danger Zone</h4>
-                                    <p className="text-xs text-text-color-muted mb-2">These actions are irreversible.</p>
+                                    <p className="text-xs text-muted mb-2">These actions are irreversible.</p>
                                     <div className="flex flex-col sm:flex-row gap-2">
                                         <button onClick={onClearHistory} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Clear Conversation History</button>
-                                        <button onClick={handleApiKeyReset} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Reset API Key</button>
+                                        <button onClick={onResetGeminiKey} className="px-3 py-1 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">Reset API Keys</button>
                                     </div>
                                 </div>
                             </div>
@@ -1142,7 +1195,7 @@ export const App: React.FC = () => {
     const [emailRecipient, setEmailRecipient] = useState('');
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
-    const [userApiKey, setUserApiKey] = useState<string | null>(null);
+    const [apiKeys, setApiKeys] = useState<ApiKeys>({ gemini: null, weather: null, news: null, youtube: null });
     const [isApiKeyLoading, setIsApiKeyLoading] = useState(true);
     const [localAudioDownloads, setLocalAudioDownloads] = useState<Record<string, string>>({});
 
@@ -1196,13 +1249,13 @@ export const App: React.FC = () => {
         console.error(`API Error in ${context || 'operation'}:`, error);
 
         const originalMessage = error instanceof Error ? error.message : JSON.stringify(error);
-        if (originalMessage.toLowerCase().includes('requested entity was not found')) {
+        if (originalMessage.toLowerCase().includes('requested entity was not found') || originalMessage.toLowerCase().includes('api key not valid')) {
             setIsStudioKeySelected(false);
-            setUserApiKey(null);
+            setApiKeys(prev => ({ ...prev, gemini: null }));
             if (userIdRef.current) {
-                db.ref(`apiKeys/${userIdRef.current}`).remove();
+                db.ref(`apiKeys/${userIdRef.current}`).update({ gemini: null });
             }
-            setApiKeyError("Your API key is no longer valid. It may have been deleted. Please provide a new one.");
+            setApiKeyError("Your Gemini API key is no longer valid. It may have been deleted or expired. Please provide a new one.");
         }
         
         addTranscriptionEntry({ speaker: 'system', text: `API Error: ${errorMessage}` });
@@ -1210,12 +1263,11 @@ export const App: React.FC = () => {
     }, [addTranscriptionEntry]);
 
     const getAiClient = useCallback(() => {
-        const apiKey = userApiKey || process.env.API_KEY;
+        const apiKey = apiKeys.gemini || process.env.API_KEY;
         if (!apiKey) {
-            console.error("API Key is not available.");
-            // This will trigger the selection screen to show
+            console.error("Gemini API Key is not available.");
             setIsStudioKeySelected(false);
-            setUserApiKey(null);
+            setApiKeys(prev => ({ ...prev, gemini: null}));
             setIsApiKeyLoading(false); // Ensure loading is finished to show screen
             return null;
         }
@@ -1228,7 +1280,7 @@ export const App: React.FC = () => {
             handleApiError(e, 'getAiClient-init');
             return null;
         }
-    }, [userApiKey, handleApiError]);
+    }, [apiKeys.gemini, handleApiError]);
 
     const getOutputAudioContext = useCallback(() => {
         if (!outputAudioContextRef.current || outputAudioContextRef.current.state === 'closed') {
@@ -1278,9 +1330,14 @@ export const App: React.FC = () => {
     
             try {
                 const snapshot = await db.ref(`apiKeys/${id}`).once('value');
-                const savedKey = snapshot.val();
-                if (savedKey) {
-                    setUserApiKey(savedKey);
+                const savedKeys = snapshot.val();
+                if (savedKeys) {
+                    setApiKeys({
+                        gemini: savedKeys.gemini || null,
+                        weather: savedKeys.weather || null,
+                        news: savedKeys.news || null,
+                        youtube: savedKeys.youtube || null,
+                    });
                 } else if (window.aistudio?.hasSelectedApiKey) {
                     const hasKey = await window.aistudio.hasSelectedApiKey();
                     if (hasKey) {
@@ -1537,7 +1594,7 @@ export const App: React.FC = () => {
             const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
             if (downloadLink) {
                 setVideoProgressMessage('Downloading final video...');
-                const videoResponse = await fetch(`${downloadLink}&key=${userApiKey || process.env.API_KEY}`);
+                const videoResponse = await fetch(`${downloadLink}&key=${apiKeys.gemini || process.env.API_KEY}`);
                 if (!videoResponse.ok) {
                     throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
                 }
@@ -1554,7 +1611,7 @@ export const App: React.FC = () => {
             setVideoError(errorMessage);
             setVideoGenerationState('error');
         }
-    }, [getAiClient, handleApiError, userApiKey]);
+    }, [getAiClient, handleApiError, apiKeys.gemini]);
 
     const handleGenerateAvatar = useCallback(async (prompt: string) => {
         const ai = getAiClient();
@@ -1863,8 +1920,13 @@ export const App: React.FC = () => {
                             }
                             break;
                         case 'searchAndPlayYoutubeVideo':
+                            if (!apiKeys.youtube) {
+                                result = "The YouTube API key is missing. Please add it in the settings to use this feature.";
+                                addTranscriptionEntry({ speaker: 'system', text: result });
+                                break;
+                            }
                             try {
-                                const results = await searchYoutubeVideo(fc.args.query as string);
+                                const results = await searchYoutubeVideo(fc.args.query as string, apiKeys.youtube);
                                 setYoutubeQueue(results);
                                 setYoutubeQueueIndex(0);
                                 const firstVideo = results[0];
@@ -1946,13 +2008,29 @@ export const App: React.FC = () => {
                             }
                             break;
                         case 'displayWeather':
-                            const weather = await fetchWeatherData(fc.args.location as string);
+                            if (!apiKeys.weather) {
+                                result = "The Visual Crossing Weather API key is missing. Please add it in the settings to use this feature.";
+                                addTranscriptionEntry({ speaker: 'system', text: result });
+                                break;
+                            }
+                            const weatherLocation = fc.args.location as string;
+                            const weather = await fetchWeatherData(weatherLocation, apiKeys.weather);
                             setWeatherData(weather);
                             setActivePanel('weather');
-                            result = `Okay, here is the weather for ${fc.args.location as string}.`;
+                            
+                            const summary = `Okay, here is the current weather for ${weather.location}. It's ${weather.temperature} degrees Celsius with ${weather.condition}. The humidity is at ${weather.humidity} percent, and the wind speed is ${weather.windSpeed} kilometers per hour.`;
+                            
+                            speakText(summary);
+
+                            result = `Okay, I've displayed and announced the weather for ${weatherLocation}.`;
                             break;
                         case 'getRealtimeNews':
-                            const articles = await fetchNewsData(fc.args.query as string);
+                            if (!apiKeys.news) {
+                                result = "The GNews API key is missing. Please add it in the settings to use this feature.";
+                                addTranscriptionEntry({ speaker: 'system', text: result });
+                                break;
+                            }
+                            const articles = await fetchNewsData(apiKeys.news, fc.args.query as string);
                             result = JSON.stringify(articles);
                             break;
                         case 'displayNews':
@@ -2066,7 +2144,7 @@ export const App: React.FC = () => {
                 }
             }
         }
-    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail, getAiClient]);
+    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail, getAiClient, apiKeys]);
 
     const handleYoutubePlayerError = useCallback((event: any) => {
         const errorCode = event.data;
@@ -2212,7 +2290,7 @@ export const App: React.FC = () => {
             
             const ai = getAiClient();
             if (!ai) {
-                throw new Error("API Key is not configured. Please provide a key.");
+                throw new Error("Gemini API Key is not configured. Please provide a key.");
             }
 
             const inputAudioContext = getInputAudioContext();
@@ -2788,21 +2866,43 @@ export const App: React.FC = () => {
             localStorage.removeItem('youtube_playback_state');
         }
     };
+    
+    const handleSaveApiKeys = (keysToSave: ApiKeys) => {
+        if (userIdRef.current) {
+            db.ref(`apiKeys/${userIdRef.current}`).set(keysToSave);
+        }
+        setApiKeys(keysToSave);
+    };
+    
+    const handleResetApiKeys = () => {
+        if (!userIdRef.current) return;
+        if (window.confirm("Are you sure you want to remove all saved API keys? You will need to re-enter your Gemini key to continue.")) {
+            db.ref(`apiKeys/${userIdRef.current}`).remove();
+            setApiKeys({ gemini: null, weather: null, news: null, youtube: null });
+            setIsStudioKeySelected(false);
+            setIsSettingsModalOpen(false);
+        }
+    };
 
     if (!isDataLoaded || isApiKeyLoading) {
         return <div className="h-screen w-screen flex items-center justify-center bg-bg-color"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>;
     }
 
-    if (!userApiKey && !isStudioKeySelected) {
+    if (!apiKeys.gemini && !isStudioKeySelected) {
         return <ApiKeySelectionScreen
-            onKeySelected={() => {
+            onStudioKeySelected={(optionalKeys) => {
                 setIsStudioKeySelected(true);
+                if (userIdRef.current) {
+                    const keysToSave = { gemini: null, ...optionalKeys };
+                    db.ref(`apiKeys/${userIdRef.current}`).set(keysToSave);
+                    setApiKeys(keysToSave);
+                }
                 setApiKeyError(null);
             }}
-            onKeySaved={(key) => {
+            onKeysSaved={(keys) => {
                 if (userIdRef.current) {
-                    db.ref(`apiKeys/${userIdRef.current}`).set(key);
-                    setUserApiKey(key);
+                    db.ref(`apiKeys/${userIdRef.current}`).set(keys);
+                    setApiKeys(keys);
                     setApiKeyError(null);
                 }
             }}
@@ -2818,11 +2918,11 @@ export const App: React.FC = () => {
                 <div className="flex items-center gap-2 md:gap-4">
                     <Clock />
                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{assistantState.toUpperCase()}</span>
-                    <button onClick={handleThemeToggle} className="text-text-color-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
+                    <button onClick={handleThemeToggle} className="text-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
                         {theme === 'light' ? <MoonIcon /> : <SunIcon />}
                     </button>
-                    <button onClick={() => setIsSettingsModalOpen(true)} className="text-text-color-muted hover:text-primary-color" aria-label="Customize Assistant"><SettingsIcon /></button>
-                    <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-text-color-muted hover:text-primary-color"><InstagramIcon /></a>
+                    <button onClick={() => setIsSettingsModalOpen(true)} className="text-muted hover:text-primary-color" aria-label="Customize Assistant"><SettingsIcon /></button>
+                    <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-muted hover:text-primary-color"><InstagramIcon /></a>
                 </div>
             </header>
             <main className="flex-grow flex flex-col lg:flex-row p-4 gap-4 overflow-y-auto lg:overflow-hidden">
@@ -2874,13 +2974,19 @@ export const App: React.FC = () => {
                                 ) : (
                                     <p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p>
                                 )}
-                             <p className="text-xs text-text-color-muted mt-1.5 mb-0 text-right">{new Date(entry.timestamp).toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-text-color-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>)
+                             <p className="text-xs text-muted mt-1.5 mb-0 text-right">{new Date(entry.timestamp).toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>)
                         })}<div ref={transcriptEndRef} /></div>
-                        <QuickActions onAction={handleQuickAction} disabled={assistantState !== 'active'} />
+                        <QuickActions 
+                            onAction={handleQuickAction} 
+                            disabled={assistantState !== 'active'}
+                            isWeatherEnabled={!!apiKeys.weather}
+                            isNewsEnabled={!!apiKeys.news}
+                            isYoutubeEnabled={!!apiKeys.youtube}
+                        />
                     </>)}
                     {activePanel === 'image' && (<div className="flex flex-col h-full overflow-hidden">
                         <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                        {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-text-color-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-text-color-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: `Check out this image I generated with Kaniska AI: "${selectedImage.prompt}"`, fileName: 'kaniska-image.jpg' })} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Share Image"><ShareIcon size={20} /></button><button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Download Image"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-text-color-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-text-color-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
+                        {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: `Check out this image I generated with Kaniska AI: "${selectedImage.prompt}"`, fileName: 'kaniska-image.jpg' })} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Share Image"><ShareIcon size={20} /></button><button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Download Image"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
                     {activePanel === 'code' && (<CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />)}
                     {activePanel === 'liveEditor' && liveEditingSnippet && (
                         <LiveCodeEditorPanel
@@ -2921,13 +3027,13 @@ export const App: React.FC = () => {
                                 <div className="text-center">
                                     <div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin mx-auto mb-4"></div>
                                     <p className="font-semibold text-lg">Generating Video</p>
-                                    <p className="text-sm text-text-color-muted">{videoProgressMessage}</p>
+                                    <p className="text-sm text-muted">{videoProgressMessage}</p>
                                 </div>
                             )}
                             {videoGenerationState === 'error' && <div className="text-red-400 p-4 text-center"><strong>Error:</strong> {videoError}</div>}
                             {videoUrl && <video src={videoUrl} controls autoPlay className="max-w-full max-h-full object-contain"></video>}
                             {!videoUrl && videoGenerationState === 'idle' && (
-                                <div className="text-center text-text-color-muted">
+                                <div className="text-center text-muted">
                                     <p>Ask Kaniska to generate a video to see it here.</p>
                                     <p className="text-xs mt-2">Try: "Generate an intro video for yourself"</p>
                                 </div>
@@ -2938,155 +3044,4 @@ export const App: React.FC = () => {
                             <div className="flex flex-col sm:flex-row gap-4 items-start">
                                 <div className="flex-shrink-0 w-full sm:w-48">
                                     <video ref={voiceoverVideoRef} src={uploadedVideoUrl || ''} controls muted className={`w-full aspect-video rounded-md bg-black ${!uploadedVideoUrl ? 'hidden' : ''}`}></video>
-                                    <button onClick={() => videoUploadInputRef.current?.click()} className="w-full mt-2 px-3 py-1.5 text-sm bg-primary-color/20 text-primary-color border border-primary-color/50 rounded-md hover:bg-primary-color/30 flex items-center justify-center gap-2">
-                                        <UploadIcon size={16} /> {uploadedVideoUrl ? 'Change Video' : 'Upload Video'}
-                                    </button>
-                                    <input type="file" ref={videoUploadInputRef} onChange={handleVideoUpload} accept="video/*" className="hidden" />
-                                </div>
-                                <div className="flex-grow">
-                                    <button onClick={handleGenerateVoiceover} disabled={!uploadedVideoUrl || (voiceoverState !== 'idle' && voiceoverState !== 'done' && voiceoverState !== 'error')} className="w-full px-4 py-2 font-semibold bg-primary-color/80 text-bg-color rounded-md hover:bg-primary-color disabled:opacity-50 disabled:cursor-not-allowed">
-                                        {voiceoverState === 'idle' || voiceoverState === 'done' || voiceoverState === 'error' ? 'Generate Voiceover' : 'Generating...'}
-                                    </button>
-                                    <p className="text-xs text-text-color-muted mt-2">Upload a short video (under 10s recommended) and Kaniska will describe it and generate a voiceover.</p>
-                                    {voiceoverProgress && <p className="text-sm mt-2 text-cyan-400">{voiceoverProgress}</p>}
-                                    {voiceoverError && <p className="text-sm mt-2 text-red-400">{voiceoverError}</p>}
-                                    {videoDescription && (
-                                        <div className="mt-4 p-2 bg-black/20 rounded-md">
-                                            <h5 className="text-xs font-bold text-text-color-muted">Generated Script:</h5>
-                                            <p className="text-xs italic">"{videoDescription}"</p>
-                                        </div>
-                                    )}
-                                    {voiceoverAudioUrl && <audio ref={voiceoverAudioRef} src={voiceoverAudioUrl} controls className="w-full mt-2"></audio>}
-                                </div>
-                            </div>
-                        </div>
-                    </div>)}
-                    {activePanel === 'email' && (
-                        <EmailPanel
-                            recipient={emailRecipient}
-                            subject={emailSubject}
-                            body={emailBody}
-                            onRecipientChange={setEmailRecipient}
-                            onSubjectChange={setEmailSubject}
-                            onBodyChange={setEmailBody}
-                            onSend={handleSendEmail}
-                        />
-                    )}
-                    {activePanel === 'lyrics' && songLyrics && (
-                        <div className="flex-grow p-4 sm:p-6 overflow-y-auto bg-black/20 flex flex-col items-center justify-center text-center">
-                            <h3 className="text-xl font-bold">{songLyrics.name}</h3>
-                            <p className="text-md text-text-color-muted mb-6">{songLyrics.artist}</p>
-                            <div className="lyrics-container w-full max-w-lg">
-                                {songLyrics.lyrics.map((line, index) => (
-                                    <p key={index} className={`lyrics-line ${index === songLyrics.currentLine ? 'active' : ''}`}>
-                                        {line}
-                                    </p>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {activePanel === 'weather' && (weatherData ? <WeatherPanel data={weatherData} /> : <div className="flex-grow flex items-center justify-center text-text-color-muted"><p>Ask Kaniska for the weather to see it here.</p></div>)}
-                    {activePanel === 'news' && (newsArticles.length > 0 ? <NewsPanel articles={newsArticles} /> : <div className="flex-grow flex items-center justify-center text-text-color-muted"><p>Ask Kaniska for news to see it here.</p></div>)}
-                    {activePanel === 'timer' && (timer ? <TimerPanel timer={timer} /> : <div className="flex-grow flex items-center justify-center text-text-color-muted"><p>Ask Kaniska to set a timer to see it here.</p></div>)}
-                </section>
-            </main>
-            {isSettingsModalOpen && (
-                <SettingsModal
-                    isOpen={isSettingsModalOpen}
-                    onClose={() => setIsSettingsModalOpen(false)}
-                    avatars={avatars}
-                    currentAvatar={currentAvatar}
-                    onSelectAvatar={setCurrentAvatar}
-                    onUploadAvatar={(newAvatar) => setAvatars(prev => [...prev, newAvatar])}
-                    onGenerateAvatar={handleGenerateAvatar}
-                    generatedAvatarResult={generatedAiAvatar}
-                    customGreeting={customGreeting}
-                    onSaveGreeting={handleSaveGreeting}
-                    customSystemPrompt={customSystemPrompt}
-                    onSaveSystemPrompt={handleSaveSystemPrompt}
-                    onClearHistory={handleClearHistory}
-                    selectedVoice={selectedVoice}
-                    onSelectVoice={setSelectedVoice}
-                    voicePitch={voicePitch}
-                    onSetVoicePitch={setVoicePitch}
-                    voiceSpeed={voiceSpeed}
-                    onSetVoiceSpeed={setVoiceSpeed}
-                    greetingVoice={greetingVoice}
-                    onSetGreetingVoice={setGreetingVoice}
-                    greetingPitch={greetingPitch}
-                    onSetGreetingPitch={setGreetingPitch}
-                    greetingSpeed={greetingSpeed}
-                    onSetGreetingSpeed={setGreetingSpeed}
-                    speakText={speakText}
-                    aiRef={aiRef.current}
-                    voiceTrainingData={voiceTrainingData}
-                    setVoiceTrainingData={setVoiceTrainingData}
-                    onAnalyzeVoice={handleAnalyzeVoice}
-                    userId={userIdRef.current}
-                    setUserApiKey={setUserApiKey}
-                    setIsStudioKeySelected={setIsStudioKeySelected}
-                />
-            )}
-            {editingImage && (
-                <ImageEditorModal
-                    isOpen={!!editingImage}
-                    image={editingImage}
-                    onClose={() => setEditingImage(null)}
-                    onSave={(newUrl) => {
-                        setGeneratedImages(prev => prev.map(img => img.id === editingImage.id ? {...img, url: newUrl} : img));
-                        if(selectedImage?.id === editingImage.id) setSelectedImage(prev => prev ? {...prev, url: newUrl} : null);
-                        setEditingImage(null);
-                    }}
-                />
-            )}
-            {liveEditingImage && (
-                <LiveImageEditorModal
-                    isOpen={!!liveEditingImage}
-                    image={liveEditingImage}
-                    filters={liveEditFilters}
-                    transform={liveEditTransform}
-                    onClose={() => setLiveEditingImage(null)}
-                    onReset={() => {
-                        setLiveEditFilters(initialFilters);
-                        setLiveEditTransform(initialTransforms);
-                    }}
-                    onSave={(newUrl) => {
-                         setGeneratedImages(prev => prev.map(img => img.id === liveEditingImage.id ? {...img, url: newUrl} : img));
-                        if(selectedImage?.id === liveEditingImage.id) setSelectedImage(prev => prev ? {...prev, url: newUrl} : null);
-                        setLiveEditingImage(null);
-                        sessionPromiseRef.current?.then(session => session.sendRealtimeInput({ text: "Live editing finished." }));
-                    }}
-                />
-            )}
-            {websitePreview && (
-                <WebsitePreviewModal
-                    preview={websitePreview}
-                    onClose={() => setWebsitePreview(null)}
-                />
-            )}
-            {shareContent && (
-                 <div className="modal-overlay" onClick={() => setShareContent(null)}>
-                    <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                             <h2 className="text-lg font-semibold">Share {shareContent.type}</h2>
-                            <button onClick={() => setShareContent(null)} className="text-2xl font-bold leading-none text-text-color-muted hover:text-white">&times;</button>
-                        </header>
-                         <div className="p-6 text-center">
-                            {shareContent.type === 'image' ? (
-                                <img src={shareContent.content} alt={shareContent.prompt} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md" />
-                            ) : (
-                                <video src={shareContent.content} controls className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md"></video>
-                            )}
-                             <p className="text-sm text-text-color-muted mt-4">{shareContent.prompt}</p>
-                            <p className="text-xs text-yellow-400 mt-4">Web Share API is not available on this browser/device. You can download the file instead.</p>
-                        </div>
-                        <footer className="flex justify-end p-4 border-t border-border-color gap-2">
-                             <button onClick={() => setShareContent(null)} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Close</button>
-                             <a href={shareContent.content} download={`kaniska-creation.${shareContent.type === 'image' ? 'jpg' : 'mp4'}`} className="inline-block px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md no-underline">Download</a>
-                        </footer>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
+                                    <button onClick={() => videoUploadInputRef.current?.click()} className="w-full mt-2 px-3 py-1.5 text-sm bg-primary-color/20 text-primary-color border
