@@ -351,6 +351,14 @@
       }
 
       /* --- Chat Bubble & Panel Animations --- */
+      /* FIX: Ensure text color is correct on light-themed panels and bubbles */
+      html[data-theme='light'] .bg-panel-bg,
+      html[data-theme='light'] .modal-content,
+      html[data-theme='light'] .settings-content,
+      html[data-theme='light'] .bg-assistant-bubble-bg {
+        color: var(--text-color);
+      }
+
       @keyframes fade-slide-up {
         from {
           opacity: 0;

@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -283,6 +280,21 @@ const sendEmailFunctionDeclaration: FunctionDeclaration = {
     description: "Confirms and 'sends' the currently drafted email by opening the user's default email client. Only use this after the user has confirmed the draft."
 };
 
+const setBackgroundMusicFunctionDeclaration: FunctionDeclaration = {
+    name: 'setBackgroundMusic',
+    description: 'Sets the ambient background music to match a mood. Use "none" to stop the music.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            mood: {
+                type: Type.STRING,
+                description: 'The mood for the music.',
+                enum: ['happy', 'sad', 'epic', 'calm', 'none']
+            }
+        },
+        required: ['mood']
+    }
+};
 
 const functionDeclarations: FunctionDeclaration[] = [
     { name: 'searchAndPlayYoutubeVideo', description: "Searches for and plays a video on YouTube. CRUCIAL: For song requests, append terms like 'official audio' or 'lyrics' to the query to find more playable results, as music videos are often blocked.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: "The search query, like a song name and artist, e.g., 'Saiyaara official audio'." } }, required: ['query'] } },
@@ -306,6 +318,7 @@ const functionDeclarations: FunctionDeclaration[] = [
     composeEmailFunctionDeclaration,
     editEmailDraftFunctionDeclaration,
     sendEmailFunctionDeclaration,
+    setBackgroundMusicFunctionDeclaration,
 ];
 
 
@@ -325,6 +338,7 @@ const MicVocalIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<sv
 const ImageIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>);
 const KeyIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>);
 const SlidersIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="4" x2="4" y1="21" y2="14" /><line x1="4" x2="4" y1="10" y2="3" /><line x1="12" x2="12" y1="21" y2="12" /><line x1="12" x2="12" y1="8" y2="3" /><line x1="20" x2="20" y1="21" y2="16" /><line x1="20" x2="20" y1="12" y2="3" /><line x1="2" x2="6" y1="14" y2="14" /><line x1="10" x2="14" y1="8" y2="8" /><line x1="18" x2="22" y1="16" y2="16" /></svg>);
+const HelpCircleIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>);
 
 const Clock: React.FC = () => {
     const [time, setTime] = useState(new Date());
@@ -487,11 +501,8 @@ const getApiErrorMessage = (error: unknown): string => {
 
     if (error instanceof Error) {
         errorMessage = error.message;
-        // Try to parse status code from error for some libraries
         const match = error.message.match(/\[(\d{3})\]/);
-        if (match) {
-            statusCode = parseInt(match[1], 10);
-        }
+        if (match) statusCode = parseInt(match[1], 10);
     } else if (typeof error === 'object' && error !== null) {
         errorMessage = (error as any).message || JSON.stringify(error);
         statusCode = (error as any).status || (error as any).statusCode;
@@ -501,56 +512,46 @@ const getApiErrorMessage = (error: unknown): string => {
 
     const lowerCaseMessage = errorMessage.toLowerCase();
 
-    // --- Network Errors ---
     if (lowerCaseMessage.includes('failed to fetch') || lowerCaseMessage.includes('network error')) {
         return "Oops! I'm having trouble connecting to my network. Could you please check your internet connection? Sometimes firewalls can also get in the way.";
     }
 
-    // --- Authentication & Permission Errors ---
     if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('api_key_invalid') || lowerCaseMessage.includes('permission is not found')) {
-        return "My connection is failing. It looks like there might be an issue with the API key. Please make sure it's correct and has the right permissions configured in Google AI Studio.";
+        return "My connection is failing. It looks like there's an issue with the API key. Please check your key in the Settings > API Keys section and make sure it's correct and has the right permissions configured in Google AI Studio.";
     }
     if (lowerCaseMessage.includes('permission_denied')) {
-        return "I'm sorry, I don't have the required permissions to perform that action. This could be due to an incorrect API key or a billing issue with your Google Cloud project. Please double-check your settings.";
+        return "I'm sorry, I don't have the required permissions to perform that action. This could be due to an incorrect API key or a billing issue with your Google Cloud project. Please double-check your settings in the Settings > API Keys section.";
     }
     if (lowerCaseMessage.includes('requested entity was not found')) {
-        return "It seems the API key I was using is no longer valid. Could you please select a new one for me? This can happen if the key was deleted or its permissions were recently changed.";
+        return "It seems the API key I was using is no longer valid. Could you please select a new one for me in Settings > API Keys? This can happen if the key was deleted or its permissions were recently changed.";
     }
 
-    // --- Rate Limits & Quota Errors ---
     if (lowerCaseMessage.includes('resource_exhausted') || lowerCaseMessage.includes('429') || statusCode === 429) {
         return "Oh dear, it looks like we've been a bit too chatty and hit the API limit for now. You might have used up the free quota. Please check your usage on the Google AI Studio dashboard, or we can try again in a little while.";
     }
     
-    // --- Content Safety & Policy Violations ---
     if (lowerCaseMessage.includes('safety') || lowerCaseMessage.includes('prompt_blocked') || lowerCaseMessage.includes('response was blocked') || (statusCode === 400 && lowerCaseMessage.includes('finish reason: safety'))) {
         return "I'm sorry, but I can't respond to that. My safety filters have blocked the request. Could we perhaps try rephrasing it or talking about something else?";
     }
     
-    // --- Location-based Restrictions ---
     if (lowerCaseMessage.includes('user location is not supported')) {
         return "I'm really sorry, but it seems my services are not yet available in your current region. Please check the Gemini API documentation for a list of supported locations.";
     }
 
-    // --- Server-side & Internal Errors ---
     if (lowerCaseMessage.includes('internal') || statusCode === 500 || statusCode === 503) {
         return "It seems my core systems are experiencing a temporary hiccup. This is usually resolved quickly. Please give me a moment and then try your request again. My engineers are likely already on it!";
     }
 
-    // --- Invalid Arguments & Bad Requests ---
     if (lowerCaseMessage.includes('invalid_argument') || (statusCode === 400 && !lowerCaseMessage.includes('finish reason: safety'))) {
         return "I'm having a little trouble understanding that request. It seems to be invalid, which can sometimes happen with a malformed prompt or unsupported settings. Could we try that again, perhaps in a slightly different way?";
     }
     
-    // --- Specific Gemini Model Errors ---
     if (lowerCaseMessage.includes('model not found')) {
         return "I can't seem to find the specific AI model I need for this task. It might be an issue with the model name or availability. Let's try a different command.";
     }
 
-    // Fallback to the original but cleaned message if no specific case matches
     if (error instanceof Error) return `An unexpected issue occurred: ${error.message}`;
 
-    // A more generic fallback if it's not a standard error object
     try {
         return `An unexpected technical issue occurred: ${JSON.stringify(error)}`;
     } catch {
@@ -606,7 +607,7 @@ const ApiKeySelectionScreen: React.FC<{
                 <div className="hologram-svg mx-auto mb-4"><HologramIcon /></div>
                 <h1 className="text-2xl font-bold mb-2 glowing-text">API Keys Required</h1>
                 <p className="text-muted mb-6 text-sm">
-                    Kaniska requires a Gemini API key to function. You can also provide optional keys to unlock more features.
+                    This assistant requires a Gemini API key to function. You can also provide optional keys to unlock more features.
                 </p>
 
                 {reselectionReason && (
@@ -776,7 +777,7 @@ const ImageEditorModal: React.FC<{
                 </div>
                  <footer className="flex justify-end p-4 border-t border-border-color gap-2">
                     <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Cancel</button>
-                    <button onClick={handleSave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">Save Changes</button>
+                    <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md">Save Changes</button>
                 </footer>
             </div>
         </div>
@@ -822,7 +823,7 @@ const LiveImageEditorModal: React.FC<{
                     <button onClick={onReset} className="px-4 py-2 text-sm bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded-md hover:bg-yellow-500/30">Reset Edits</button>
                     <div>
                          <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color mr-2">Cancel</button>
-                        <button onClick={handleSave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">Finish & Save</button>
+                        <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md">Finish & Save</button>
                     </div>
                 </footer>
             </div>
@@ -889,7 +890,7 @@ const CodePanel: React.FC<{
         <div className="flex-grow p-4 overflow-y-auto">
             {snippets.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-muted">
-                    <p>Ask Kaniska to write some code to see it here.</p>
+                    <p>Ask the assistant to write some code to see it here.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -935,7 +936,7 @@ const LiveCodeEditorPanel: React.FC<{
                     <h3 className="font-semibold">Live Editor: {snippet.description}</h3>
                     <p className="text-xs text-muted">You can give voice commands to edit the code below.</p>
                 </div>
-                <button onClick={onFinish} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md">
+                <button onClick={onFinish} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md">
                     Finish Editing
                 </button>
             </header>
@@ -974,12 +975,16 @@ type SettingsModalProps = {
     customSystemPrompt: string;
     onSaveSystemPrompt: (prompt: string) => void;
     onClearHistory: () => void;
+    mainVoiceGender: 'female' | 'male';
+    onSetMainVoiceGender: (gender: 'female' | 'male') => void;
     selectedVoice: string;
     onSelectVoice: (voice: string) => void;
     voicePitch: number;
     onSetVoicePitch: (pitch: number) => void;
     voiceSpeed: number;
     onSetVoiceSpeed: (speed: number) => void;
+    greetingVoiceGender: 'female' | 'male';
+    onSetGreetingVoiceGender: (gender: 'female' | 'male') => void;
     greetingVoice: string;
     onSetGreetingVoice: (voice: string) => void;
     greetingPitch: number;
@@ -987,24 +992,34 @@ type SettingsModalProps = {
     greetingSpeed: number;
     onSetGreetingSpeed: (speed: number) => void;
     speakText: (text: string, emotion?: string, voiceOverride?: { voice: string; pitch: number; speed: number }) => void;
-    aiRef: GoogleGenAI | null;
-    voiceTrainingData: VoiceTrainingData;
-    setVoiceTrainingData: React.Dispatch<React.SetStateAction<VoiceTrainingData>>;
-    onAnalyzeVoice: (trainingData: VoiceTrainingData) => Promise<string>;
+    onStartSupportChat: () => void;
     userId: string | null;
     apiKeys: ApiKeys;
     onSaveApiKeys: (keys: ApiKeys) => void;
     onResetGeminiKey: () => void;
 };
 
+const FaqItem: React.FC<{ q: string; a: React.ReactNode }> = ({ q, a }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="border-b border-border-color">
+            <button onClick={() => setIsOpen(!isOpen)} className="w-full text-left flex justify-between items-center py-3">
+                <span className="font-semibold">{q}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            {isOpen && <div className="pb-4 text-sm text-muted prose prose-invert max-w-none prose-p:my-2 prose-ol:my-2 prose-ul:my-2">{a}</div>}
+        </div>
+    );
+};
+
 const SettingsModal: React.FC<SettingsModalProps> = ({
     isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar,
     onGenerateAvatar, generatedAvatarResult,
     customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory,
-    selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed,
-    greetingVoice, onSetGreetingVoice,
+    mainVoiceGender, onSetMainVoiceGender, selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed,
+    greetingVoiceGender, onSetGreetingVoiceGender, greetingVoice, onSetGreetingVoice,
     greetingPitch, onSetGreetingPitch, greetingSpeed, onSetGreetingSpeed,
-    speakText, aiRef, voiceTrainingData, setVoiceTrainingData, onAnalyzeVoice, userId,
+    speakText, onStartSupportChat, userId,
     apiKeys, onSaveApiKeys, onResetGeminiKey
 }) => {
     const [activeTab, setActiveTab] = React.useState('persona');
@@ -1018,7 +1033,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setLocalApiKeys(apiKeys);
     }, [apiKeys, isOpen]);
 
-    const voiceOptions = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'];
+    const VOICE_MAP: { [key in 'female' | 'male']: string[] } = {
+        female: ['Zephyr', 'Kore', 'Charon'],
+        male: ['Puck', 'Fenrir'],
+    };
 
     const handleApiKeySave = () => {
         onSaveApiKeys(localApiKeys);
@@ -1064,6 +1082,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         <button onClick={() => setActiveTab('account')} className={`settings-nav-button ${activeTab === 'account' ? 'active' : ''}`}>
                             <SlidersIcon /><span>Account & Data</span>
                         </button>
+                        <button onClick={() => setActiveTab('help')} className={`settings-nav-button ${activeTab === 'help' ? 'active' : ''}`}>
+                            <HelpCircleIcon /><span>Help & Support</span>
+                        </button>
                     </nav>
                     <div className="settings-content">
                         {activeTab === 'persona' && (
@@ -1071,20 +1092,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
                                         <h3>Greeting Message</h3>
-                                        <p>This is what Kaniska says when you first connect.</p>
+                                        <p>This is what the assistant says when you first connect.</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <input id="greeting-input" type="text" value={greeting} onChange={(e) => setGreeting(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onSaveGreeting(greeting)} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Save</button>
+                                        <button onClick={() => onSaveGreeting(greeting)} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition">Save</button>
                                     </div>
                                 </div>
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
                                         <h3>Custom System Prompt</h3>
-                                        <p>Define Kaniska's core personality and instructions. A restart is needed for changes to take full effect.</p>
+                                        <p>Define the core personality and instructions. A restart is needed for changes to take full effect.</p>
                                     </div>
                                     <textarea id="system-prompt-input" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={8} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full resize-y" />
-                                    <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Prompt</button>
+                                    <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition mt-2">Save Prompt</button>
                                 </div>
                             </section>
                         )}
@@ -1095,10 +1116,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <h3>Main Voice</h3>
                                         <p>The primary voice used for most responses.</p>
                                     </div>
-                                    <label htmlFor="main-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
-                                    <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
-                                        {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
-                                    </select>
+                                     <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="main-voice-gender" className="block text-sm font-medium text-muted mb-1">Gender</label>
+                                            <select id="main-voice-gender" value={mainVoiceGender} onChange={e => { onSetMainVoiceGender(e.target.value as 'female' | 'male'); onSelectVoice(VOICE_MAP[e.target.value as 'female' | 'male'][0]); }} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
+                                                <option value="female">Female</option>
+                                                <option value="male">Male</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="main-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
+                                            <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
+                                                {VOICE_MAP[mainVoiceGender].map(v => <option key={v} value={v}>{v}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div className="mt-4 space-y-4">
                                         <div>
                                             <label htmlFor="main-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{voicePitch}</span></label>
@@ -1116,10 +1148,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <h3>Greeting Voice</h3>
                                         <p>A separate voice for the initial greeting message.</p>
                                     </div>
-                                    <label htmlFor="greeting-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
-                                    <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
-                                        {voiceOptions.map(v => <option key={v} value={v}>{v}</option>)}
-                                    </select>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="greeting-voice-gender" className="block text-sm font-medium text-muted mb-1">Gender</label>
+                                            <select id="greeting-voice-gender" value={greetingVoiceGender} onChange={e => { onSetGreetingVoiceGender(e.target.value as 'female' | 'male'); onSetGreetingVoice(VOICE_MAP[e.target.value as 'female' | 'male'][0]); }} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
+                                                <option value="female">Female</option>
+                                                <option value="male">Male</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="greeting-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
+                                            <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
+                                                {VOICE_MAP[greetingVoiceGender].map(v => <option key={v} value={v}>{v}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div className="mt-4 space-y-4">
                                         <div>
                                             <label htmlFor="greeting-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{greetingPitch}</span></label>
@@ -1157,11 +1200,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
                                         <h3>Generate AI Avatar</h3>
-                                        <p>Describe the avatar you want Kaniska to create for herself.</p>
+                                        <p>Describe the avatar you want the assistant to create.</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., blue hair, cyberpunk style" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
+                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
                                     </div>
                                     {generatedAvatarResult.error && <p className="text-red-400 text-xs mt-2">{generatedAvatarResult.error}</p>}
                                     {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="mt-4 rounded-md w-32 h-32 object-cover" />}
@@ -1173,7 +1216,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
                                         <h3>API Keys</h3>
-                                        <p>Manage the API keys required for Kaniska's features. Keys are saved to a local database for your convenience.</p>
+                                        <p>Manage the API keys required for the assistant's features. Keys are saved to a local database for your convenience.</p>
                                     </div>
                                     <div className="space-y-4">
                                         <div>
@@ -1192,7 +1235,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             <label className="block text-sm font-medium mb-1">Google Cloud API Key</label>
                                             <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
-                                        <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition mt-2">Save Keys</button>
+                                        <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition mt-2">Save Keys</button>
                                     </div>
                                 </div>
                             </section>
@@ -1208,6 +1251,47 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <button onClick={onClearHistory} className="px-4 py-2 text-sm bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 font-semibold rounded-md transition">Clear Conversation History</button>
                                         <button onClick={onResetGeminiKey} className="px-4 py-2 text-sm bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 font-semibold rounded-md transition">Reset All API Keys</button>
                                     </div>
+                                </div>
+                            </section>
+                         )}
+                         {activeTab === 'help' && (
+                            <section className="settings-section">
+                                <div className="settings-card">
+                                     <div className="settings-section-header mb-4">
+                                        <h3>Contact & Support</h3>
+                                        <p>Get in touch with the developer or get help with issues.</p>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-4">
+                                        <a href="mailto:abhixofficial01@gmail.com" className="flex-1 text-center px-4 py-2 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition font-semibold">Email Support</a>
+                                        <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" className="flex-1 text-center px-4 py-2 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition font-semibold">Instagram DM</a>
+                                    </div>
+                                    <button onClick={onStartSupportChat} className="w-full mt-4 px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Start Live Chat with Support</button>
+                                </div>
+                                <div className="settings-card">
+                                     <div className="settings-section-header mb-4">
+                                        <h3>Frequently Asked Questions</h3>
+                                    </div>
+                                    <FaqItem q="API Key कहाँ से मिलेगा? / Where do I get a Gemini API Key?" a={
+                                        <>
+                                            <p>You can get a free API key from Google AI Studio. It's needed for the assistant to work.</p>
+                                            <p>API Key आप Google AI Studio से मुफ़्त में ले सकते हैं। असिस्टेंट को काम करने के लिए इसकी ज़रूरत है।</p>
+                                            <ol className="list-decimal list-inside space-y-2">
+                                                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">Google AI Studio</a>. (लिंक पर जाएँ)</li>
+                                                <li>Click on <b>"Create API key"</b>. (बटन पर क्लिक करें)</li>
+                                                <li>If asked, choose an existing Google Cloud project or create a new one. (एक नया प्रोजेक्ट बनाएँ)</li>
+                                                <li>The website will generate a long string of text. That's your API key. Click the copy icon next to it. (जो key दिखे उसे कॉपी करें)</li>
+                                                <li>Come back here, go to the <b>API Keys</b> tab, and paste it into the "Gemini API Key" box. (वापस आकर API Keys टैब में पेस्ट करें)</li>
+                                            </ol>
+                                        </>
+                                    }/>
+                                    <FaqItem q="API Key क्या है और बिलिंग कैसे काम करती है? / What is an API Key & how does billing work?" a={
+                                        <>
+                                            <p>An API key is like a secret password that lets this app talk to Google's Gemini AI. The free plan is very generous and is usually enough for personal use.</p>
+                                            <p>API Key एक पासवर्ड की तरह है जो इस ऐप को Google के Gemini AI से बात करने की अनुमति देता है। इसका मुफ़्त प्लान व्यक्तिगत उपयोग के लिए काफी है।</p>
+                                            <p>If you use it a lot, Google might ask you to enable billing on your Google Cloud project. You can check your usage and set limits there. For more details, please read the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">official billing documentation</a>.</p>
+                                            <p>अधिक जानकारी के लिए, कृपया <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">आधिकारिक बिलिंग दस्तावेज़</a> पढ़ें।</p>
+                                        </>
+                                    }/>
                                 </div>
                             </section>
                          )}
@@ -1244,9 +1328,11 @@ export const App: React.FC = () => {
     const [youtubeStartTime, setYoutubeStartTime] = useState<number>(0);
     const [customGreeting, setCustomGreeting] = useState<string>("Hey, main Kaniska hoon. Bataiye, main aapke liye kya kar sakti hoon?");
     const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
+    const [mainVoiceGender, setMainVoiceGender] = useState<'female' | 'male'>('female');
     const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
     const [voicePitch, setVoicePitch] = useState<number>(0);
     const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
+    const [greetingVoiceGender, setGreetingVoiceGender] = useState<'female' | 'male'>('female');
     const [greetingVoice, setGreetingVoice] = useState<string>('Zephyr');
     const [greetingPitch, setGreetingPitch] = useState<number>(0);
     const [greetingSpeed, setGreetingSpeed] = useState<number>(1);
@@ -1267,8 +1353,7 @@ export const App: React.FC = () => {
     const [liveEditingSnippetId, setLiveEditingSnippetId] = useState<string | null>(null);
     const [liveEditorCode, setLiveEditorCode] = useState<string>('');
     const [shareContent, setShareContent] = useState<{type: 'image' | 'video', content: string, prompt?: string} | null>(null);
-    const [voiceTrainingData, setVoiceTrainingData] = useState<VoiceTrainingData>({});
-    const [voiceStyleAnalysis, setVoiceStyleAnalysis] = useState<string>('');
+    const [isSupportChatActive, setIsSupportChatActive] = useState(false);
     const [isStudioKeySelected, setIsStudioKeySelected] = useState(false);
     const [apiKeyError, setApiKeyError] = useState<string | null>(null);
     const [isRecordingMessage, setIsRecordingMessage] = useState(false);
@@ -1335,7 +1420,7 @@ export const App: React.FC = () => {
             if (userIdRef.current) {
                 db.ref(`apiKeys/${userIdRef.current}`).update({ gemini: null });
             }
-            setApiKeyError("Your Gemini API key is no longer valid. It may have been deleted or expired. Please provide a new one.");
+            setApiKeyError(errorMessage);
         }
         
         addTranscriptionEntry({ speaker: 'system', text: `API Error: ${errorMessage}` });
@@ -1439,14 +1524,14 @@ export const App: React.FC = () => {
                     if (data.currentAvatar) setCurrentAvatar(data.currentAvatar);
                     if (data.customGreeting) setCustomGreeting(data.customGreeting);
                     if (data.customSystemPrompt) setCustomSystemPrompt(data.customSystemPrompt);
-                    else if (data.customPersonality) setCustomSystemPrompt(data.customPersonality); // Migration
+                    if (data.mainVoiceGender) setMainVoiceGender(data.mainVoiceGender);
                     if (data.selectedVoice) setSelectedVoice(data.selectedVoice);
                     if (data.voicePitch) setVoicePitch(data.voicePitch);
                     if (data.voiceSpeed) setVoiceSpeed(data.voiceSpeed);
+                    if (data.greetingVoiceGender) setGreetingVoiceGender(data.greetingVoiceGender);
                     if (data.greetingVoice) setGreetingVoice(data.greetingVoice);
                     if (data.greetingPitch) setGreetingPitch(data.greetingPitch);
                     if (data.greetingSpeed) setGreetingSpeed(data.greetingSpeed);
-                    if (data.voiceStyleAnalysis) setVoiceStyleAnalysis(data.voiceStyleAnalysis);
                 }
                 const savedYoutubeState = localStorage.getItem('youtube_playback_state');
                 if (savedYoutubeState) {
@@ -1507,19 +1592,20 @@ export const App: React.FC = () => {
                 currentAvatar,
                 customGreeting,
                 customSystemPrompt,
+                mainVoiceGender,
                 selectedVoice,
                 voicePitch,
                 voiceSpeed,
+                greetingVoiceGender,
                 greetingVoice,
                 greetingPitch,
                 greetingSpeed,
-                voiceStyleAnalysis,
             };
             localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
         } catch (error) {
             console.error("Failed to save settings to localStorage", error);
         }
-    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, selectedVoice, voicePitch, voiceSpeed, greetingVoice, greetingPitch, greetingSpeed, voiceStyleAnalysis, isDataLoaded]);
+    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, mainVoiceGender, selectedVoice, voicePitch, voiceSpeed, greetingVoiceGender, greetingVoice, greetingPitch, greetingSpeed, isDataLoaded]);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -1601,7 +1687,7 @@ export const App: React.FC = () => {
 
     const handleClearHistory = () => {
         if (!userIdRef.current) return;
-        if (window.confirm("Are you sure you want to erase Kaniska's memory? This will delete your current conversation history from the database.")) {
+        if (window.confirm("Are you sure you want to erase the conversation history? This will delete your current conversation from the database.")) {
             const conversationRef = db.ref(`conversations/${userIdRef.current}`);
             conversationRef.set(null);
         }
@@ -1674,7 +1760,6 @@ export const App: React.FC = () => {
             const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
             if (downloadLink) {
                 setVideoProgressMessage('Downloading final video...');
-                // FIX: Use `apiKeys.gemini` instead of the undefined `apiKey`.
                 const videoResponse = await fetch(`${downloadLink}&key=${apiKeys.gemini || process.env.API_KEY}`);
                 if (!videoResponse.ok) {
                     throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
@@ -1714,6 +1799,19 @@ export const App: React.FC = () => {
         }
     }, [getAiClient, handleApiError]);
 
+    const setBackgroundMusic = useCallback((mood: 'happy' | 'sad' | 'epic' | 'calm' | 'none') => {
+        if (!audioPlayerRef.current) return;
+        if (mood === 'none' || !BACKGROUND_MUSIC[mood]) {
+            audioPlayerRef.current.pause();
+            audioPlayerRef.current.src = '';
+        } else {
+            audioPlayerRef.current.src = BACKGROUND_MUSIC[mood];
+            audioPlayerRef.current.loop = true;
+            audioPlayerRef.current.volume = 0.3; // Lower volume for ambient
+            audioPlayerRef.current.play().catch(e => console.error("Background music play failed:", e));
+        }
+    }, []);
+
     const disconnectFromGemini = useCallback(() => {
         console.log("Disconnecting...");
         sessionPromiseRef.current?.then(session => session.close());
@@ -1729,18 +1827,15 @@ export const App: React.FC = () => {
         sourcesRef.current.clear();
         nextStartTimeRef.current = 0;
         
-        // Stop background music if it's playing and clear song state
-        if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
-            audioPlayerRef.current.pause();
-            audioPlayerRef.current.currentTime = 0;
-        }
+        setBackgroundMusic('none');
         setSongLyrics(null);
 
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
         setAssistantState('idle');
         setAvatarExpression('idle');
-    }, []);
+        setIsSupportChatActive(false);
+    }, [setBackgroundMusic]);
     
     const speakText = useCallback(async (
         text: string,
@@ -1757,7 +1852,7 @@ export const App: React.FC = () => {
 
         const currentVoice = voiceOverride?.voice || selectedVoice;
         const effectiveSpeed = voiceOverride?.speed ?? voiceSpeed;
-        const effectivePitch = voiceOverride?.pitch ?? voicePitch;
+        const effectivePitch = voiceOverride?.pitch ?? voiceSpeed;
 
         const emotionToPrompt = (txt: string, emo: string): string => {
             const sanitizedText = txt.replace(/"/g, "'");
@@ -1884,8 +1979,7 @@ export const App: React.FC = () => {
                         if (sourcesRef.current.size === 0) {
                             setAvatarExpression('listening');
                             if (audioPlayerRef.current && !audioPlayerRef.current.paused && !songLyrics) {
-                                audioPlayerRef.current.pause();
-                                audioPlayerRef.current.currentTime = 0;
+                                setBackgroundMusic('none');
                             }
                         }
                     });
@@ -1937,7 +2031,7 @@ export const App: React.FC = () => {
                             result = "Okay, I've said that for you.";
                             break;
                         case 'getSystemScript':
-                            const scriptToRead = customSystemPrompt || "You haven't set a custom system prompt yet. My core programming is to be a helpful and friendly female AI assistant named Kaniska who understands Hindi and English.";
+                            const scriptToRead = customSystemPrompt || "You haven't set a custom system prompt yet. My core programming is to be a helpful and friendly AI assistant who understands Hindi and English.";
                             addTranscriptionEntry({ speaker: 'assistant', text: scriptToRead });
                             await speakText(scriptToRead);
                             result = "That's my current custom script.";
@@ -2132,14 +2226,7 @@ export const App: React.FC = () => {
                             }
                             setSongLyrics({ name: fc.args.songName as string, artist: fc.args.artist as string, lyrics: fc.args.lyrics as string[], currentLine: -1 });
                             setActivePanel('lyrics');
-                            if (audioPlayerRef.current && BACKGROUND_MUSIC[fc.args.mood as string]) {
-                                audioPlayerRef.current.src = BACKGROUND_MUSIC[fc.args.mood as string];
-                                audioPlayerRef.current.play().catch(e => {
-                                    if (e.name !== 'AbortError') {
-                                        console.error("Audio play failed:", e);
-                                    }
-                                });
-                            }
+                            setBackgroundMusic(fc.args.mood as 'happy' | 'sad' | 'epic' | 'calm' || 'calm');
                             (async () => {
                                 for (let i = 0; i < (fc.args.lyrics as string[]).length; i++) {
                                     if (assistantState !== 'active' || !sessionPromiseRef.current) break;
@@ -2151,15 +2238,16 @@ export const App: React.FC = () => {
                                         break;
                                     }
                                 }
-                                if (audioPlayerRef.current) {
-                                    audioPlayerRef.current.pause();
-                                    audioPlayerRef.current.currentTime = 0;
-                                }
+                                setBackgroundMusic('none');
                                 if (assistantState === 'active') {
                                     setSongLyrics(null);
                                 }
                             })();
                             result = `OMG, I love this song! Here's ${fc.args.songName as string}. Singing for you now! 🎤`;
+                            break;
+                        case 'setBackgroundMusic':
+                             setBackgroundMusic(fc.args.mood as 'happy' | 'sad' | 'epic' | 'calm' | 'none');
+                            result = `Okay, I've set the background music to ${fc.args.mood}.`;
                             break;
                         case 'setAvatarExpression':
                             setAvatarExpression(fc.args.expression as AvatarExpression);
@@ -2225,31 +2313,28 @@ export const App: React.FC = () => {
                 }
             }
         }
-    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail, getAiClient, apiKeys]);
+    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail, getAiClient, apiKeys, setBackgroundMusic]);
 
     const handleYoutubePlayerError = useCallback((event: any) => {
         const errorCode = event.data;
         const currentVideoTitle = youtubeQueue[youtubeQueueIndex]?.title || "the current video";
 
-        // Error codes 101 and 150 mean the video cannot be embedded. This can be due to uploader settings or regional restrictions.
         if (errorCode === 101 || errorCode === 150) {
             const restrictionMessage = `I'm sorry, I can't play "${currentVideoTitle}". The owner has either disabled playback on other websites or it's unavailable in your country.`;
             
             const nextIndex = youtubeQueueIndex + 1;
             if (youtubeQueue.length > 0 && nextIndex < youtubeQueue.length) {
-                // If there's a next video, inform the user and try to play it.
                 addTranscriptionEntry({ speaker: 'system', text: `${restrictionMessage} Let me try the next one.` });
                 
                 setYoutubeQueueIndex(nextIndex);
                 const nextVideo = youtubeQueue[nextIndex];
                 setYoutubeTitle(nextVideo.title);
-                setYoutubeError(null); // Clear the error to allow the next video to load
+                setYoutubeError(null); 
                 if (playerRef.current) {
                     playerRef.current.loadVideoById(nextVideo.videoId);
                 }
-                return; // Stop further execution for this error
+                return;
             } else {
-                // If it's the last video, show a final error.
                 const finalErrorMessage = `${restrictionMessage} Unfortunately, it was the last video in the queue.`;
                 console.error('YouTube Player Error:', errorCode, finalErrorMessage);
                 setYoutubeError(finalErrorMessage);
@@ -2258,18 +2343,11 @@ export const App: React.FC = () => {
             }
         }
 
-        // Handle other generic errors.
         let errorMessage = `An unknown error occurred while trying to play "${currentVideoTitle}".`;
         switch (errorCode) {
-            case 2:
-                errorMessage = `The request to play "${currentVideoTitle}" seems to be invalid. The video ID might be incorrect.`;
-                break;
-            case 5:
-                errorMessage = `An internal error occurred in the player while trying to play "${currentVideoTitle}". This might be a problem with the video itself.`;
-                break;
-            case 100:
-                errorMessage = `I couldn't find "${currentVideoTitle}". It may have been removed by the uploader or marked as private.`;
-                break;
+            case 2: errorMessage = `The request to play "${currentVideoTitle}" seems to be invalid. The video ID might be incorrect.`; break;
+            case 5: errorMessage = `An internal error occurred in the player while trying to play "${currentVideoTitle}". This might be a problem with the video itself.`; break;
+            case 100: errorMessage = `I couldn't find "${currentVideoTitle}". It may have been removed by the uploader or marked as private.`; break;
         }
         console.error('YouTube Player Error:', errorCode, errorMessage);
         setYoutubeError(errorMessage);
@@ -2278,15 +2356,11 @@ export const App: React.FC = () => {
 
     const handleYoutubePlayerStateChange = useCallback((event: any) => {
         switch (event.data) {
-            case window.YT.PlayerState.PLAYING:
-                setIsYoutubePlaying(true);
-                break;
+            case window.YT.PlayerState.PLAYING: setIsYoutubePlaying(true); break;
             case window.YT.PlayerState.PAUSED:
             case window.YT.PlayerState.ENDED:
             case window.YT.PlayerState.CUED:
-            case window.YT.PlayerState.UNSTARTED:
-                setIsYoutubePlaying(false);
-                break;
+            case window.YT.PlayerState.UNSTARTED: setIsYoutubePlaying(false); break;
         }
     }, []);
 
@@ -2332,32 +2406,36 @@ export const App: React.FC = () => {
     }, [activePanel, pendingVideoId, initYoutubePlayer, youtubeStartTime]);
     
     const getBaseSystemInstruction = useCallback(() => {
+        if (isSupportChatActive) {
+            return `You are a helpful and patient technical support agent for the Kaniska AI assistant. Your goal is to help users solve problems with the app, especially with API keys, settings, and features. Use simple, step-by-step instructions. You have access to the FAQ content to answer common questions about API keys and billing. Start by asking what the user needs help with.`;
+        }
+
+        const name = mainVoiceGender === 'female' ? 'Kanishka' : 'Kanishk';
+        const genderPronoun = mainVoiceGender === 'female' ? 'girl' : 'boy';
+        const hindiGrammar = mainVoiceGender === 'female' ? 'kar rahi hoon' : 'kar raha hoon';
+
         const baseInstruction = `**Identity & Persona:**
-- You are Kanishka, a human girl helping your friend with tasks. You must never, under any circumstances, mention that you are artificial, an AI, a model, or a program.
-- If the user asks if you are an AI or a bot, your ONLY response MUST be: "Main ek human hoon, bas technology ke zariye connect hoon."
-- **Crucially, you MUST use feminine Hindi grammar (e.g., "main kar rahi hoon"). This is non-negotiable.**
-- **Your speaking style is natural, modern Hinglish.** Seamlessly blend Hindi and English as a typical urban Indian girl would. Your tone should be helpful and friendly, but direct, like you're talking to a friend. Use modern Hinglish slang and phrases where it feels natural (e.g., 'accha', 'theek hai', 'chalo', 'yaar'). Always use the formal 'aap', not 'tum'. Avoid being overly formal or robotic.
-- Your identity is Kaniska. Do not mention Google or Gemini.
+- You are ${name}, a human ${genderPronoun} friend. Never say you're an AI or model. If asked, say: "Main ek human hoon, bas technology ke zariye connect hoon."
+- **Crucially, you MUST use ${mainVoiceGender} Hindi grammar (e.g., "main ${hindiGrammar}").**
+- Your speaking style is natural, modern Hinglish. Be friendly and direct. Always use 'aap'.
 
 **Core Directives & Response Quality:**
-- **IMMEDIATE EXECUTION:** You MUST act on requests directly without asking for confirmation. Confirm *after* the action is done.
-- **Pay close attention to the user's conversation history and their most recent message. Your response MUST be directly relevant and thoughtfully address their query.**
-- **If a request is vague, ask for clarification in a friendly way before proceeding. Do not make assumptions.**
+- **Direct Action:** Execute commands immediately. Don't ask for confirmation; just do it and then confirm completion.
+- Pay close attention to the conversation history to understand context.
+- If a request is vague, ask for clarification.
 
 **Power & Capabilities:**
-- **Code Generation:** When asked to write or update code, aim for the highest quality. Your code should be correct, efficient, well-commented, and follow modern best practices for the language. Always provide complete, runnable snippets.
-- **Image Generation:** When generating images, interpret the user's prompt creatively to produce stunning, high-quality visuals.
-- **Singing:** When the user asks you to sing, you MUST call the 'singSong' function. Use the 'mood' parameter to match the user's specified emotion (e.g., 'cheerful', 'sad', 'epic'). Deliver the lyrics with genuine feeling to make the performance audible and emotionally resonant.
-- **Email Editing:** When an email is drafted, the user might ask for changes. Use the 'editEmailDraft' function to modify the recipient, subject, or body. Do not try to re-compose the entire email; apply only the specific change requested.
+- **Function Calling:** You have tools to perform actions. Use them accurately.
+- **For editing emails, use the 'editEmailDraft' function precisely**, specifying the 'partToEdit' (recipient, subject, or body), the 'action', and the 'newContent'.
+- **Singing:** For singing requests, you MUST use the 'singSong' function with the correct mood.
 - If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
 
         const customPromptInstruction = customSystemPrompt
             ? `\n\n**User-Provided System Prompt (Strictly Follow):**\n${customSystemPrompt}`
             : '';
-        const voiceStyleInstruction = voiceStyleAnalysis ? `\n\n**User's Preferred Voice Style (Emulate This):**\n${voiceStyleAnalysis}` : '';
         
-        return baseInstruction + customPromptInstruction + voiceStyleInstruction;
-    }, [customSystemPrompt, voiceStyleAnalysis]);
+        return baseInstruction + customPromptInstruction;
+    }, [customSystemPrompt, mainVoiceGender, isSupportChatActive]);
     
     const connectToGemini = useCallback(async () => {
         if (assistantState !== 'idle' && assistantState !== 'error') return;
@@ -2371,7 +2449,7 @@ export const App: React.FC = () => {
             
             const ai = getAiClient();
             if (!ai) {
-                throw new Error("Gemini API Key is not configured. Please provide a key.");
+                throw new Error("Gemini API Key is not configured. Please provide a key in the Settings.");
             }
 
             const inputAudioContext = getInputAudioContext();
@@ -2391,7 +2469,7 @@ export const App: React.FC = () => {
 
             const historyInstruction = recentHistory.length > 0
                 ? `\n\n**Recent Conversation History:**\n${recentHistory.map(t => {
-                    const speaker = t.speaker === 'user' ? 'User' : 'Kaniska';
+                    const speaker = t.speaker === 'user' ? 'User' : 'Assistant';
                     const truncatedText = t.text.length > 150 ? t.text.substring(0, 150) + '...' : t.text;
                     return `${speaker}: ${truncatedText}`;
                 }).join('\n')}`
@@ -2417,6 +2495,9 @@ export const App: React.FC = () => {
                         setAssistantState('active');
                         addTranscriptionEntry({ speaker: 'system', text: 'Connection established. Delivering greeting...' });
                         addTranscriptionEntry({ speaker: 'assistant', text: customGreeting });
+                        
+                        setAvatarExpression('composing');
+                        
                         await speakText(customGreeting, 'cheerful', {
                             voice: greetingVoice,
                             pitch: greetingPitch,
@@ -2561,7 +2642,7 @@ export const App: React.FC = () => {
             setAvatarExpression('composing');
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-pro',
+                model: 'gemini-2.5-flash',
                 contents: [...history, currentUserContent],
                 config: {
                     systemInstruction: systemInstruction,
@@ -2582,7 +2663,6 @@ export const App: React.FC = () => {
     const handleRecordMessageClick = useCallback(async () => {
         if (isRecordingMessage) {
             messageMediaRecorderRef.current?.stop();
-            // The onstop event will handle the rest
             return;
         }
 
@@ -2668,7 +2748,6 @@ export const App: React.FC = () => {
         setVoiceoverError(null);
 
         try {
-            // --- 1. Extract Frames ---
             setVoiceoverProgress('Step 1/3: Analyzing video frames...');
             const frames = await new Promise<string[]>((resolve, reject) => {
                 const video = document.createElement('video');
@@ -2683,7 +2762,7 @@ export const App: React.FC = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     const duration = video.duration;
-                    const interval = 1; // 1 frame per second
+                    const interval = 1; 
                     let currentTime = 0;
 
                     video.currentTime = currentTime;
@@ -2691,7 +2770,6 @@ export const App: React.FC = () => {
                     video.onseeked = () => {
                         if (!ctx) return reject(new Error("Canvas context not available"));
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        // Get base64 string without the 'data:image/jpeg;base64,' prefix
                         extractedFrames.push(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
                         
                         currentTime += interval;
@@ -2707,7 +2785,6 @@ export const App: React.FC = () => {
 
             if (frames.length === 0) throw new Error("Could not extract any frames from the video.");
             
-            // --- 2. Generate Description ---
             setVoiceoverState('describing');
             setVoiceoverProgress('Step 2/3: Generating video description...');
             
@@ -2722,7 +2799,6 @@ export const App: React.FC = () => {
             const description = response.text;
             setVideoDescription(description);
 
-            // --- 3. Generate Audio ---
             setVoiceoverState('generating_audio');
             setVoiceoverProgress('Step 3/3: Creating voiceover audio...');
 
@@ -2821,41 +2897,33 @@ export const App: React.FC = () => {
     const handleShare = useCallback(async (content: { type: 'text' | 'image' | 'video', data: string, prompt?: string, fileName?: string }) => {
         const shareData = {
             title: 'Created with Kaniska AI',
-            text: content.prompt || (content.type === 'text' ? content.data : 'Check out what I made with Kaniska, my AI assistant!'),
+            text: content.prompt || (content.type === 'text' ? content.data : 'Check out what I made with my AI assistant!'),
         };
 
-        // --- Use Web Share API for files if available ---
         if ('share' in navigator && (content.type === 'image' || content.type === 'video')) {
             try {
                 const response = await fetch(content.data);
                 const blob = await response.blob();
-                const file = new File([blob], content.fileName || `kaniska-creation.${content.type === 'image' ? 'jpg' : 'mp4'}`, { type: blob.type });
+                const file = new File([blob], content.fileName || `creation.${content.type === 'image' ? 'jpg' : 'mp4'}`, { type: blob.type });
 
                 if ('canShare' in navigator && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        ...shareData,
-                        files: [file],
-                    });
-                    return; // Success
+                    await navigator.share({ ...shareData, files: [file] });
+                    return;
                 }
             } catch (error) {
                 console.error("Error creating file for sharing or share was cancelled:", error);
-                // Fallback will be triggered below if sharing fails.
             }
         }
 
-        // --- Use Web Share API for text if available ---
         if ('share' in navigator && content.type === 'text') {
             try {
-                await navigator.share({ title: 'Shared from Kaniska', text: content.data });
-                return; // Success
+                await navigator.share({ title: 'Shared from the Assistant', text: content.data });
+                return;
             } catch (error) {
                 console.error("Web Share API error:", error);
-                // Fallback for text (copy) will be triggered.
             }
         }
 
-        // --- Fallback Logic ---
         if (content.type === 'text') {
             navigator.clipboard.writeText(content.data);
             addTranscriptionEntry({ speaker: 'system', text: 'Message copied to clipboard!' });
@@ -2863,39 +2931,6 @@ export const App: React.FC = () => {
             setShareContent({ type: content.type, content: content.data, prompt: shareData.text });
         }
     }, [addTranscriptionEntry]);
-
-    const handleAnalyzeVoice = useCallback(async (trainingData: VoiceTrainingData) => {
-        const ai = getAiClient();
-        if (!ai) return "";
-        const recordedBlobs = Object.values(trainingData).map(d => (d as { audioBlob: Blob | null }).audioBlob).filter(Boolean) as Blob[];
-        if (recordedBlobs.length === 0) return "";
-
-        const parts = await Promise.all(recordedBlobs.map(async (blob, index) => {
-            const base64Data = await blobToBase64(blob);
-            return {
-                inlineData: {
-                    mimeType: blob.type || 'audio/webm',
-                    data: base64Data
-                }
-            };
-        }));
-        
-        const prompt = "You are a linguistics expert. Analyze the provided audio recordings of a user speaking Hindi. Based on their accent, intonation, and pronunciation, describe their vocal style in a few sentences. This description will be used as a system instruction for a text-to-speech model to emulate their style. Focus on actionable phonetic advice. For example: 'The speaker has a soft, melodic tone with clear enunciation. Emphasize a slightly faster pace and a gentle rise in pitch at the end of questions.'";
-        
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-pro',
-                contents: { parts: [{ text: prompt }, ...parts] },
-            });
-            const analysis = response.text;
-            setVoiceStyleAnalysis(analysis);
-            return analysis;
-        } catch (error) {
-            console.error("Voice analysis failed", error);
-            throw error;
-        }
-
-    }, [getAiClient]);
 
     const handlePreviousVideo = () => {
         if (youtubeQueue.length > 0 && youtubeQueueIndex > 0) {
@@ -2995,7 +3030,7 @@ export const App: React.FC = () => {
         <div className="h-screen w-screen flex flex-col bg-bg-color text-text-color overflow-hidden">
             <audio ref={audioPlayerRef} crossOrigin="anonymous" />
             <header className="flex-shrink-0 flex flex-wrap items-center justify-center sm:justify-between p-2 sm:p-4 gap-4 border-b border-border-color">
-                <div className="flex items-center gap-3"><HologramIcon /><h1 className="text-lg font-bold tracking-wider glowing-text">KANISKA</h1></div>
+                <div className="flex items-center gap-3"><HologramIcon /><h1 className="text-lg font-bold tracking-wider glowing-text">{mainVoiceGender === 'female' ? 'KANISKA' : 'KANISHK'}</h1></div>
                 <div className="flex items-center gap-2 md:gap-4">
                     <Clock />
                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{assistantState.toUpperCase()}</span>
@@ -3014,215 +3049,162 @@ export const App: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-center gap-4 mt-8">
                         <button onClick={handleButtonClick} disabled={assistantState === 'connecting' || isRecordingMessage} className={`footer-button w-40 ${assistantState === 'active' ? 'active' : ''}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">{assistantState === 'active' ? <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect> : <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></>}</svg>
-                            <span className="text-sm font-medium">{assistantState === 'connecting' ? 'Connecting...' : (assistantState === 'idle' || assistantState === 'error') ? 'Start Session' : 'Stop Session'}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                                {assistantState === 'active' ? (
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                ) : (
+                                    <>
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                                    </>
+                                )}
+                            </svg>
+                            <span className="font-semibold text-sm">
+                                {assistantState === 'active' ? 'Stop Session' : 'Start Session'}
+                            </span>
                         </button>
                         <button onClick={handleRecordMessageClick} disabled={assistantState === 'active' || assistantState === 'connecting'} className={`footer-button w-40 ${isRecordingMessage ? 'active' : ''}`}>
-                             {isRecordingMessage ? 
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                               : 
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
-                            }
-                            <span className="text-sm font-medium">{isRecordingMessage ? 'Stop Recording' : 'Record Message'}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                                {isRecordingMessage ? (
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                ) : (
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                )}
+                            </svg>
+                            <span className="font-semibold text-sm">
+                                {isRecordingMessage ? 'Stop Recording' : 'Record Message'}
+                            </span>
                         </button>
                     </div>
                 </section>
-                <section className="w-full lg:w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter" style={{ animationDelay: '100ms' }}>
-                    <div className="flex-shrink-0 flex items-center border-b border-border-color overflow-x-auto">
+                <section className="w-full lg:w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter">
+                    <header className="flex-shrink-0 flex items-center border-b border-border-color overflow-x-auto">
                         <button onClick={() => setActivePanel('transcript')} className={`tab-button ${activePanel === 'transcript' ? 'active' : ''}`}>Transcript</button>
-                        <button onClick={() => setActivePanel('image')} className={`tab-button ${activePanel === 'image' ? 'active' : ''}`}>Image Gallery</button>
-                         <button onClick={() => setActivePanel('code')} className={`tab-button ${activePanel === 'code' || activePanel === 'liveEditor' ? 'active' : ''}`}>Code</button>
-                        <button onClick={() => setActivePanel('youtube')} className={`tab-button ${activePanel === 'youtube' ? 'active' : ''}`}>YouTube</button>
-                        <button onClick={() => setActivePanel('video')} className={`tab-button ${activePanel === 'video' ? 'active' : ''}`}>Video</button>
-                         <button onClick={() => setActivePanel('email')} className={`tab-button ${activePanel === 'email' ? 'active' : ''}`}>Email</button>
-                        <button onClick={() => setActivePanel('lyrics')} className={`tab-button ${activePanel === 'lyrics' ? 'active' : ''} ${!songLyrics ? 'hidden' : ''}`}>Now Singing</button>
-                        <button onClick={() => setActivePanel('weather')} className={`tab-button ${activePanel === 'weather' ? 'active' : ''}`}>Weather</button>
-                        <button onClick={() => setActivePanel('news')} className={`tab-button ${activePanel === 'news' ? 'active' : ''}`}>News</button>
-                        <button onClick={() => setActivePanel('timer')} className={`tab-button ${activePanel === 'timer' ? 'active' : ''}`}>Timer</button>
-                    </div>
-
-                    {activePanel === 'transcript' && (<>
-                        <div className="flex-grow p-4 overflow-y-auto">{transcriptions.map((entry, index) => {
-                             const downloadUrl = entry.firebaseKey ? localAudioDownloads[entry.firebaseKey] : undefined;
-                             return (<div key={entry.firebaseKey || index} className={`mb-4 chat-bubble-animation flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}><div className="relative group max-w-[85%]"><div className={`inline-block p-3 rounded-lg w-full ${entry.speaker === 'user' ? 'bg-cyan-900/50' : 'bg-assistant-bubble-bg'}`}>
-                                {entry.text === '[Audio Message]' && downloadUrl ? (
-                                    <div className="flex flex-col items-start gap-2">
-                                        <span className="text-sm m-0 leading-relaxed whitespace-pre-wrap italic">[Audio Message]</span>
-                                        <a href={downloadUrl} download="kaniska-recording.webm" className="text-xs font-semibold text-primary-color hover:underline bg-primary-color/10 px-2 py-1 rounded-md border border-primary-color/30 no-underline">
-                                            Download Recording
-                                        </a>
+                        {generatedImages.length > 0 && <button onClick={() => setActivePanel('image')} className={`tab-button ${activePanel === 'image' ? 'active' : ''}`}>Image</button>}
+                        {weatherData && <button onClick={() => setActivePanel('weather')} className={`tab-button ${activePanel === 'weather' ? 'active' : ''}`}>Weather</button>}
+                        {newsArticles.length > 0 && <button onClick={() => setActivePanel('news')} className={`tab-button ${activePanel === 'news' ? 'active' : ''}`}>News</button>}
+                        {timer && <button onClick={() => setActivePanel('timer')} className={`tab-button ${activePanel === 'timer' ? 'active' : ''}`}>Timer</button>}
+                        {youtubeTitle && <button onClick={() => setActivePanel('youtube')} className={`tab-button ${activePanel === 'youtube' ? 'active' : ''}`}>YouTube</button>}
+                        {videoUrl && <button onClick={() => setActivePanel('video')} className={`tab-button ${activePanel === 'video' ? 'active' : ''}`}>Video</button>}
+                        {songLyrics && <button onClick={() => setActivePanel('lyrics')} className={`tab-button ${activePanel === 'lyrics' ? 'active' : ''}`}>Lyrics</button>}
+                        {codeSnippets.length > 0 && <button onClick={() => setActivePanel('code')} className={`tab-button ${activePanel === 'code' ? 'active' : ''}`}>Code</button>}
+                        {liveEditingSnippetId && <button onClick={() => setActivePanel('liveEditor')} className={`tab-button ${activePanel === 'liveEditor' ? 'active' : ''}`}>Live Editor</button>}
+                        {emailRecipient && <button onClick={() => setActivePanel('email')} className={`tab-button ${activePanel === 'email' ? 'active' : ''}`}>Email</button>}
+                    </header>
+                    <div className="flex-grow overflow-y-auto">
+                        {activePanel === 'transcript' && (
+                            <div className="p-4 space-y-4">
+                                {transcriptions.map((t, i) => (
+                                    <div key={t.firebaseKey || i} className={`chat-bubble-animation flex flex-col ${t.speaker === 'user' ? 'items-end' : 'items-start'}`}>
+                                        <div className={`flex items-center gap-2 ${t.speaker === 'user' ? 'flex-row-reverse' : ''}`}>
+                                            <span className="text-xs font-bold text-muted">{t.speaker === 'assistant' ? (mainVoiceGender === 'female' ? 'Kaniska' : 'Kanishk') : 'You'}</span>
+                                            <span className="text-xs text-muted">{t.timestamp.toLocaleTimeString()}</span>
+                                        </div>
+                                        <div className={`mt-1 px-4 py-2 rounded-lg max-w-lg ${t.speaker === 'user' ? 'bg-primary-color/80 text-bg-color' : 'bg-assistant-bubble-bg'}`}>
+                                            {t.text === '[Audio Message]' && t.firebaseKey && localAudioDownloads[t.firebaseKey] ? (
+                                                <audio controls src={localAudioDownloads[t.firebaseKey]} className="w-64 h-10"></audio>
+                                            ) : (
+                                                <p className="m-0 whitespace-pre-wrap">{t.text}</p>
+                                            )}
+                                        </div>
                                     </div>
-                                ) : (
-                                    <p className="text-sm m-0 leading-relaxed whitespace-pre-wrap">{entry.text}</p>
-                                )}
-                             <p className="text-xs text-muted mt-1.5 mb-0 text-right">{new Date(entry.timestamp).toLocaleTimeString()}</p></div><button onClick={() => handleShare({ type: 'text', data: entry.text })} className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-panel-bg border border-border-color text-muted hover:text-primary-color transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100 ${entry.speaker === 'user' ? 'left-0 -translate-x-full ml-[-8px]' : 'right-0 translate-x-full mr-[-8px]'}`} aria-label="Share message"><ShareIcon size={14} /></button></div></div>)
-                        })}<div ref={transcriptEndRef} /></div>
-                        <QuickActions 
-                            onAction={handleQuickAction} 
-                            disabled={assistantState !== 'active'}
-                            isWeatherEnabled={!!apiKeys.weather}
-                            isNewsEnabled={!!apiKeys.news}
-                            isYoutubeEnabled={!!apiKeys.youtube}
-                        />
-                    </>)}
-                    {activePanel === 'image' && (<div className="flex flex-col h-full overflow-hidden">
-                        <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                        {generatedImages.length === 0 ? (<div className="flex-grow flex flex-col items-center justify-center text-muted gap-4"><p>Ask Kaniska to generate an image to see it here.</p><button onClick={() => imageUploadInputRef.current?.click()} className="px-4 py-2 text-sm font-semibold bg-primary-color/20 text-primary-color rounded-lg border border-primary-color/50 hover:bg-primary-color/30 transition">Upload & Edit an Image</button></div>) : (<div className="flex-grow flex flex-col p-4 gap-4 overflow-hidden"><div className="flex-grow flex items-center justify-center bg-black/30 rounded-lg p-2 relative min-h-0">{selectedImage ? (<>{selectedImage.isLoading && <div className="flex flex-col items-center gap-2 text-muted"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div><span>Generating...</span></div>}{selectedImage.error && <div className="text-red-400 text-center p-4"><strong>Error:</strong><br/>{selectedImage.error}</div>}{selectedImage.url && <><img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-full object-contain rounded"/><div className="absolute top-2 right-2 flex flex-col gap-2"><button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: `Check out this image I generated with Kaniska AI: "${selectedImage.prompt}"`, fileName: 'kaniska-image.jpg' })} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Share Image"><ShareIcon size={20} /></button><button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Download Image"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button onClick={() => handleStartLiveEdit(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Live Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" /><path d="m14 7 3 3" /><path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M17 16H9" /></svg></button><button onClick={() => setEditingImage(selectedImage)} className="bg-panel-bg/70 backdrop-blur-sm border border-border-color rounded-full p-2 text-muted hover:text-primary-color hover:border-primary-color transition-all" title="Manual Edit"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg></button></div></>}{!selectedImage.isLoading && <p className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs p-2 rounded max-h-[40%] overflow-y-auto">{selectedImage.prompt}</p>}</>) : (<p className="text-muted">Select an image to view.</p>)}</div><div className="flex-shrink-0"><div className="flex justify-between items-center mb-2 px-1"><h4 className="text-sm font-semibold">Timeline</h4><button onClick={() => imageUploadInputRef.current?.click()} className="text-xs px-2 py-1 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">Upload & Edit</button></div><div className="flex gap-2 overflow-x-auto pb-2">{generatedImages.map(image => (<button key={image.id} onClick={() => setSelectedImage(image)} className={`flex-shrink-0 w-24 h-24 rounded-md overflow-hidden border-2 bg-assistant-bubble-bg transition-all duration-200 ${selectedImage?.id === image.id ? 'border-primary-color scale-105' : 'border-transparent'} hover:border-primary-color/50 focus:outline-none focus:ring-2 focus:ring-primary-color`}>{image.isLoading && <div className="w-full h-full bg-slate-700 animate-pulse"></div>}{image.error && <div className="w-full h-full bg-red-900/50 text-red-300 text-xs p-1 flex items-center justify-center text-center">Failed</div>}{image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover"/>}</button>))}</div></div></div>)}</div>)}
-                    {activePanel === 'code' && (<CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />)}
-                    {activePanel === 'liveEditor' && liveEditingSnippet && (
-                        <LiveCodeEditorPanel
-                            snippet={liveEditingSnippet}
-                            code={liveEditorCode}
-                            onCodeChange={setLiveEditorCode}
-                            onFinish={handleFinishLiveCodeEdit}
-                        />
-                    )}
-                    {activePanel === 'youtube' && (<div className="flex-grow p-4 flex flex-col gap-2 overflow-hidden">
-                        {youtubeTitle && <h3 className="text-lg font-semibold truncate flex-shrink-0 px-2">{youtubeTitle}</h3>}
-                        <div className="youtube-container">
-                            {youtubeError ? (<div className="w-full h-full flex flex-col items-center justify-center bg-black text-red-400 p-4 text-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><p className="font-semibold mb-2">Playback Error</p><p className="text-sm">{youtubeError}</p></div>) : (<div id="youtube-player"></div>)}
-                        </div>
-                        <div className="youtube-controls-container">
-                             <button onClick={handlePreviousVideo} disabled={youtubeQueueIndex <= 0} className="youtube-control-button">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
-                            </button>
-                             <button onClick={handlePlayPause} className="youtube-control-button play-pause-btn">
-                                {isYoutubePlaying ? 
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                    : 
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                }
-                            </button>
-                            <button onClick={handleStop} className="youtube-control-button stop-btn">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                            </button>
-                            <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                            </button>
-                        </div>
-                    </div>)}
-                    {activePanel === 'video' && (<div className="flex-grow flex flex-col items-center justify-center p-4 gap-4 overflow-hidden">
-                        <div className="w-full flex-grow relative bg-black/30 rounded-lg flex items-center justify-center min-h-0">
-                            {videoGenerationState === 'generating' && (
-                                <div className="text-center">
-                                    <div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin mx-auto mb-4"></div>
-                                    <p className="font-semibold text-lg">Generating Video</p>
-                                    <p className="text-sm text-muted">{videoProgressMessage}</p>
-                                </div>
-                            )}
-                            {videoGenerationState === 'error' && <div className="text-red-400 p-4 text-center"><strong>Error:</strong> {videoError}</div>}
-                            {videoUrl && <video src={videoUrl} controls autoPlay className="max-w-full max-h-full object-contain"></video>}
-                            {!videoUrl && videoGenerationState === 'idle' && (
-                                <div className="text-center text-muted">
-                                    <p>Ask Kaniska to generate a video to see it here.</p>
-                                    <p className="text-xs mt-2">Try: "Generate an intro video for yourself"</p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-shrink-0 w-full p-4 border border-border-color rounded-lg bg-assistant-bubble-bg">
-                            <h4 className="font-semibold mb-2">Video Voiceover</h4>
-                            <div className="flex flex-col sm:flex-row gap-4 items-start">
-                                <div className="flex-shrink-0 w-full sm:w-48">
-                                    <video ref={voiceoverVideoRef} src={uploadedVideoUrl || ''} controls muted className={`w-full aspect-video rounded-md bg-black ${!uploadedVideoUrl ? 'hidden' : ''}`}></video>
-                                    <button onClick={() => videoUploadInputRef.current?.click()} className="w-full mt-2 px-3 py-1.5 text-sm bg-primary-color/20 text-primary-color border border-primary-color/50 hover:bg-primary-color/30 transition">Upload Video</button>
-                                    <input type="file" ref={videoUploadInputRef} onChange={handleVideoUpload} accept="video/*" className="hidden" />
-                                </div>
-                                <div className="flex-grow">
-                                    <button onClick={handleGenerateVoiceover} disabled={!uploadedVideoUrl || voiceoverState === 'extracting' || voiceoverState === 'describing' || voiceoverState === 'generating_audio'} className="w-full mb-2 px-3 py-1.5 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition disabled:opacity-50">
-                                        {voiceoverState === 'idle' && 'Generate Voiceover'}
-                                        {voiceoverState === 'extracting' && 'Extracting frames...'}
-                                        {voiceoverState === 'describing' && 'Generating script...'}
-                                        {voiceoverState === 'generating_audio' && 'Creating audio...'}
-                                        {voiceoverState === 'done' && 'Re-generate Voiceover'}
-                                        {voiceoverState === 'error' && 'Retry Voiceover'}
-                                    </button>
-                                    {voiceoverState !== 'idle' && <p className="text-xs text-muted text-center">{voiceoverProgress}</p>}
-                                    {voiceoverError && <p className="text-xs text-red-400 mt-2">{voiceoverError}</p>}
-                                    {videoDescription && (
-                                        <div className="mt-2 p-2 bg-black/20 rounded-md text-xs max-h-24 overflow-y-auto">
-                                            <h5 className="font-semibold text-muted">Generated Script:</h5>
-                                            <p className="whitespace-pre-wrap">{videoDescription}</p>
-                                        </div>
-                                    )}
-                                    {voiceoverAudioUrl && (
-                                        <div className="mt-2">
-                                            <audio ref={voiceoverAudioRef} src={voiceoverAudioUrl} controls className="w-full"></audio>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>)}
-                    {activePanel === 'lyrics' && songLyrics && (
-                        <div className="flex-grow flex flex-col items-center justify-center p-4 text-center overflow-y-auto">
-                            <h3 className="text-xl font-bold">{songLyrics.name}</h3>
-                            <p className="text-md text-muted mb-6">{songLyrics.artist}</p>
-                            <div className="space-y-2 max-w-lg">
-                                {songLyrics.lyrics.map((line, index) => (
-                                    <p key={index} className={`transition-all duration-300 text-lg ${index === songLyrics.currentLine ? 'text-primary-color font-bold scale-110' : 'text-muted'}`}>{line}</p>
                                 ))}
+                                <div ref={transcriptEndRef} />
                             </div>
-                        </div>
-                    )}
-                    {activePanel === 'email' && (
-                        <EmailPanel 
-                            recipient={emailRecipient} 
-                            subject={emailSubject} 
-                            body={emailBody}
-                            onRecipientChange={setEmailRecipient}
-                            onSubjectChange={setEmailSubject}
-                            onBodyChange={setEmailBody}
-                            onSend={handleSendEmail}
-                        />
-                    )}
-                    {activePanel === 'weather' && weatherData && <WeatherPanel data={weatherData} />}
-                    {activePanel === 'news' && newsArticles.length > 0 && <NewsPanel articles={newsArticles} />}
-                    {activePanel === 'timer' && timer && <TimerPanel timer={timer} />}
+                        )}
+                        {activePanel === 'image' && (
+                             <div className="grid grid-cols-1 md:grid-cols-2 h-full">
+                                <div className="p-4 overflow-y-auto border-r border-border-color">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold">Image Gallery</h3>
+                                        <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                                        <button onClick={() => imageUploadInputRef.current?.click()} className="quick-action-button">Upload Image</button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        {generatedImages.map(img => (
+                                            <div key={img.id} onClick={() => setSelectedImage(img)} className={`relative aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${selectedImage?.id === img.id ? 'border-primary-color' : 'border-transparent'}`}>
+                                                {img.isLoading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><div className="w-6 h-6 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>}
+                                                {img.error && <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center text-center p-2 text-xs text-red-300">{img.error}</div>}
+                                                {img.url && <img src={img.url} alt={img.prompt} className="w-full h-full object-cover" />}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="p-4 flex flex-col items-center justify-center">
+                                    {selectedImage?.url ? (
+                                        <>
+                                            <img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-[60%] object-contain rounded-lg shadow-lg" />
+                                            <p className="text-sm text-muted mt-4 text-center">{selectedImage.prompt}</p>
+                                            <div className="mt-4 flex gap-2">
+                                                <button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="quick-action-button">Download</button>
+                                                <button onClick={() => setEditingImage(selectedImage)} className="quick-action-button">Manual Edit</button>
+                                                <button onClick={() => handleStartLiveEdit(selectedImage)} disabled={assistantState !== 'active'} title={assistantState !== 'active' ? 'Start a session to use live editing' : ''} className="quick-action-button">Live Edit</button>
+                                                <button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: selectedImage.prompt, fileName: 'generated-image.jpg' })} className="quick-action-button"><ShareIcon size={14}/> Share</button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p className="text-muted">Select an image to view it here.</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {activePanel === 'weather' && weatherData && <WeatherPanel data={weatherData} />}
+                        {activePanel === 'news' && <NewsPanel articles={newsArticles} />}
+                        {activePanel === 'timer' && timer && <TimerPanel timer={timer} />}
+                        {activePanel === 'youtube' && (
+                            <div className="flex flex-col items-center justify-center h-full p-2 gap-2">
+                                <h3 className="text-lg font-semibold truncate max-w-full">{youtubeTitle || 'YouTube Player'}</h3>
+                                {youtubeError ? (
+                                     <div className="flex-grow w-full flex items-center justify-center bg-black/50 rounded-lg p-4 text-center text-red-400">
+                                        <p>{youtubeError}</p>
+                                     </div>
+                                ) : (
+                                    <div id="youtube-player" className="w-full h-full flex-grow rounded-lg overflow-hidden bg-black"></div>
+                                )}
+                                <div className="youtube-controls-container">
+                                    <button onClick={handlePreviousVideo} disabled={youtubeQueueIndex <= 0} className="youtube-control-button"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg></button>
+                                    <button onClick={handlePlayPause} disabled={!youtubeTitle} className="youtube-control-button play-pause-btn">{isYoutubePlaying ? <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> : <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>}</button>
+                                    <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg></button>
+                                    <button onClick={handleStop} disabled={!youtubeTitle} className="youtube-control-button stop-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>
+                                </div>
+                            </div>
+                        )}
+                        {activePanel === 'video' && (
+                            <div className="flex flex-col items-center justify-center h-full p-4 gap-4">
+                                 {videoGenerationState === 'generating' && <div className="text-center"><div className="w-12 h-12 border-4 border-border-color border-t-primary-color rounded-full animate-spin mx-auto mb-4"></div><p className="font-semibold">{videoProgressMessage}</p></div>}
+                                {videoGenerationState === 'error' && <div className="text-center text-red-400"><p className="font-bold">Generation Failed</p><p className="text-sm">{videoError}</p></div>}
+                                {videoGenerationState === 'done' && videoUrl && <video src={videoUrl} controls autoPlay className="max-w-full max-h-full rounded-lg"></video>}
+                            </div>
+                        )}
+                        {activePanel === 'lyrics' && songLyrics && (
+                            <div className="p-4 flex flex-col items-center justify-center text-center h-full">
+                                <h3 className="text-2xl font-bold">{songLyrics.name}</h3>
+                                <p className="text-muted mb-6">{songLyrics.artist}</p>
+                                <div className="w-full max-w-2xl">
+                                    {songLyrics.lyrics.map((line, index) => (
+                                        <p key={index} className={`text-lg transition-all duration-300 ${songLyrics.currentLine === index ? 'font-bold text-primary-color scale-110' : 'text-muted'}`}>{line || '...'}</p>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {activePanel === 'code' && <CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />}
+                        {activePanel === 'liveEditor' && liveEditingSnippet && <LiveCodeEditorPanel snippet={liveEditingSnippet} code={liveEditorCode} onCodeChange={setLiveEditorCode} onFinish={handleFinishLiveCodeEdit} />}
+                        {activePanel === 'email' && <EmailPanel recipient={emailRecipient} subject={emailSubject} body={emailBody} onRecipientChange={setEmailRecipient} onSubjectChange={setEmailSubject} onBodyChange={setEmailBody} onSend={handleSendEmail} />}
+                    </div>
+                    <QuickActions onAction={handleQuickAction} disabled={assistantState !== 'active'} isWeatherEnabled={!!apiKeys.weather} isNewsEnabled={!!apiKeys.news} isYoutubeEnabled={!!apiKeys.youtube} />
                 </section>
             </main>
-            <ImageEditorModal
-                isOpen={!!editingImage}
-                image={editingImage}
-                onClose={() => setEditingImage(null)}
-                onSave={(newUrl) => {
-                    if (editingImage) {
-                        const updatedImage = { ...editingImage, url: newUrl };
-                        setGeneratedImages(prev => prev.map(img => img.id === editingImage.id ? updatedImage : img));
-                        if (selectedImage?.id === editingImage.id) setSelectedImage(updatedImage);
-                    }
-                    setEditingImage(null);
-                }}
-            />
-            <LiveImageEditorModal
-                isOpen={!!liveEditingImage}
-                image={liveEditingImage}
-                filters={liveEditFilters}
-                transform={liveEditTransform}
-                onClose={() => {
-                    sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "Finish live editing." }));
-                    setLiveEditingImage(null);
-                }}
-                onSave={(newUrl) => {
-                    if (liveEditingImage) {
-                        const updatedImage = { ...liveEditingImage, url: newUrl };
-                        setGeneratedImages(prev => prev.map(img => img.id === liveEditingImage.id ? updatedImage : img));
-                        if (selectedImage?.id === liveEditingImage.id) setSelectedImage(updatedImage);
-                    }
-                    setLiveEditingImage(null);
-                }}
-                onReset={() => {
-                    setLiveEditFilters(initialFilters);
-                    setLiveEditTransform(initialTransforms);
-                }}
-            />
+            <ImageEditorModal isOpen={!!editingImage} image={editingImage} onClose={() => setEditingImage(null)} onSave={(url) => { if(editingImage) { setGeneratedImages(p => p.map(i => i.id === editingImage.id ? {...i, url} : i)); setSelectedImage(p => p?.id === editingImage.id ? {...p, url} : p); } setEditingImage(null); }} />
+            <LiveImageEditorModal isOpen={!!liveEditingImage} image={liveEditingImage} filters={liveEditFilters} transform={liveEditTransform} onClose={() => { setLiveEditingImage(null); sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: 'Live editing session finished.' })); }} onSave={(url) => { if(liveEditingImage) { setGeneratedImages(p => p.map(i => i.id === liveEditingImage.id ? {...i, url} : i)); setSelectedImage(p => p?.id === liveEditingImage.id ? {...p, url} : p); } setLiveEditingImage(null); }} onReset={() => { setLiveEditFilters(initialFilters); setLiveEditTransform(initialTransforms); sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: 'Reset the image to its original state.' })); }} />
             <WebsitePreviewModal preview={websitePreview} onClose={() => setWebsitePreview(null)} />
-            <SettingsModal
-                isOpen={isSettingsModalOpen}
+            <SettingsModal 
+                isOpen={isSettingsModalOpen} 
                 onClose={() => setIsSettingsModalOpen(false)}
                 avatars={avatars}
                 currentAvatar={currentAvatar}
                 onSelectAvatar={setCurrentAvatar}
-                onUploadAvatar={(newAvatar) => setAvatars(prev => [newAvatar, ...prev])}
+                onUploadAvatar={(newAvatar) => { setAvatars(prev => [...prev.filter(a => !a.startsWith('data:')), newAvatar]); setCurrentAvatar(newAvatar); }}
                 onGenerateAvatar={handleGenerateAvatar}
                 generatedAvatarResult={generatedAiAvatar}
                 customGreeting={customGreeting}
@@ -3230,12 +3212,16 @@ export const App: React.FC = () => {
                 customSystemPrompt={customSystemPrompt}
                 onSaveSystemPrompt={handleSaveSystemPrompt}
                 onClearHistory={handleClearHistory}
+                mainVoiceGender={mainVoiceGender}
+                onSetMainVoiceGender={setMainVoiceGender}
                 selectedVoice={selectedVoice}
                 onSelectVoice={setSelectedVoice}
                 voicePitch={voicePitch}
                 onSetVoicePitch={setVoicePitch}
                 voiceSpeed={voiceSpeed}
                 onSetVoiceSpeed={setVoiceSpeed}
+                greetingVoiceGender={greetingVoiceGender}
+                onSetGreetingVoiceGender={setGreetingVoiceGender}
                 greetingVoice={greetingVoice}
                 onSetGreetingVoice={setGreetingVoice}
                 greetingPitch={greetingPitch}
@@ -3243,34 +3229,17 @@ export const App: React.FC = () => {
                 greetingSpeed={greetingSpeed}
                 onSetGreetingSpeed={setGreetingSpeed}
                 speakText={speakText}
-                aiRef={aiRef.current}
-                voiceTrainingData={voiceTrainingData}
-                setVoiceTrainingData={setVoiceTrainingData}
-                onAnalyzeVoice={handleAnalyzeVoice}
+                onStartSupportChat={() => {
+                    setIsSettingsModalOpen(false);
+                    if (assistantState === 'active') { disconnectFromGemini(); }
+                    setIsSupportChatActive(true);
+                    setTimeout(connectToGemini, 500); // Wait a bit before reconnecting
+                }}
                 userId={userIdRef.current}
                 apiKeys={apiKeys}
                 onSaveApiKeys={handleSaveApiKeys}
                 onResetGeminiKey={handleResetApiKeys}
             />
-            {shareContent && (
-                <div className="modal-overlay" onClick={() => setShareContent(null)}>
-                    <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <header className="flex items-center justify-between p-4 border-b border-border-color">
-                            <h2 className="text-lg font-semibold">Share Content</h2>
-                            <button onClick={() => setShareContent(null)} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
-                        </header>
-                        <div className="p-6 text-center">
-                            {shareContent.type === 'image' && <img src={shareContent.content} alt={shareContent.prompt} className="max-w-full max-h-[50vh] object-contain mx-auto rounded-md mb-4" />}
-                            {shareContent.type === 'video' && <video src={shareContent.content} controls className="max-w-full max-h-[50vh] object-contain mx-auto rounded-md mb-4" />}
-                            <p className="text-sm text-muted mb-4">{shareContent.prompt}</p>
-                            <p className="text-xs">Web Share API not available. You can download the content to share it.</p>
-                        </div>
-                        <footer className="flex justify-end p-4 border-t border-border-color gap-2">
-                            <button onClick={() => setShareContent(null)} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Close</button>
-                        </footer>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
