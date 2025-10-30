@@ -1836,7 +1836,7 @@ export const App: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen w-screen flex flex-col bg-bg-color text-text-color">
+        <div className="min-h-screen w-screen flex flex-col bg-bg-color text-text-color pb-24">
             {/* --- Modals --- */}
             <SettingsModal
                 isOpen={showSettingsModal}
@@ -1864,7 +1864,7 @@ export const App: React.FC = () => {
             <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border-color">
                 <div className="flex items-center gap-3">
                     <HologramIcon />
-                    <h1 className="text-xl font-bold glowing-text">Kaniska</h1>
+                    <h1 className="text-xl font-bold glowing-text font-mono tracking-widest uppercase">Kaniska</h1>
                 </div>
                 <div className="flex items-center gap-4">
                     <Clock />
@@ -1932,7 +1932,7 @@ export const App: React.FC = () => {
                 </div>
             </main>
 
-            <footer className="flex-shrink-0 p-3 border-t border-border-color flex items-center justify-around">
+            <footer className="fixed bottom-0 left-0 right-0 z-20 bg-bg-color p-3 border-t border-border-color flex items-center justify-around">
                  <button onClick={() => assistantState === 'active' ? disconnect() : connect()} className={`footer-button ${assistantState === 'active' ? 'active' : ''}`}>
                     {assistantState === 'active' ? 
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>

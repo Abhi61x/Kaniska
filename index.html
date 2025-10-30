@@ -60,7 +60,7 @@
 
       .glowing-text {
         color: var(--primary-color);
-        text-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+        text-shadow: 0 0 5px rgba(34, 211, 238, 0.3), 0 0 10px rgba(34, 211, 238, 0.5), 0 0 18px rgba(34, 211, 238, 0.7);
       }
       html[data-theme='light'] .glowing-text {
         text-shadow: none;
@@ -476,6 +476,12 @@
         border-radius: 6px;
         border: 1px solid var(--border-color);
         letter-spacing: 0.05em;
+      }
+      @media (max-width: 640px) {
+        .header-clock {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+        }
       }
       
       /* --- News Panel --- */
