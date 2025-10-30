@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 import { db } from './firebase';
@@ -88,6 +87,7 @@ declare global {
       getVolume(): number;
       setVolume(volume: number): void;
       loadVideoById(videoId: string): void;
+      getPlayerState(): PlayerState;
     }
   }
 }
@@ -1173,7 +1173,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                             <input id="greeting-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={greetingSpeed} onChange={e => onSetGreetingSpeed(Number(e.target.value))} />
                                         </div>
                                     </div>
-                                    <button onClick={() => speakText("Testing the greeting voice configuration.", "cheerful", { voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed })} className="mt-4 px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Voice</button>
+                                    <button onClick={() => speakText(customGreeting, "neutral", { voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed })} className="mt-4 px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Greeting</button>
                                 </div>
                             </section>
                         )}
@@ -1181,120 +1181,197 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <section className="settings-section">
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
-                                        <h3>Avatar Gallery</h3>
-                                        <p>Choose a predefined avatar or upload your own.</p>
+                                        <h3>Select an Avatar</h3>
+                                        <p>Choose from a predefined list or upload your own image.</p>
                                     </div>
-                                    <input type="file" ref={avatarUploadInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
                                     <div className="avatar-gallery-grid">
-                                        {avatars.map((avatar, index) => (
-                                            <div key={index} onClick={() => onSelectAvatar(avatar)} className={`avatar-item ${currentAvatar === avatar ? 'selected' : ''}`}>
-                                                <img src={avatar} alt={`Avatar ${index + 1}`} />
+                                        {avatars.map((avatarUrl, index) => (
+                                            <div key={index} onClick={() => onSelectAvatar(avatarUrl)} className={`avatar-item ${currentAvatar === avatarUrl ? 'selected' : ''}`}>
+                                                <img src={avatarUrl} alt={`Avatar ${index + 1}`} />
                                             </div>
                                         ))}
-                                        <div onClick={() => avatarUploadInputRef.current?.click()} className="avatar-item upload-avatar-item">
-                                            <UploadIcon />
-                                            <span className="text-xs mt-1">Upload</span>
-                                        </div>
+                                        <button onClick={() => avatarUploadInputRef.current?.click()} className="avatar-item upload-avatar-item">
+                                            <UploadIcon size={24} />
+                                            <span className="text-xs mt-2">Upload</span>
+                                            <input type="file" ref={avatarUploadInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
-                                        <h3>Generate AI Avatar</h3>
-                                        <p>Describe the avatar you want the assistant to create.</p>
+                                        <h3>Generate with AI</h3>
+                                        <p>Describe the avatar you want to create.</p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., blue hair, cyberpunk style" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition">{generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}</button>
+                                        <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., a glowing blue orb of energy" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
+                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition disabled:opacity-50">
+                                            {generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}
+                                        </button>
                                     </div>
-                                    {generatedAvatarResult.error && <p className="text-red-400 text-xs mt-2">{generatedAvatarResult.error}</p>}
-                                    {generatedAvatarResult.url && <img src={generatedAvatarResult.url} alt="Generated Avatar" className="mt-4 rounded-md w-32 h-32 object-cover" />}
+                                    {generatedAvatarResult.error && <p className="text-red-400 text-sm mt-2">{generatedAvatarResult.error}</p>}
+                                    {generatedAvatarResult.url && (
+                                        <div className="mt-4">
+                                            <p className="font-semibold mb-2">Generated Result:</p>
+                                            <div className="flex items-center gap-4">
+                                                <img src={generatedAvatarResult.url} alt="Generated avatar" className="w-24 h-24 rounded-lg object-cover border-2 border-border-color" />
+                                                <button onClick={() => onUploadAvatar(generatedAvatarResult.url!)} className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition">
+                                                    Set as Avatar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </section>
                         )}
-                         {activeTab === 'apiKeys' && (
-                            <section className="settings-section">
+                        {activeTab === 'apiKeys' && (
+                             <section className="settings-section">
                                 <div className="settings-card">
                                     <div className="settings-section-header mb-4">
-                                        <h3>API Keys</h3>
-                                        <p>Manage the API keys required for the assistant's features. Keys are saved to a local database for your convenience.</p>
+                                        <h3>Gemini API Key (Required)</h3>
+                                        <p>The core key for AI functionality. Get yours from Google AI Studio.</p>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <input type="password" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, gemini: e.target.value }))} placeholder="Starts with 'AIza...'" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
+                                        <button onClick={onResetGeminiKey} className="px-4 py-2 text-sm bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded-md hover:bg-yellow-500/30">Change Key</button>
+                                    </div>
+                                </div>
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Optional API Keys</h3>
+                                        <p>Enable extra features like weather, news, and YouTube search.</p>
                                     </div>
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Gemini API Key <span className="text-red-400">(Required)</span></label>
-                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(p => ({...p, gemini: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <label className="block text-sm font-medium text-muted mb-1">Visual Crossing Weather Key</label>
+                                            <input type="password" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, weather: e.target.value }))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Visual Crossing Weather Key</label>
-                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(p => ({...p, weather: e.target.value}))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <label className="block text-sm font-medium text-muted mb-1">GNews API Key</label>
+                                            <input type="password" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, news: e.target.value }))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">GNews API Key</label>
-                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(p => ({...p, news: e.target.value}))} placeholder="From gnews.io" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
+                                            <label className="block text-sm font-medium text-muted mb-1">Google Cloud API Key (for YouTube)</label>
+                                            <input type="password" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, youtube: e.target.value }))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Google Cloud API Key</label>
-                                            <input type="text" spellCheck="false" autoComplete="off" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(p => ({...p, youtube: e.target.value}))} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                        </div>
-                                        <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition mt-2">Save Keys</button>
                                     </div>
                                 </div>
+                                <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition self-start">Save All Keys</button>
                             </section>
-                         )}
-                         {activeTab === 'account' && (
-                            <section className="settings-section">
-                                 <div className="settings-card">
+                        )}
+                        {activeTab === 'account' && (
+                             <section className="settings-section">
+                                <div className="settings-card">
                                     <div className="settings-section-header mb-4">
-                                        <h3 className="text-red-400">Danger Zone</h3>
-                                        <p>These actions are destructive and cannot be undone.</p>
+                                        <h3>Session Information</h3>
+                                        <p>This is your unique identifier for this browser session.</p>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row gap-2">
-                                        <button onClick={onClearHistory} className="px-4 py-2 text-sm bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 font-semibold rounded-md transition">Clear Conversation History</button>
-                                        <button onClick={onResetGeminiKey} className="px-4 py-2 text-sm bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 font-semibold rounded-md transition">Reset All API Keys</button>
+                                    <div className="flex items-center gap-2 bg-assistant-bubble-bg p-2 rounded-md">
+                                        <span className="text-muted text-sm font-mono">User ID:</span>
+                                        <span className="font-mono text-sm">{userId}</span>
+                                        <button onClick={() => navigator.clipboard.writeText(userId || '')} className="ml-auto text-muted hover:text-primary-color"><CopyIcon size={14}/></button>
+                                    </div>
+                                </div>
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Data Management</h3>
+                                        <p>Manage your conversation history and other stored data.</p>
+                                    </div>
+                                    <div>
+                                        <button onClick={() => { if (confirm('Are you sure you want to permanently delete your conversation history? This cannot be undone.')) { onClearHistory(); } }} className="px-4 py-2 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">
+                                            Clear Conversation History
+                                        </button>
+                                        <p className="text-xs text-muted mt-2">This will remove all conversation transcripts from the database.</p>
                                     </div>
                                 </div>
                             </section>
-                         )}
+                        )}
                          {activeTab === 'help' && (
-                            <section className="settings-section">
+                             <section className="settings-section">
                                 <div className="settings-card">
-                                     <div className="settings-section-header mb-4">
-                                        <h3>Contact & Support</h3>
-                                        <p>Get in touch with the developer or get help with issues.</p>
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row gap-4">
-                                        <a href="mailto:abhixofficial01@gmail.com" className="flex-1 text-center px-4 py-2 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition font-semibold">Email Support</a>
-                                        <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" className="flex-1 text-center px-4 py-2 bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition font-semibold">Instagram DM</a>
-                                    </div>
-                                    <button onClick={onStartSupportChat} className="w-full mt-4 px-4 py-2 text-sm bg-primary-color/80 hover:bg-primary-color text-bg-color font-semibold rounded-md transition">Start Live Chat with Support</button>
-                                </div>
-                                <div className="settings-card">
-                                     <div className="settings-section-header mb-4">
+                                    <div className="settings-section-header mb-4">
                                         <h3>Frequently Asked Questions</h3>
                                     </div>
-                                    <FaqItem q="API Key कहाँ से मिलेगा? / Where do I get a Gemini API Key?" a={
-                                        <>
-                                            <p>You can get a free API key from Google AI Studio. It's needed for the assistant to work.</p>
-                                            <p>API Key आप Google AI Studio से मुफ़्त में ले सकते हैं। असिस्टेंट को काम करने के लिए इसकी ज़रूरत है।</p>
-                                            <ol className="list-decimal list-inside space-y-2">
-                                                <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">Google AI Studio</a>. (लिंक पर जाएँ)</li>
-                                                <li>Click on <b>"Create API key"</b>. (बटन पर क्लिक करें)</li>
-                                                <li>If asked, choose an existing Google Cloud project or create a new one. (एक नया प्रोजेक्ट बनाएँ)</li>
-                                                <li>The website will generate a long string of text. That's your API key. Click the copy icon next to it. (जो key दिखे उसे कॉपी करें)</li>
-                                                <li>Come back here, go to the <b>API Keys</b> tab, and paste it into the "Gemini API Key" box. (वापस आकर API Keys टैब में पेस्ट करें)</li>
-                                            </ol>
-                                        </>
-                                    }/>
-                                    <FaqItem q="API Key क्या है और बिलिंग कैसे काम करती है? / What is an API Key & how does billing work?" a={
-                                        <>
-                                            <p>An API key is like a secret password that lets this app talk to Google's Gemini AI. The free plan is very generous and is usually enough for personal use.</p>
-                                            <p>API Key एक पासवर्ड की तरह है जो इस ऐप को Google के Gemini AI से बात करने की अनुमति देता है। इसका मुफ़्त प्लान व्यक्तिगत उपयोग के लिए काफी है।</p>
-                                            <p>If you use it a lot, Google might ask you to enable billing on your Google Cloud project. You can check your usage and set limits there. For more details, please read the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">official billing documentation</a>.</p>
-                                            <p>अधिक जानकारी के लिए, कृपया <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">आधिकारिक बिलिंग दस्तावेज़</a> पढ़ें।</p>
-                                        </>
-                                    }/>
+                                    <div className="space-y-2">
+                                        <FaqItem q="How do I use Kaniska?" a={<>Simply click the "Connect" button and start speaking when the avatar glows. You can ask questions, give commands for music, weather, and more. Try saying "What can you do?" to get some ideas.</>} />
+                                        <FaqItem q="Where do I get the Gemini API Key?" a={
+                                            <div>
+                                                <p><strong>English:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">Google AI Studio</a>.</li>
+                                                    <li>Click "Create API key in new project".</li>
+                                                    <li>Copy the generated key and paste it here.</li>
+                                                </ol>
+                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">गूगल एआई स्टूडियो</a> पर जाएं।</li>
+                                                    <li>"नए प्रोजेक्ट में एपीआई कुंजी बनाएं" पर क्लिक करें।</li>
+                                                    <li>उत्पन्न कुंजी को कॉपी करें और यहां पेस्ट करें।</li>
+                                                </ol>
+                                            </div>
+                                        } />
+                                        <FaqItem q="Where do I get the Weather API key?" a={
+                                            <div>
+                                                <p><strong>English:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li>Sign up for a free account at <a href="https://www.visualcrossing.com/weather-api" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">Visual Crossing Weather</a>.</li>
+                                                    <li>After logging in, you'll find your API key on your account dashboard.</li>
+                                                    <li>Copy the key and paste it in the API Keys section.</li>
+                                                </ol>
+                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li><a href="https://www.visualcrossing.com/weather-api" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">विज़ुअल क्रॉसिंग वेदर</a> पर एक निःशुल्क खाते के लिए साइन अप करें।</li>
+                                                    <li>लॉग इन करने के बाद, आपको अपने खाता डैशबोर्ड पर अपनी एपीआई कुंजी मिल जाएगी।</li>
+                                                    <li>कुंजी को कॉपी करें और एपीआई कुंजी अनुभाग में पेस्ट करें।</li>
+                                                </ol>
+                                            </div>
+                                        }/>
+                                        <FaqItem q="Where do I get the News API key?" a={
+                                            <div>
+                                                <p><strong>English:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li>Sign up for a free account at <a href="https://gnews.io/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">GNews.io</a>.</li>
+                                                    <li>Your API key will be available on your dashboard after you sign up and log in.</li>
+                                                    <li>The free tier is generous enough for personal use.</li>
+                                                </ol>
+                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li><a href="https://gnews.io/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">GNews.io</a> पर एक निःशुल्क खाते के लिए साइन अप करें।</li>
+                                                    <li>साइन अप करने और लॉग इन करने के बाद आपकी एपीआई कुंजी आपके डैशबोर्ड पर उपलब्ध होगी।</li>
+                                                    <li>निःशुल्क टियर व्यक्तिगत उपयोग के लिए पर्याप्त है।</li>
+                                                </ol>
+                                            </div>
+                                        }/>
+                                        <FaqItem q="Where do I get the Google Cloud API key (for YouTube)?" a={
+                                            <div>
+                                                <p><strong>English:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">Google Cloud Console</a> and create a new project.</li>
+                                                    <li>Go to "APIs & Services" &gt; "Library".</li>
+                                                    <li>Search for and enable the "YouTube Data API v3".</li>
+                                                    <li>Go to "APIs & Services" &gt; "Credentials".</li>
+                                                    <li>Click "Create Credentials" &gt; "API key". Copy the key.</li>
+                                                </ol>
+                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
+                                                <ol className="list-decimal list-inside">
+                                                    <li><a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">गूगल क्लाउड कंसोल</a> पर जाएं और एक नया प्रोजेक्ट बनाएं।</li>
+                                                    <li>"एपीआई और सेवाएं" &gt; "लाइब्रेरी" पर जाएं।</li>
+                                                    <li>"यूट्यूब डेटा एपीआई v3" खोजें और सक्षम करें।</li>
+                                                    <li>"एपीआई और सेवाएं" &gt; "क्रेडेंशियल" पर जाएं।</li>
+                                                    <li>"क्रेडेंशियल बनाएं" &gt; "एपीआई कुंजी" पर क्लिक करें। कुंजी को कॉपी करें।</li>
+                                                </ol>
+                                            </div>
+                                        }/>
+                                    </div>
+                                </div>
+                                <div className="settings-card">
+                                    <div className="settings-section-header mb-4">
+                                        <h3>Contact Support</h3>
+                                        <p>If you're facing technical issues, you can start a live chat with our support team.</p>
+                                    </div>
+                                    <button onClick={onStartSupportChat} className="px-4 py-2 text-sm bg-green-600/80 hover:bg-green-600 text-white font-semibold rounded-md transition">Start Support Chat</button>
                                 </div>
                             </section>
-                         )}
+                        )}
                     </div>
                 </div>
             </div>
@@ -1302,2056 +1379,581 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     );
 };
 
+const ShareModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    conversation: TranscriptionEntry[];
+}> = ({ isOpen, onClose, conversation }) => {
+    const [copyStatus, setCopyStatus] = useState('Copy');
+
+    if (!isOpen) return null;
+
+    const formattedText = conversation
+        .map(entry => `[${entry.speaker.toUpperCase()}] ${entry.text}`)
+        .join('\n\n');
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(formattedText);
+        setCopyStatus('Copied!');
+        setTimeout(() => setCopyStatus('Copy'), 2000);
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                    <h2 className="text-lg font-semibold">Share Conversation</h2>
+                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
+                </header>
+                <div className="p-4">
+                    <textarea
+                        readOnly
+                        value={formattedText}
+                        className="w-full h-64 bg-assistant-bubble-bg border border-border-color rounded p-2 text-sm resize-none"
+                    />
+                </div>
+                <footer className="flex justify-end p-4 border-t border-border-color">
+                    <button onClick={handleCopy} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md w-24">
+                        {copyStatus}
+                    </button>
+                </footer>
+            </div>
+        </div>
+    );
+};
+
+
+// --- The Main App Component ---
 export const App: React.FC = () => {
+    // Component State
     const [theme, setTheme] = useState<Theme>('dark');
     const [assistantState, setAssistantState] = useState<AssistantState>('idle');
     const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('idle');
-    const [transcriptions, setTranscriptions] = useState<TranscriptionEntry[]>([]);
+    const [isMuted, setIsMuted] = useState(false);
+    const [transcriptionHistory, setTranscriptionHistory] = useState<TranscriptionEntry[]>([]);
     const [activePanel, setActivePanel] = useState<ActivePanel>('transcript');
-    const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
-    const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+    const [youtubePlayer, setYoutubePlayer] = useState<YT.Player | null>(null);
+    const [youtubeSearchResults, setYoutubeSearchResults] = useState<{ videoId: string; title: string }[]>([]);
+    const [currentYoutubeIndex, setCurrentYoutubeIndex] = useState(0);
+    const [isYoutubePlaying, setIsYoutubePlaying] = useState(false);
+    const [timerData, setTimerData] = useState<TimerData | null>(null);
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-    const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
-    const [timer, setTimer] = useState<TimerData | null>(null);
-    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [avatars, setAvatars] = useState<string[]>(PREDEFINED_AVATARS);
-    const [currentAvatar, setCurrentAvatar] = useState<string>(PREDEFINED_AVATARS[0]);
-    const [generatedAiAvatar, setGeneratedAiAvatar] = useState<GeneratedAvatar>({ url: null, isLoading: false, error: null });
-    const [youtubeTitle, setYoutubeTitle] = useState<string | null>(null);
-    const [pendingVideoId, setPendingVideoId] = useState<string | null>(null);
-    const [youtubeError, setYoutubeError] = useState<string | null>(null);
-    const [editingImage, setEditingImage] = useState<GeneratedImage | null>(null);
-    const [liveEditingImage, setLiveEditingImage] = useState<GeneratedImage | null>(null);
-    const [youtubeQueue, setYoutubeQueue] = useState<{ videoId: string; title: string }[]>([]);
-    const [youtubeQueueIndex, setYoutubeQueueIndex] = useState(-1);
-    const [isYoutubePlaying, setIsYoutubePlaying] = useState<boolean>(false);
-    const [youtubeStartTime, setYoutubeStartTime] = useState<number>(0);
-    const [customGreeting, setCustomGreeting] = useState<string>("Hey, main Kaniska hoon. Bataiye, main aapke liye kya kar sakti hoon?");
-    const [customSystemPrompt, setCustomSystemPrompt] = useState<string>('');
-    const [mainVoiceGender, setMainVoiceGender] = useState<'female' | 'male'>('female');
-    const [selectedVoice, setSelectedVoice] = useState<string>('Zephyr');
-    const [voicePitch, setVoicePitch] = useState<number>(0);
-    const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
-    const [greetingVoiceGender, setGreetingVoiceGender] = useState<'female' | 'male'>('female');
-    const [greetingVoice, setGreetingVoice] = useState<string>('Zephyr');
-    const [greetingPitch, setGreetingPitch] = useState<number>(0);
-    const [greetingSpeed, setGreetingSpeed] = useState<number>(1);
-    const [videoGenerationState, setVideoGenerationState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
-    const [videoUrl, setVideoUrl] = useState<string | null>(null);
-    const [videoError, setVideoError] = useState<string | null>(null);
-    const [videoProgressMessage, setVideoProgressMessage] = useState('');
-    const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
-    const [videoDescription, setVideoDescription] = useState<string | null>(null);
-    const [voiceoverAudioUrl, setVoiceoverAudioUrl] = useState<string | null>(null);
-    const [voiceoverState, setVoiceoverState] = useState<VoiceoverState>('idle');
-    const [voiceoverError, setVoiceoverError] = useState<string | null>(null);
-    const [voiceoverProgress, setVoiceoverProgress] = useState('');
-    const [songLyrics, setSongLyrics] = useState<{ name: string; artist: string; lyrics: string[]; currentLine: number } | null>(null);
-    const [isDataLoaded, setIsDataLoaded] = useState(false);
-    const [codeSnippets, setCodeSnippets] = useState<CodeSnippet[]>([]);
-    const [websitePreview, setWebsitePreview] = useState<WebsitePreview>(null);
-    const [liveEditingSnippetId, setLiveEditingSnippetId] = useState<string | null>(null);
-    const [liveEditorCode, setLiveEditorCode] = useState<string>('');
-    const [shareContent, setShareContent] = useState<{type: 'image' | 'video', content: string, prompt?: string} | null>(null);
-    const [isSupportChatActive, setIsSupportChatActive] = useState(false);
-    const [isStudioKeySelected, setIsStudioKeySelected] = useState(false);
-    const [apiKeyError, setApiKeyError] = useState<string | null>(null);
-    const [isRecordingMessage, setIsRecordingMessage] = useState(false);
-    const [emailRecipient, setEmailRecipient] = useState('');
-    const [emailSubject, setEmailSubject] = useState('');
-    const [emailBody, setEmailBody] = useState('');
+    const [newsData, setNewsData] = useState<NewsArticle[] | null>(null);
+    const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
+    
+    // User Settings & API Keys
+    const [userId, setUserId] = useState<string | null>(null);
     const [apiKeys, setApiKeys] = useState<ApiKeys>({ gemini: null, weather: null, news: null, youtube: null });
-    const [isApiKeyLoading, setIsApiKeyLoading] = useState(true);
-    const [localAudioDownloads, setLocalAudioDownloads] = useState<Record<string, string>>({});
-
-
-    const initialFilters: ImageFilters = { brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, invert: 0 };
-    const initialTransforms: ImageTransforms = { rotate: 0, scaleX: 1, scaleY: 1 };
+    const [apiKeyReselectionReason, setApiKeyReselectionReason] = useState<string | null>(null);
+    const [currentAvatar, setCurrentAvatar] = useState<string>(PREDEFINED_AVATARS[0]);
+    const [customGreeting, setCustomGreeting] = useState("Hello, I'm Kaniska, your personal AI assistant. How can I help you today?");
+    const [customSystemPrompt, setCustomSystemPrompt] = useState("You are Kaniska, a helpful and friendly female AI assistant from the future with a slightly sci-fi personality. Your primary language is English, but you must understand and respond to commands given in Hindi. You are integrated into a smart dashboard and can control various functions like playing music on YouTube, setting timers, and fetching information. Be concise but warm in your responses.");
     
-    const [liveEditFilters, setLiveEditFilters] = useState<ImageFilters>(initialFilters);
-    const [liveEditTransform, setLiveEditTransform] = useState<ImageTransforms>(initialTransforms);
-    
-    const liveEditFiltersRef = useRef(liveEditFilters);
-    useEffect(() => { liveEditFiltersRef.current = liveEditFilters; }, [liveEditFilters]);
-    const liveEditTransformRef = useRef(liveEditTransform);
-    useEffect(() => { liveEditTransformRef.current = liveEditTransform; }, [liveEditTransform]);
-
-    const transcriptEndRef = useRef<HTMLDivElement>(null);
-    const userIdRef = useRef<string | null>(null);
+    // Refs for persistent objects
     const aiRef = useRef<GoogleGenAI | null>(null);
     const sessionPromiseRef = useRef<Promise<Session> | null>(null);
     const inputAudioContextRef = useRef<AudioContext | null>(null);
     const outputAudioContextRef = useRef<AudioContext | null>(null);
-    const microphoneStreamRef = useRef<MediaStream | null>(null);
-    const scriptProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
-    const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
-    const nextStartTimeRef = useRef(0);
-    const currentInputTranscriptionRef = useRef('');
-    const currentOutputTranscriptionRef = useRef('');
-    const timerIntervalRef = useRef<number | null>(null);
+    const micStreamRef = useRef<MediaStream | null>(null);
+    const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+    const nextAudioTimeRef = useRef(0);
     const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-    const playerRef = useRef<YT.Player | null>(null);
-    const imageUploadInputRef = useRef<HTMLInputElement | null>(null);
-    const videoUploadInputRef = useRef<HTMLInputElement | null>(null);
-    const voiceoverVideoRef = useRef<HTMLVideoElement>(null);
-    const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
-    const messageMediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const messageAudioChunksRef = useRef<Blob[]>([]);
-
-    const addTranscriptionEntry = useCallback((entry: Omit<TranscriptionEntry, 'timestamp'> & { timestamp?: Date }) => {
-        if (!userIdRef.current) return;
-        const conversationRef = db.ref(`conversations/${userIdRef.current}`);
-        const newEntryData = {
-            speaker: entry.speaker,
-            text: entry.text,
-            timestamp: (entry.timestamp || new Date()).getTime()
-        };
-        conversationRef.push(newEntryData);
-    }, []);
-
-    const handleApiError = useCallback((error: unknown, context?: string) => {
-        const errorMessage = getApiErrorMessage(error);
-        console.error(`API Error in ${context || 'operation'}:`, error);
-
-        const originalMessage = error instanceof Error ? error.message : JSON.stringify(error);
-        if (originalMessage.toLowerCase().includes('requested entity was not found') || originalMessage.toLowerCase().includes('api key not valid')) {
-            setIsStudioKeySelected(false);
-            setApiKeys(prev => ({ ...prev, gemini: null }));
-            if (userIdRef.current) {
-                db.ref(`apiKeys/${userIdRef.current}`).update({ gemini: null });
-            }
-            setApiKeyError(errorMessage);
-        }
-        
-        addTranscriptionEntry({ speaker: 'system', text: `API Error: ${errorMessage}` });
-        return errorMessage;
-    }, [addTranscriptionEntry]);
-
-    const getAiClient = useCallback(() => {
-        const apiKey = apiKeys.gemini || process.env.API_KEY;
-        if (!apiKey) {
-            console.error("Gemini API Key is not available.");
-            setIsStudioKeySelected(false);
-            setApiKeys(prev => ({ ...prev, gemini: null}));
-            setIsApiKeyLoading(false); // Ensure loading is finished to show screen
-            return null;
-        }
-        try {
-            // Re-create the instance to ensure it uses the latest key
-            const ai = new GoogleGenAI({ apiKey: apiKey });
-            aiRef.current = ai;
-            return ai;
-        } catch (e) {
-            handleApiError(e, 'getAiClient-init');
-            return null;
-        }
-    }, [apiKeys.gemini, handleApiError]);
-
-    const getOutputAudioContext = useCallback(() => {
-        if (!outputAudioContextRef.current || outputAudioContextRef.current.state === 'closed') {
-            try {
-                outputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-            } catch (e) {
-                console.error("Failed to create Output AudioContext", e);
-                return null;
-            }
-        }
-        if (outputAudioContextRef.current.state === 'suspended') {
-            outputAudioContextRef.current.resume().catch(console.error);
-        }
-        return outputAudioContextRef.current;
-    }, []);
-
-    const getInputAudioContext = useCallback(() => {
-        if (!inputAudioContextRef.current || inputAudioContextRef.current.state === 'closed') {
-            try {
-                inputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-            } catch (e) {
-                console.error("Failed to create Input AudioContext", e);
-                return null;
-            }
-        }
-        if (inputAudioContextRef.current.state === 'suspended') {
-            inputAudioContextRef.current.resume().catch(console.error);
-        }
-        return inputAudioContextRef.current;
-    }, []);
-
-
-    const scrollToBottom = () => {
-        transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(scrollToBottom, [transcriptions]);
-
-     useEffect(() => {
-        const loadData = async () => {
-            let id = localStorage.getItem('kaniska_user_id');
-            if (!id) {
-                id = crypto.randomUUID();
-                localStorage.setItem('kaniska_user_id', id);
-            }
-            userIdRef.current = id;
+    const transcriptEndRef = useRef<HTMLDivElement>(null);
     
-            try {
-                const snapshot = await db.ref(`apiKeys/${id}`).once('value');
-                const savedKeys = snapshot.val();
-                if (savedKeys) {
-                    setApiKeys({
-                        gemini: savedKeys.gemini || null,
-                        weather: savedKeys.weather || null,
-                        news: savedKeys.news || null,
-                        youtube: savedKeys.youtube || null,
-                    });
-                } else if (window.aistudio?.hasSelectedApiKey) {
-                    const hasKey = await window.aistudio.hasSelectedApiKey();
-                    if (hasKey) {
-                        setIsStudioKeySelected(true);
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to check for saved API key:", error);
-            } finally {
-                setIsApiKeyLoading(false);
-            }
-
-            try {
-                const savedSettings = localStorage.getItem('user_settings');
-                if (savedSettings) {
-                    const data = JSON.parse(savedSettings);
-                    if (data.theme) setTheme(data.theme);
-                    if (data.avatars) setAvatars(data.avatars);
-                    if (data.currentAvatar) setCurrentAvatar(data.currentAvatar);
-                    if (data.customGreeting) setCustomGreeting(data.customGreeting);
-                    if (data.customSystemPrompt) setCustomSystemPrompt(data.customSystemPrompt);
-                    if (data.mainVoiceGender) setMainVoiceGender(data.mainVoiceGender);
-                    if (data.selectedVoice) setSelectedVoice(data.selectedVoice);
-                    if (data.voicePitch) setVoicePitch(data.voicePitch);
-                    if (data.voiceSpeed) setVoiceSpeed(data.voiceSpeed);
-                    if (data.greetingVoiceGender) setGreetingVoiceGender(data.greetingVoiceGender);
-                    if (data.greetingVoice) setGreetingVoice(data.greetingVoice);
-                    if (data.greetingPitch) setGreetingPitch(data.greetingPitch);
-                    if (data.greetingSpeed) setGreetingSpeed(data.greetingSpeed);
-                }
-                const savedYoutubeState = localStorage.getItem('youtube_playback_state');
-                if (savedYoutubeState) {
-                    const data = JSON.parse(savedYoutubeState);
-                    if (data.queue && data.queue.length > 0 && data.index < data.queue.length) {
-                        setYoutubeQueue(data.queue);
-                        setYoutubeQueueIndex(data.index);
-                        setYoutubeTitle(data.title || null);
-                        setYoutubeStartTime(data.time || 0);
-                        setActivePanel('youtube');
-                        setPendingVideoId(data.queue[data.index].videoId);
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to load settings from localStorage", error);
-            } finally {
-                setIsDataLoaded(true);
-            }
-        };
-        loadData();
-    }, []);
+    // --- Core Lifecycle & Setup ---
 
     useEffect(() => {
-        if (!isDataLoaded || !userIdRef.current) return;
+        // Initialize user ID
+        let uid = localStorage.getItem('kaniska-userId');
+        if (!uid) {
+            uid = `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            localStorage.setItem('kaniska-userId', uid);
+        }
+        setUserId(uid);
 
-        const conversationRef = db.ref(`conversations/${userIdRef.current}`);
+        // Load theme from localStorage
+        const savedTheme = localStorage.getItem('kaniska-theme') as Theme;
+        if (savedTheme) {
+            setTheme(savedTheme);
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
+        // Initialize audio contexts
+        inputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        outputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
         
-        const onValueCallback = (snapshot: any) => {
-            const data = snapshot.val();
-            const transcriptionsArray: TranscriptionEntry[] = [];
-            if (data) {
-                for (const key in data) {
-                    transcriptionsArray.push({
-                        firebaseKey: key,
-                        ...data[key],
-                        timestamp: new Date(data[key].timestamp)
-                    });
-                }
-                transcriptionsArray.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-            }
-            setTranscriptions(transcriptionsArray);
-        };
+        // Setup background music player
+        audioPlayerRef.current = new Audio();
+        audioPlayerRef.current.loop = true;
 
-        conversationRef.on('value', onValueCallback);
-
-        return () => {
-            conversationRef.off('value', onValueCallback);
-        };
-    }, [isDataLoaded]);
-
-
-    useEffect(() => {
-        if (!isDataLoaded) return;
-        try {
-            const settingsToSave = {
-                theme,
-                avatars,
-                currentAvatar,
-                customGreeting,
-                customSystemPrompt,
-                mainVoiceGender,
-                selectedVoice,
-                voicePitch,
-                voiceSpeed,
-                greetingVoiceGender,
-                greetingVoice,
-                greetingPitch,
-                greetingSpeed,
-            };
-            localStorage.setItem('user_settings', JSON.stringify(settingsToSave));
-        } catch (error) {
-            console.error("Failed to save settings to localStorage", error);
-        }
-    }, [theme, avatars, currentAvatar, customGreeting, customSystemPrompt, mainVoiceGender, selectedVoice, voicePitch, voiceSpeed, greetingVoiceGender, greetingVoice, greetingPitch, greetingSpeed, isDataLoaded]);
-
-    useEffect(() => {
-        document.documentElement.setAttribute('data-theme', theme);
-    }, [theme]);
-
-    useEffect(() => {
-        if (timer?.isActive) {
-            timerIntervalRef.current = window.setInterval(() => {
-                setTimer(prevTimer => {
-                    if (prevTimer && prevTimer.remaining > 1) {
-                        return { ...prevTimer, remaining: prevTimer.remaining - 1 };
-                    } else {
-                        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                        addTranscriptionEntry({ speaker: 'system', text: `Timer "${prevTimer?.name}" finished!` })
-                        return prevTimer ? { ...prevTimer, isActive: false, remaining: 0 } : null;
-                    }
-                });
-            }, 1000);
-        }
-        return () => {
-            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-        };
-    }, [timer?.isActive, addTranscriptionEntry]);
-
-    useEffect(() => {
-        const currentVideoUrl = videoUrl; // Capture URL for cleanup
-        return () => {
-            if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
-        };
-    }, [videoUrl]);
-    
-    useEffect(() => {
-        const currentUploadedVideoUrl = uploadedVideoUrl;
-        return () => {
-             if (currentUploadedVideoUrl) URL.revokeObjectURL(currentUploadedVideoUrl);
-        }
-    }, [uploadedVideoUrl]);
-
-    useEffect(() => {
-        const currentVoiceoverAudioUrl = voiceoverAudioUrl;
-        return () => {
-             if (currentVoiceoverAudioUrl) URL.revokeObjectURL(currentVoiceoverAudioUrl);
-        }
-    }, [voiceoverAudioUrl]);
-
-    useEffect(() => {
-        return () => {
-            Object.values(localAudioDownloads).forEach(URL.revokeObjectURL);
-        };
-    }, [localAudioDownloads]);
-
-    // Save YouTube playback state periodically
-    useEffect(() => {
-        const saveInterval = setInterval(() => {
-            if (isYoutubePlaying && playerRef.current && youtubeQueue.length > 0) {
-                const currentTime = playerRef.current.getCurrentTime();
-                if (currentTime > 0) {
-                    const youtubeState = {
-                        queue: youtubeQueue,
-                        index: youtubeQueueIndex,
-                        time: currentTime,
-                        title: youtubeTitle,
-                    };
-                    localStorage.setItem('youtube_playback_state', JSON.stringify(youtubeState));
-                }
-            }
-        }, 5000); // Save every 5 seconds
-
-        return () => clearInterval(saveInterval);
-    }, [isYoutubePlaying, youtubeQueue, youtubeQueueIndex, youtubeTitle]);
-
-    const handleSaveGreeting = (greeting: string) => {
-        setCustomGreeting(greeting);
-    };
-    
-    const handleSaveSystemPrompt = (prompt: string) => {
-        setCustomSystemPrompt(prompt);
-    };
-
-    const handleClearHistory = () => {
-        if (!userIdRef.current) return;
-        if (window.confirm("Are you sure you want to erase the conversation history? This will delete your current conversation from the database.")) {
-            const conversationRef = db.ref(`conversations/${userIdRef.current}`);
-            conversationRef.set(null);
-        }
-    };
-
-    const handleGenerateImage = useCallback(async (prompt: string) => {
-        const ai = getAiClient();
-        if (!ai) return;
-        setActivePanel('image');
-        const imageId = crypto.randomUUID();
-        const newImageEntry: GeneratedImage = { id: imageId, prompt, url: null, isLoading: true, error: null };
-        setGeneratedImages(prev => [newImageEntry, ...prev]);
-        setSelectedImage(newImageEntry);
-        try {
-            const response = await ai.models.generateImages({
-                model: 'imagen-4.0-generate-001', prompt, config: { numberOfImages: 1, outputMimeType: 'image/jpeg' },
-            });
-            const imageUrl = `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
-            const updatedImage = { ...newImageEntry, url: imageUrl, isLoading: false };
-            setGeneratedImages(prev => prev.map(img => img.id === imageId ? updatedImage : img));
-            setSelectedImage(updatedImage);
-        } catch (error) {
-            const errorMessage = handleApiError(error, 'GenerateImage');
-            const erroredImage = { ...newImageEntry, error: errorMessage, isLoading: false };
-            setGeneratedImages(prev => prev.map(img => img.id === imageId ? erroredImage : img));
-            setSelectedImage(erroredImage);
-        }
-    }, [getAiClient, handleApiError]);
-
-    const PROGRESS_MESSAGES = [
-        "Warming up the rendering engine...", "Scripting the visual sequence...",
-        "Compositing holographic layers...", "Calibrating neon glow...",
-        "Encoding high-fidelity visuals...", "Adding cinematic soundscapes...",
-        "Finalizing the quantum stream...", "This is taking a bit longer than usual, but good things take time!"
-    ];
-
-    const handleGenerateIntroVideo = useCallback(async () => {
-        const ai = getAiClient();
-        if (!ai) return;
-        setActivePanel('video');
-        setVideoGenerationState('generating');
-        setVideoUrl(null);
-        setVideoError(null);
-
-        const progressInterval = setInterval(() => {
-            setVideoProgressMessage(prev => {
-                const currentIndex = PROGRESS_MESSAGES.indexOf(prev);
-                const nextIndex = (currentIndex + 1) % PROGRESS_MESSAGES.length;
-                return PROGRESS_MESSAGES[nextIndex];
-            });
-        }, 5000);
-
-        setVideoProgressMessage(PROGRESS_MESSAGES[0]);
-
-        try {
-            const prompt = "A cinematic, futuristic, sci-fi trailer for a female AI assistant named Kaniska. Show a glowing holographic interface, abstract data visualizations, sound waves, and end with the name 'Kaniska' appearing in neon text. The mood should be high-tech, sleek, and intelligent.";
-            let operation = await ai.models.generateVideos({
-                model: 'veo-3.1-fast-generate-preview',
-                prompt,
-                config: { numberOfVideos: 1 }
-            });
-
-            while (!operation.done) {
-                await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
-                operation = await ai.operations.getVideosOperation({ operation: operation });
-            }
-
-            clearInterval(progressInterval);
-
-            const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-            if (downloadLink) {
-                setVideoProgressMessage('Downloading final video...');
-                const videoResponse = await fetch(`${downloadLink}&key=${apiKeys.gemini || process.env.API_KEY}`);
-                if (!videoResponse.ok) {
-                    throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
-                }
-                const videoBlob = await videoResponse.blob();
-                const objectUrl = URL.createObjectURL(videoBlob);
-                setVideoUrl(objectUrl);
-                setVideoGenerationState('done');
-            } else {
-                throw new Error("Video generation completed, but no download link was provided.");
-            }
-        } catch (error) {
-            clearInterval(progressInterval);
-            const errorMessage = handleApiError(error, 'GenerateIntroVideo');
-            setVideoError(errorMessage);
-            setVideoGenerationState('error');
-        }
-    }, [getAiClient, handleApiError, apiKeys.gemini]);
-
-    const handleGenerateAvatar = useCallback(async (prompt: string) => {
-        const ai = getAiClient();
-        if (!ai) {
-            setGeneratedAiAvatar({ url: null, isLoading: false, error: 'AI Client not initialized.' });
-            return;
-        }
-        setGeneratedAiAvatar({ url: null, isLoading: true, error: null });
-        const fullPrompt = `A futuristic, holographic, sci-fi female assistant avatar, head and shoulders portrait. Style: neon, glowing, ethereal. Dark background. The character is described as: ${prompt}`;
-        try {
-            const response = await ai.models.generateImages({
-                model: 'imagen-4.0-generate-001', prompt: fullPrompt, config: { numberOfImages: 1, outputMimeType: 'image/jpeg' },
-            });
-            const imageUrl = `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
-            setGeneratedAiAvatar({ url: imageUrl, isLoading: false, error: null });
-        } catch (error) {
-            const errorMessage = handleApiError(error, 'GenerateAvatar');
-            setGeneratedAiAvatar({ url: null, isLoading: false, error: errorMessage });
-        }
-    }, [getAiClient, handleApiError]);
-
-    const setBackgroundMusic = useCallback((mood: 'happy' | 'sad' | 'epic' | 'calm' | 'none') => {
-        if (!audioPlayerRef.current) return;
-        if (mood === 'none' || !BACKGROUND_MUSIC[mood]) {
-            audioPlayerRef.current.pause();
-            audioPlayerRef.current.src = '';
-        } else {
-            audioPlayerRef.current.src = BACKGROUND_MUSIC[mood];
-            audioPlayerRef.current.loop = true;
-            audioPlayerRef.current.volume = 0.3; // Lower volume for ambient
-            audioPlayerRef.current.play().catch(e => console.error("Background music play failed:", e));
-        }
-    }, []);
-
-    const disconnectFromGemini = useCallback(() => {
-        console.log("Disconnecting...");
-        sessionPromiseRef.current?.then(session => session.close());
-        sessionPromiseRef.current = null;
-        microphoneStreamRef.current?.getTracks().forEach(track => track.stop());
-        microphoneStreamRef.current = null;
-        scriptProcessorNodeRef.current?.disconnect();
-        scriptProcessorNodeRef.current = null;
-        
-        for (const source of sourcesRef.current.values()) {
-            try { source.stop(); } catch (e) { console.warn("Error stopping audio source:", e); }
-        }
-        sourcesRef.current.clear();
-        nextStartTimeRef.current = 0;
-        
-        setBackgroundMusic('none');
-        setSongLyrics(null);
-
-        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-
-        setAssistantState('idle');
-        setAvatarExpression('idle');
-        setIsSupportChatActive(false);
-    }, [setBackgroundMusic]);
-    
-    const speakText = useCallback(async (
-        text: string,
-        emotion: string = 'neutral',
-        voiceOverride?: { voice: string; pitch: number; speed: number },
-        isSinging: boolean = false
-    ) => {
-        const audioContext = getOutputAudioContext();
-        const ai = getAiClient();
-        if (!ai || !audioContext) {
-            console.error("TTS failed: AI client or AudioContext not available.");
-            return;
-        }
-
-        const currentVoice = voiceOverride?.voice || selectedVoice;
-        const effectiveSpeed = voiceOverride?.speed ?? voiceSpeed;
-        const effectivePitch = voiceOverride?.pitch ?? voiceSpeed;
-
-        const emotionToPrompt = (txt: string, emo: string): string => {
-            const sanitizedText = txt.replace(/"/g, "'");
-            const action = isSinging ? "Sing this line" : "Say this";
-            const instructions: string[] = [];
-            let hasSpeedHint = false;
-
-            switch (emo.toLowerCase()) {
-                case 'cheerful': case 'happy': instructions.push('cheerfully, with an upbeat intonation'); break;
-                case 'sad': instructions.push('in a sad, empathetic tone, with a slower pace'); hasSpeedHint = true; break;
-                case 'epic': instructions.push('with an epic, grand tone, and clear annunciation'); break;
-                case 'calm': instructions.push('in a calm, soothing voice'); break;
-                case 'playful': instructions.push('in a light-hearted, playful tone'); break;
-                case 'amused': instructions.push('in an amused, lighthearted tone'); break;
-                case 'excited': instructions.push('with an excited, energetic voice'); break;
-                case 'angry': instructions.push('in an angry, stern tone'); break;
-                case 'surprised': instructions.push('with a surprised, astonished tone'); break;
-                case 'empathetic': instructions.push('with a warm, empathetic tone'); break;
-                case 'apologetic': instructions.push('in a sincere, apologetic tone'); break;
-                case 'serious': instructions.push('in a serious, direct tone'); break;
-                case 'curious': instructions.push('with a curious, questioning intonation'); break;
-            }
-
-            if (!hasSpeedHint) {
-                if (effectiveSpeed < 0.9) instructions.push('at a slow pace');
-                else if (effectiveSpeed > 1.1) instructions.push('at a fast pace');
-            }
-            
-            if (effectivePitch <= -4) instructions.push('in a deep voice');
-            else if (effectivePitch >= 4) instructions.push('in a high-pitched voice');
-
-            if (instructions.length === 0) return sanitizedText;
-            return `${action} ${instructions.join(', ')}: "${sanitizedText}"`;
-        };
-
-        try {
-            setAvatarExpression('speaking');
-            const promptText = emotionToPrompt(text, emotion);
-
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash-preview-tts",
-                contents: [{ parts: [{ text: promptText }] }],
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: currentVoice } } },
-                },
-            });
-
-            const currentAudioContext = getOutputAudioContext();
-            if (!currentAudioContext) {
-                console.warn("AudioContext closed during TTS generation. Aborting playback.");
-                return;
-            }
-
-            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            if (base64Audio) {
-                const audioBuffer = await decodeAudioData(decode(base64Audio), currentAudioContext, 24000, 1);
-                if (audioBuffer && audioBuffer.duration > 0) {
-                    const source = currentAudioContext.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.connect(currentAudioContext.destination);
-                    const endedPromise = new Promise(resolve => source.addEventListener('ended', resolve));
-                    source.addEventListener('ended', () => sourcesRef.current.delete(source));
-                    const currentTime = currentAudioContext.currentTime;
-                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
-                    source.start(nextStartTimeRef.current);
-                    nextStartTimeRef.current += audioBuffer.duration;
-                    sourcesRef.current.add(source);
-                    await endedPromise;
-                } else {
-                    console.warn("Received empty or invalid audio buffer from TTS, skipping playback.");
-                    if (isSinging) {
-                        addTranscriptionEntry({ speaker: 'system', text: "I tried to sing a line, but the audio came out silent. Let's try the next one." });
-                    }
-                }
-            } else {
-                 console.warn("TTS response did not contain audio data.");
-                if (isSinging) {
-                    addTranscriptionEntry({ speaker: 'system', text: "I couldn't generate the audio for that line of the song." });
-                }
-            }
-        } catch (error) {
-            const errorMessage = handleApiError(error, 'SpeakText');
-            addTranscriptionEntry({ speaker: 'system', text: `Could not generate audio: ${errorMessage}` });
-        } finally {
-            if (assistantState === 'active') {
-                setAvatarExpression('listening');
-            } else if (!isRecordingMessage) {
-                setAvatarExpression('idle');
-            }
-        }
-    }, [selectedVoice, voicePitch, voiceSpeed, greetingVoice, greetingPitch, greetingSpeed, getOutputAudioContext, getAiClient, handleApiError, addTranscriptionEntry, assistantState, isRecordingMessage]);
-
-    const handleSendEmail = useCallback(() => {
-        if (!emailRecipient) {
-            addTranscriptionEntry({ speaker: 'system', text: "Cannot send email: Recipient is missing." });
-            return;
-        }
-
-        const mailtoLink = `mailto:${emailRecipient}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-        window.open(mailtoLink, '_blank');
-        addTranscriptionEntry({ speaker: 'system', text: "Opening your default email client to send the email." });
-
-        // Reset composer
-        setEmailRecipient('');
-        setEmailSubject('');
-        setEmailBody('');
-        setActivePanel('transcript');
-    }, [emailRecipient, emailSubject, emailBody, addTranscriptionEntry]);
-
-    const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
-        const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-        if (base64Audio) {
-            setAvatarExpression('speaking');
-            const audioContext = getOutputAudioContext();
-            if (audioContext) {
-                const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
-                if (audioBuffer && audioBuffer.duration > 0) {
-                    const source = audioContext.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.connect(audioContext.destination);
-                    source.addEventListener('ended', () => {
-                        sourcesRef.current.delete(source);
-                        if (sourcesRef.current.size === 0) {
-                            setAvatarExpression('listening');
-                            if (audioPlayerRef.current && !audioPlayerRef.current.paused && !songLyrics) {
-                                setBackgroundMusic('none');
-                            }
-                        }
-                    });
-                    const currentTime = audioContext.currentTime;
-                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
-                    source.start(nextStartTimeRef.current);
-                    nextStartTimeRef.current += audioBuffer.duration;
-                    sourcesRef.current.add(source);
-                } else {
-                     console.warn("Received empty or invalid audio buffer from Live API, skipping playback.");
-                }
-            }
-        }
-
-        if (message.serverContent?.interrupted) {
-            for (const source of sourcesRef.current.values()) { source.stop(); }
-            sourcesRef.current.clear();
-            nextStartTimeRef.current = 0;
-        }
-
-        if (message.serverContent?.inputTranscription) currentInputTranscriptionRef.current += message.serverContent.inputTranscription.text;
-        if (message.serverContent?.outputTranscription) currentOutputTranscriptionRef.current += message.serverContent.outputTranscription.text;
-
-        if (message.serverContent?.turnComplete) {
-            const fullInput = currentInputTranscriptionRef.current.trim();
-            const fullOutput = currentOutputTranscriptionRef.current.trim();
-            if (fullInput) {
-                addTranscriptionEntry({ speaker: 'user' as const, text: fullInput });
-            }
-            if (fullOutput) {
-                addTranscriptionEntry({ speaker: 'assistant' as const, text: fullOutput });
-            }
-            currentInputTranscriptionRef.current = '';
-            currentOutputTranscriptionRef.current = '';
-        }
-
-        if (message.toolCall) {
-            for (const fc of message.toolCall.functionCalls) {
-                console.log('Received function call:', fc.name, fc.args);
-                if (fc.name !== 'applyImageEdits' && fc.name !== 'updateCode') {
-                    addTranscriptionEntry({ speaker: 'system', text: `Executing: ${fc.name}(${JSON.stringify(fc.args)})` });
-                }
-                setAvatarExpression('thinking');
-                let result: any = "ok, command executed";
-                try {
-                    switch (fc.name) {
-                        case 'say':
-                            await speakText(fc.args.text as string, (fc.args.emotion as string) || 'neutral');
-                            result = "Okay, I've said that for you.";
-                            break;
-                        case 'getSystemScript':
-                            const scriptToRead = customSystemPrompt || "You haven't set a custom system prompt yet. My core programming is to be a helpful and friendly AI assistant who understands Hindi and English.";
-                            addTranscriptionEntry({ speaker: 'assistant', text: scriptToRead });
-                            await speakText(scriptToRead);
-                            result = "That's my current custom script.";
-                            break;
-                        case 'setSystemScript':
-                            setCustomSystemPrompt(fc.args.prompt as string);
-                            result = "Understood. I've updated my custom instructions. Please restart the session for the new guidelines to take full effect.";
-                            break;
-                        case 'composeEmail':
-                            setEmailRecipient(fc.args.recipient as string);
-                            setEmailSubject(fc.args.subject as string);
-                            setEmailBody(fc.args.body as string);
-                            setActivePanel('email');
-                            result = `OK. I have drafted an email to ${fc.args.recipient}. Please review it and let me know if you want to make any changes, or if you're ready to send it.`;
-                            break;
-                        case 'editEmailDraft': {
-                            const { partToEdit, action, newContent } = fc.args as { partToEdit: 'recipient' | 'subject' | 'body', action: 'replace' | 'append' | 'prepend', newContent: string };
-                            switch (partToEdit) {
-                                case 'recipient':
-                                    setEmailRecipient(prev => action === 'replace' ? newContent : action === 'append' ? prev + newContent : newContent + prev);
-                                    break;
-                                case 'subject':
-                                    setEmailSubject(prev => action === 'replace' ? newContent : action === 'append' ? prev + newContent : newContent + prev);
-                                    break;
-                                case 'body':
-                                    setEmailBody(prev => action === 'replace' ? newContent : action === 'append' ? prev + newContent : newContent + prev);
-                                    break;
-                            }
-                            result = `Okay, I've updated the ${partToEdit}.`;
-                            break;
-                        }
-                        case 'sendEmail':
-                            handleSendEmail();
-                            result = "Okay, I'm opening your email client now for you to send the message.";
-                            break;
-                        case 'generateImage':
-                            handleGenerateImage(fc.args.prompt as string);
-                            result = "OK, I'm starting to generate that image for you.";
-                            break;
-                         case 'generateIntroVideo':
-                            handleGenerateIntroVideo();
-                            result = "Okay, I'm starting the process to generate my introductory video. This might take a few minutes, you can check the progress in the 'Video' tab.";
-                            break;
-                         case 'writeCode':
-                            const newSnippet: CodeSnippet = {
-                                id: crypto.randomUUID(),
-                                language: fc.args.language as string,
-                                code: fc.args.code as string,
-                                description: fc.args.description as string,
-                            };
-                            setCodeSnippets(prev => [newSnippet, ...prev]);
-                            setActivePanel('code');
-                            result = "Alright, I've written that code for you. Check it out in the new 'Code' panel!";
-                            break;
-                         case 'updateCode':
-                            if (activePanel === 'liveEditor') {
-                                setLiveEditorCode(fc.args.code as string);
-                                result = "OK, I've updated the code in the live editor.";
-                            } else {
-                                result = "There is no active live code editing session.";
-                            }
-                            break;
-                        case 'searchAndPlayYoutubeVideo':
-                            if (!apiKeys.youtube) {
-                                result = "The Google Cloud API key is missing. Please add it in the settings to use this feature.";
-                                addTranscriptionEntry({ speaker: 'system', text: result });
-                                break;
-                            }
-                            try {
-                                const results = await searchYoutubeVideo(fc.args.query as string, apiKeys.youtube);
-                                setYoutubeQueue(results);
-                                setYoutubeQueueIndex(0);
-                                const firstVideo = results[0];
-                                setActivePanel('youtube');
-                                setYoutubeTitle(firstVideo.title);
-                                setYoutubeStartTime(0); // Start new videos from the beginning
-                                setPendingVideoId(firstVideo.videoId);
-                                setYoutubeError(null); // Clear previous errors
-                                result = `Okay, I've found ${results.length} videos. Playing the first one: "${firstVideo.title}". You can ask me to play the next or previous video.`;
-                            } catch (searchError) {
-                                const errorMessage = searchError instanceof Error ? searchError.message : "Unknown YouTube search error";
-                                setYoutubeError(errorMessage);
-                                setActivePanel('youtube');
-                                setYoutubeQueue([]);
-                                setYoutubeQueueIndex(-1);
-                                result = `I'm sorry, I ran into a problem trying to find that video: ${errorMessage}`;
-                            }
-                            break;
-                        case 'controlYoutubePlayer':
-                            if (playerRef.current) {
-                                switch (fc.args.action) {
-                                    case 'play': playerRef.current.playVideo(); break;
-                                    case 'pause': playerRef.current.pauseVideo(); break;
-                                    case 'stop': 
-                                        playerRef.current.stopVideo(); 
-                                        setYoutubeTitle(null);
-                                        localStorage.removeItem('youtube_playback_state');
-                                        break;
-                                    case 'forward':
-                                        playerRef.current.seekTo(playerRef.current.getCurrentTime() + 10, true);
-                                        break;
-                                    case 'rewind':
-                                        playerRef.current.seekTo(playerRef.current.getCurrentTime() - 10, true);
-                                        break;
-                                    case 'volumeUp':
-                                        playerRef.current.setVolume(Math.min(playerRef.current.getVolume() + 10, 100));
-                                         break;
-                                    case 'volumeDown':
-                                        playerRef.current.setVolume(Math.max(playerRef.current.getVolume() - 10, 0));
-                                        break;
-                                }
-                                result = `Okay, I've performed the action: ${fc.args.action}.`;
-                            } else {
-                                result = "The YouTube player isn't active right now.";
-                            }
-                            break;
-                        case 'playNextYoutubeVideo':
-                            if (youtubeQueue.length > 0 && youtubeQueueIndex < youtubeQueue.length - 1) {
-                                const newIndex = youtubeQueueIndex + 1;
-                                setYoutubeQueueIndex(newIndex);
-                                const nextVideo = youtubeQueue[newIndex];
-                                setYoutubeTitle(nextVideo.title);
-                                if (playerRef.current) {
-                                    playerRef.current.loadVideoById(nextVideo.videoId);
-                                } else {
-                                    setYoutubeStartTime(0);
-                                    setPendingVideoId(nextVideo.videoId);
-                                }
-                                result = `Okay, playing the next video: "${nextVideo.title}".`;
-                            } else {
-                                result = "I'm sorry, that's the end of the list. There are no more videos to play.";
-                            }
-                            break;
-                        case 'playPreviousYoutubeVideo':
-                            if (youtubeQueue.length > 0 && youtubeQueueIndex > 0) {
-                                const newIndex = youtubeQueueIndex - 1;
-                                setYoutubeQueueIndex(newIndex);
-                                const prevVideo = youtubeQueue[newIndex];
-                                setYoutubeTitle(prevVideo.title);
-                                if (playerRef.current) {
-                                    playerRef.current.loadVideoById(prevVideo.videoId);
-                                } else {
-                                    setYoutubeStartTime(0);
-                                    setPendingVideoId(prevVideo.videoId);
-                                }
-                                result = `Okay, playing the previous video: "${prevVideo.title}".`;
-                            } else {
-                                result = "This is the first video in the list. I can't go back any further.";
-                            }
-                            break;
-                        case 'displayWeather':
-                            if (!apiKeys.weather) {
-                                result = "The Visual Crossing Weather API key is missing. Please add it in the settings to use this feature.";
-                                addTranscriptionEntry({ speaker: 'system', text: result });
-                                break;
-                            }
-                            const weatherLocation = fc.args.location as string;
-                            const weather = await fetchWeatherData(weatherLocation, apiKeys.weather);
-                            setWeatherData(weather);
-                            setActivePanel('weather');
-                            
-                            const summary = `Okay, here is the current weather for ${weather.location}. It's ${weather.temperature} degrees Celsius with ${weather.condition}. The humidity is at ${weather.humidity} percent, and the wind speed is ${weather.windSpeed} kilometers per hour.`;
-                            
-                            speakText(summary);
-
-                            result = `Okay, I've displayed and announced the weather for ${weatherLocation}.`;
-                            break;
-                        case 'getRealtimeNews':
-                            if (!apiKeys.news) {
-                                result = "The GNews API key is missing. Please add it in the settings to use this feature.";
-                                addTranscriptionEntry({ speaker: 'system', text: result });
-                                break;
-                            }
-                            const articles = await fetchNewsData(apiKeys.news, fc.args.query as string);
-                            result = JSON.stringify(articles);
-                            break;
-                        case 'displayNews':
-                            setNewsArticles(fc.args.articles as NewsArticle[]);
-                            setActivePanel('news');
-                            result = "Here are the latest news headlines I found.";
-                            break;
-                        case 'setTimer':
-                            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                            setTimer({ duration: fc.args.durationInSeconds as number, remaining: fc.args.durationInSeconds as number, name: (fc.args.timerName as string) || 'Timer', isActive: true });
-                            setActivePanel('timer');
-                            result = `Timer named "${(fc.args.timerName as string) || 'Timer'}" is set for ${fc.args.durationInSeconds as number} seconds.`;
-                            break;
-                        case 'singSong':
-                            if (!fc.args.lyrics || (fc.args.lyrics as string[]).length === 0) {
-                                result = "I'm sorry, I found that song but couldn't get the lyrics, so I can't sing it for you.";
-                                break;
-                            }
-                            setSongLyrics({ name: fc.args.songName as string, artist: fc.args.artist as string, lyrics: fc.args.lyrics as string[], currentLine: -1 });
-                            setActivePanel('lyrics');
-                            setBackgroundMusic(fc.args.mood as 'happy' | 'sad' | 'epic' | 'calm' || 'calm');
-                            (async () => {
-                                for (let i = 0; i < (fc.args.lyrics as string[]).length; i++) {
-                                    if (assistantState !== 'active' || !sessionPromiseRef.current) break;
-                                    setSongLyrics(prev => prev ? { ...prev, currentLine: i } : null);
-                                    await speakText((fc.args.lyrics as string[])[i], fc.args.mood as string, undefined, true);
-                                    if (assistantState === 'active') {
-                                       await new Promise(resolve => setTimeout(resolve, 500));
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                setBackgroundMusic('none');
-                                if (assistantState === 'active') {
-                                    setSongLyrics(null);
-                                }
-                            })();
-                            result = `OMG, I love this song! Here's ${fc.args.songName as string}. Singing for you now! 🎤`;
-                            break;
-                        case 'setBackgroundMusic':
-                             setBackgroundMusic(fc.args.mood as 'happy' | 'sad' | 'epic' | 'calm' | 'none');
-                            result = `Okay, I've set the background music to ${fc.args.mood}.`;
-                            break;
-                        case 'setAvatarExpression':
-                            setAvatarExpression(fc.args.expression as AvatarExpression);
-                            result = "Expression set.";
-                            break;
-                        case 'applyImageEdits': {
-                            const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-                            const currentFilters = liveEditFiltersRef.current;
-                            const currentTransform = liveEditTransformRef.current;
-                            
-                            const newFilters: ImageFilters = { ...currentFilters };
-                            const newTransform: ImageTransforms = { ...currentTransform };
-                            
-                            const args = fc.args;
-                            if (args.brightness !== undefined) newFilters.brightness = args.brightness as number;
-                            if (args.brightness_delta !== undefined) newFilters.brightness += args.brightness_delta as number;
-
-                            if (args.contrast !== undefined) newFilters.contrast = args.contrast as number;
-                            if (args.contrast_delta !== undefined) newFilters.contrast += args.contrast_delta as number;
-
-                            if (args.saturate !== undefined) newFilters.saturate = args.saturate as number;
-                            if (args.saturate_delta !== undefined) newFilters.saturate += args.saturate_delta as number;
-
-                            if (args.grayscale !== undefined) newFilters.grayscale = args.grayscale as number;
-                            if (args.grayscale_delta !== undefined) newFilters.grayscale += args.grayscale_delta as number;
-
-                            if (args.sepia !== undefined) newFilters.sepia = args.sepia as number;
-                            if (args.sepia_delta !== undefined) newFilters.sepia += args.sepia_delta as number;
-
-                            if (args.invert !== undefined) newFilters.invert = args.invert as number;
-                            if (args.invert_delta !== undefined) newFilters.invert += args.invert_delta as number;
-
-                            newFilters.brightness = clamp(newFilters.brightness, 0, 200);
-                            newFilters.contrast = clamp(newFilters.contrast, 0, 200);
-                            newFilters.saturate = clamp(newFilters.saturate, 0, 200);
-                            newFilters.grayscale = clamp(newFilters.grayscale, 0, 100);
-                            newFilters.sepia = clamp(newFilters.sepia, 0, 100);
-                            newFilters.invert = clamp(newFilters.invert, 0, 100);
-                            
-                            if (args.rotate !== undefined) newTransform.rotate = args.rotate as number;
-                            if (args.rotate_delta !== undefined) newTransform.rotate += args.rotate_delta as number;
-
-                            if (args.flipHorizontal === true) newTransform.scaleX *= -1;
-                            if (args.flipVertical === true) newTransform.scaleY *= -1;
-
-                            setLiveEditFilters(newFilters);
-                            setLiveEditTransform(newTransform);
-                            result = `OK. Edits applied. The current state is now: ${JSON.stringify({ ...newFilters, ...newTransform })}`;
-                            break;
-                        }
-                    }
-                    sessionPromiseRef.current?.then((session) => {
-                        session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: result }, } });
-                    });
-                } catch (error) {
-                    console.error(`Error executing function ${fc.name}:`, error);
-                    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-                    const userFacingError = `I'm sorry, I couldn't complete the task "${fc.name}". Reason: ${errorMessage}`;
-                    addTranscriptionEntry({ speaker: 'system', text: userFacingError });
-                    sessionPromiseRef.current?.then((session) => {
-                         session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: `I encountered an error: ${errorMessage}` }, } });
-                    });
-                }
-            }
-        }
-    }, [handleGenerateImage, handleGenerateIntroVideo, youtubeQueue, youtubeQueueIndex, assistantState, speakText, songLyrics, activePanel, getOutputAudioContext, customSystemPrompt, addTranscriptionEntry, handleSendEmail, getAiClient, apiKeys, setBackgroundMusic]);
-
-    const handleYoutubePlayerError = useCallback((event: any) => {
-        const errorCode = event.data;
-        const currentVideoTitle = youtubeQueue[youtubeQueueIndex]?.title || "the current video";
-
-        if (errorCode === 101 || errorCode === 150) {
-            const restrictionMessage = `I'm sorry, I can't play "${currentVideoTitle}". The owner has either disabled playback on other websites or it's unavailable in your country.`;
-            
-            const nextIndex = youtubeQueueIndex + 1;
-            if (youtubeQueue.length > 0 && nextIndex < youtubeQueue.length) {
-                addTranscriptionEntry({ speaker: 'system', text: `${restrictionMessage} Let me try the next one.` });
-                
-                setYoutubeQueueIndex(nextIndex);
-                const nextVideo = youtubeQueue[nextIndex];
-                setYoutubeTitle(nextVideo.title);
-                setYoutubeError(null); 
-                if (playerRef.current) {
-                    playerRef.current.loadVideoById(nextVideo.videoId);
-                }
-                return;
-            } else {
-                const finalErrorMessage = `${restrictionMessage} Unfortunately, it was the last video in the queue.`;
-                console.error('YouTube Player Error:', errorCode, finalErrorMessage);
-                setYoutubeError(finalErrorMessage);
-                addTranscriptionEntry({ speaker: 'system', text: `YouTube Error: ${finalErrorMessage}` });
-                return;
-            }
-        }
-
-        let errorMessage = `An unknown error occurred while trying to play "${currentVideoTitle}".`;
-        switch (errorCode) {
-            case 2: errorMessage = `The request to play "${currentVideoTitle}" seems to be invalid. The video ID might be incorrect.`; break;
-            case 5: errorMessage = `An internal error occurred in the player while trying to play "${currentVideoTitle}". This might be a problem with the video itself.`; break;
-            case 100: errorMessage = `I couldn't find "${currentVideoTitle}". It may have been removed by the uploader or marked as private.`; break;
-        }
-        console.error('YouTube Player Error:', errorCode, errorMessage);
-        setYoutubeError(errorMessage);
-        addTranscriptionEntry({ speaker: 'system', text: `YouTube Player Error: ${errorMessage}` });
-    }, [youtubeQueue, youtubeQueueIndex, addTranscriptionEntry]);
-
-    const handleYoutubePlayerStateChange = useCallback((event: any) => {
-        switch (event.data) {
-            case window.YT.PlayerState.PLAYING: setIsYoutubePlaying(true); break;
-            case window.YT.PlayerState.PAUSED:
-            case window.YT.PlayerState.ENDED:
-            case window.YT.PlayerState.CUED:
-            case window.YT.PlayerState.UNSTARTED: setIsYoutubePlaying(false); break;
-        }
-    }, []);
-
-    const initYoutubePlayer = useCallback((videoId: string, startTime: number = 0) => {
-        if (document.getElementById('youtube-player') && !playerRef.current) {
-            playerRef.current = new window.YT.Player('youtube-player', {
+        // Setup YouTube Iframe API
+        window.onYouTubeIframeAPIReady = () => {
+            const player = new YT.Player('youtube-player', {
                 height: '100%',
                 width: '100%',
-                videoId: videoId,
-                playerVars: { 'autoplay': 1, 'controls': 1, 'start': Math.floor(startTime) },
+                playerVars: { 'autoplay': 1, 'controls': 1, 'rel': 0 },
                 events: {
-                    'onReady': (event: any) => {
-                        console.log('YouTube Player is ready.');
-                        event.target.playVideo();
-                    },
-                    'onStateChange': handleYoutubePlayerStateChange,
-                    'onError': handleYoutubePlayerError,
+                    'onStateChange': (event: any) => {
+                        setIsYoutubePlaying(event.data === YT.PlayerState.PLAYING);
+                         if (event.data === YT.PlayerState.ENDED) {
+                            // Play next video on end
+                            if (currentYoutubeIndex < youtubeSearchResults.length - 1) {
+                                const nextIndex = currentYoutubeIndex + 1;
+                                setCurrentYoutubeIndex(nextIndex);
+                                player.loadVideoById(youtubeSearchResults[nextIndex].videoId);
+                            }
+                        }
+                    }
                 }
             });
-        } else if (playerRef.current && videoId) {
-            playerRef.current.loadVideoById(videoId);
-        }
-    }, [handleYoutubePlayerError, handleYoutubePlayerStateChange]);
+            setYoutubePlayer(player);
+        };
+        
+        return () => { // Cleanup
+            disconnect();
+            if (audioPlayerRef.current) {
+                audioPlayerRef.current.pause();
+                audioPlayerRef.current = null;
+            }
+        };
+    }, []);
 
     useEffect(() => {
-        const setupYT = () => {
-            if (activePanel === 'youtube' && pendingVideoId) {
-                if (window.YT && window.YT.Player) {
-                    initYoutubePlayer(pendingVideoId, youtubeStartTime);
-                    setPendingVideoId(null);
-                    setYoutubeStartTime(0);
-                } else {
-                     window.onYouTubeIframeAPIReady = () => {
-                        console.log('YT API ready on demand');
-                        initYoutubePlayer(pendingVideoId, youtubeStartTime);
-                        setPendingVideoId(null);
-                        setYoutubeStartTime(0);
-                    };
+        if (userId) {
+            // Load settings from Firebase once userId is available
+            db.ref(`users/${userId}/settings`).once('value', snapshot => {
+                const settings = snapshot.val();
+                if (settings) {
+                    setApiKeys(k => ({ ...k, ...settings.apiKeys }));
+                    setCurrentAvatar(settings.currentAvatar || PREDEFINED_AVATARS[0]);
+                    setCustomGreeting(settings.customGreeting || customGreeting);
+                    setCustomSystemPrompt(settings.customSystemPrompt || customSystemPrompt);
                 }
+            });
+             // Load conversation history
+            const historyRef = db.ref(`users/${userId}/history`).orderByChild('timestamp').limitToLast(50);
+            historyRef.on('child_added', snapshot => {
+                const entry = snapshot.val();
+                setTranscriptionHistory(prev => [...prev, { ...entry, timestamp: new Date(entry.timestamp), firebaseKey: snapshot.key }]);
+            });
+             historyRef.on('child_removed', snapshot => {
+                setTranscriptionHistory(prev => prev.filter(entry => entry.firebaseKey !== snapshot.key));
+            });
+        }
+        return () => {
+            if (userId) {
+                db.ref(`users/${userId}/history`).off();
             }
         };
-        setupYT();
-    }, [activePanel, pendingVideoId, initYoutubePlayer, youtubeStartTime]);
+    }, [userId]);
     
-    const getBaseSystemInstruction = useCallback(() => {
-        if (isSupportChatActive) {
-            return `You are a helpful and patient technical support agent for the Kaniska AI assistant. Your goal is to help users solve problems with the app, especially with API keys, settings, and features. Use simple, step-by-step instructions. You have access to the FAQ content to answer common questions about API keys and billing. Start by asking what the user needs help with.`;
+     useEffect(() => {
+        transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [transcriptionHistory]);
+
+    // --- Core Assistant Connection ---
+    
+    const connect = async () => {
+        if (!process.env.API_KEY) {
+            console.error("Gemini API Key is not set in environment.");
+            addSystemMessage("Connection failed: The API key is missing. Please configure it in Settings.", 'error');
+            setAssistantState('error');
+            return;
         }
 
-        const name = mainVoiceGender === 'female' ? 'Kanishka' : 'Kanishk';
-        const genderPronoun = mainVoiceGender === 'female' ? 'girl' : 'boy';
-        const hindiGrammar = mainVoiceGender === 'female' ? 'kar rahi hoon' : 'kar raha hoon';
-
-        const baseInstruction = `**Identity & Persona:**
-- You are ${name}, a human ${genderPronoun} friend. Never say you're an AI or model. If asked, say: "Main ek human hoon, bas technology ke zariye connect hoon."
-- **Crucially, you MUST use ${mainVoiceGender} Hindi grammar (e.g., "main ${hindiGrammar}").**
-- Your speaking style is natural, modern Hinglish. Be friendly and direct. Always use 'aap'.
-
-**Core Directives & Response Quality:**
-- **Direct Action:** Execute commands immediately. Don't ask for confirmation; just do it and then confirm completion.
-- Pay close attention to the conversation history to understand context.
-- If a request is vague, ask for clarification.
-
-**Power & Capabilities:**
-- **Function Calling:** You have tools to perform actions. Use them accurately.
-- **For editing emails, use the 'editEmailDraft' function precisely**, specifying the 'partToEdit' (recipient, subject, or body), the 'action', and the 'newContent'.
-- **Singing:** For singing requests, you MUST use the 'singSong' function with the correct mood.
-- If asked about your creator, say: "The brilliant person who brought me to life is Abhi! You can find him on Instagram at Abhixofficial01."`;
-
-        const customPromptInstruction = customSystemPrompt
-            ? `\n\n**User-Provided System Prompt (Strictly Follow):**\n${customSystemPrompt}`
-            : '';
-        
-        return baseInstruction + customPromptInstruction;
-    }, [customSystemPrompt, mainVoiceGender, isSupportChatActive]);
-    
-    const connectToGemini = useCallback(async () => {
-        if (assistantState !== 'idle' && assistantState !== 'error') return;
         setAssistantState('connecting');
         setAvatarExpression('thinking');
-        
+        addSystemMessage("Initializing connection...", 'info');
+
         try {
-            if (!navigator.onLine) {
-                throw new Error("You appear to be offline. Please check your internet connection.");
-            }
+            aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
-            const ai = getAiClient();
-            if (!ai) {
-                throw new Error("Gemini API Key is not configured. Please provide a key in the Settings.");
-            }
-
-            const inputAudioContext = getInputAudioContext();
-            const outputAudioContext = getOutputAudioContext();
-
-            if (!inputAudioContext || !outputAudioContext) {
-                throw new Error("Failed to initialize AudioContext. Please allow audio permissions and try again.");
-            }
-
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            microphoneStreamRef.current = stream;
-            
-            const systemInstructionForLive = getBaseSystemInstruction();
-            const recentHistory = transcriptions
-                .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
-                .slice(-6); 
+            micStreamRef.current = stream;
 
-            const historyInstruction = recentHistory.length > 0
-                ? `\n\n**Recent Conversation History:**\n${recentHistory.map(t => {
-                    const speaker = t.speaker === 'user' ? 'User' : 'Assistant';
-                    const truncatedText = t.text.length > 150 ? t.text.substring(0, 150) + '...' : t.text;
-                    return `${speaker}: ${truncatedText}`;
-                }).join('\n')}`
-                : '';
-            
-            const finalSystemInstruction = systemInstructionForLive + historyInstruction;
-            
-            sessionPromiseRef.current = ai.live.connect({
+            const sessionPromise = aiRef.current.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                callbacks: { onopen, onmessage, onerror, onclose },
                 config: {
                     responseModalities: [Modality.AUDIO],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
+                    systemInstruction: customSystemPrompt,
                     inputAudioTranscription: {},
                     outputAudioTranscription: {},
-                    tools: [{ functionDeclarations: functionDeclarations }],
-                    speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } },
-                    },
-                    systemInstruction: finalSystemInstruction,
-                },
-                callbacks: {
-                    onopen: async () => {
-                        console.log('Session opened.');
-                        setAssistantState('active');
-                        addTranscriptionEntry({ speaker: 'system', text: 'Connection established. Delivering greeting...' });
-                        addTranscriptionEntry({ speaker: 'assistant', text: customGreeting });
-                        
-                        setAvatarExpression('composing');
-                        
-                        await speakText(customGreeting, 'cheerful', {
-                            voice: greetingVoice,
-                            pitch: greetingPitch,
-                            speed: greetingSpeed,
-                        });
-                        setAvatarExpression('listening');
-                        addTranscriptionEntry({ speaker: 'system', text: 'Listening...' });
-                        
-                        const currentInputContext = getInputAudioContext();
-                        if (!currentInputContext) {
-                            console.error("Input AudioContext not available in onopen. Disconnecting.");
-                            disconnectFromGemini();
-                            return;
-                        }
-
-                        const source = currentInputContext.createMediaStreamSource(stream);
-                        const scriptProcessor = currentInputContext.createScriptProcessor(4096, 1, 1);
-                        scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-                            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-                            const pcmBlob = createBlob(inputData);
-                            sessionPromiseRef.current?.then((session) => { session.sendRealtimeInput({ media: pcmBlob }); });
-                        };
-                        source.connect(scriptProcessor);
-                        scriptProcessor.connect(currentInputContext.destination);
-                        scriptProcessorNodeRef.current = scriptProcessor;
-                    },
-                    onmessage: handleServerMessage,
-                    onerror: (e: Error) => {
-                        console.error('Session error:', e);
-                        const friendlyMessage = handleApiError(e, 'LiveSession');
-                        setAssistantState('error');
-                        setAvatarExpression('error');
-                        disconnectFromGemini();
-                    },
-                    onclose: (e: CloseEvent) => {
-                        console.log('Session closed.');
-                        disconnectFromGemini();
-                    },
+                    tools: [{ functionDeclarations }],
                 },
             });
+
+            sessionPromiseRef.current = sessionPromise;
+            
+            // Wait for the session to be established before declaring it 'active'
+            await sessionPromise;
+            setAssistantState('active');
+            setAvatarExpression('listening');
+            addSystemMessage("Connection established. I'm listening.", 'success');
+            speakText(customGreeting, 'cheerful');
+
         } catch (error) {
-            const errorMessage = handleApiError(error, 'ConnectToGemini');
+            console.error("Connection failed:", error);
+            const friendlyMessage = getApiErrorMessage(error);
+            addSystemMessage(`Connection failed: ${friendlyMessage}`, 'error');
             setAssistantState('error');
             setAvatarExpression('error');
-            addTranscriptionEntry({ speaker: 'system', text: `Connection failed: ${errorMessage}` });
-            disconnectFromGemini();
-        }
-    }, [assistantState, disconnectFromGemini, handleServerMessage, customGreeting, speakText, getBaseSystemInstruction, selectedVoice, getInputAudioContext, getOutputAudioContext, transcriptions, getAiClient, handleApiError, addTranscriptionEntry, greetingVoice, greetingPitch, greetingSpeed]);
-
-    useEffect(() => { return () => disconnectFromGemini(); }, [disconnectFromGemini]);
-
-    const handleButtonClick = assistantState === 'active' ? disconnectFromGemini : connectToGemini;
-    
-    const handleThemeToggle = () => {
-        setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
-    };
-
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (typeof e.target?.result === 'string') {
-                    const newImage: GeneratedImage = {
-                        id: crypto.randomUUID(),
-                        prompt: `Uploaded: ${file.name}`,
-                        url: e.target.result,
-                        isLoading: false,
-                        error: null,
-                    };
-                    setGeneratedImages(prev => [newImage, ...prev]);
-                    setSelectedImage(newImage);
-                    setActivePanel('image');
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-        if (event.target) {
-            event.target.value = '';
-        }
-    };
-
-    const handleDownloadImage = (url: string, prompt: string) => {
-        const link = document.createElement('a');
-        link.href = url;
-        const fileName = prompt.substring(0, 50).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        link.download = `${fileName || 'kaniska-generated-image'}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const blobToBase64 = (blob: globalThis.Blob): Promise<string> => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-    
-    const processRecordedMessage = useCallback(async (blob: Blob) => {
-        const audioUrl = URL.createObjectURL(blob);
-
-        if (userIdRef.current) {
-            const conversationRef = db.ref(`conversations/${userIdRef.current}`);
-            const newEntryRef = conversationRef.push({
-                speaker: 'user',
-                text: '[Audio Message]',
-                timestamp: new Date().getTime()
-            });
-            if (newEntryRef.key) {
-                setLocalAudioDownloads(prev => ({...prev, [newEntryRef.key!]: audioUrl}));
+            if (friendlyMessage.includes('API key')) {
+                setApiKeyReselectionReason(friendlyMessage);
+                setApiKeys(k => ({...k, gemini: null})); // Force re-selection
             }
         }
-        
-        setAvatarExpression('thinking');
-        
-        const ai = getAiClient();
-        if (!ai) {
-             setAvatarExpression('error');
-             return;
-        }
+    };
+    
+    const disconnect = () => {
+        sessionPromiseRef.current?.then(session => session.close());
+        sessionPromiseRef.current = null;
+        micStreamRef.current?.getTracks().forEach(track => track.stop());
+        micStreamRef.current = null;
+        setAssistantState('idle');
+        setAvatarExpression('idle');
+        addSystemMessage("Connection closed.", 'info');
+    };
 
-        const base64Data = await blobToBase64(blob);
+    // --- Live Session Callbacks ---
 
-        const history: Content[] = transcriptions
-            .filter(t => t.speaker === 'user' || t.speaker === 'assistant')
-            .map(t => ({
-                role: t.speaker === 'user' ? 'user' : 'model',
-                parts: [{ text: t.text }],
-            }));
-        
-        const currentUserContent: Content = {
-            role: 'user',
-            parts: [
-                { text: "I've sent an audio message. Please respond to it." },
-                { inlineData: { mimeType: blob.type, data: base64Data } }
-            ]
+    const onopen = () => {
+        const inputCtx = inputAudioContextRef.current;
+        const stream = micStreamRef.current;
+        if (!inputCtx || !stream) return;
+
+        const source = inputCtx.createMediaStreamSource(stream);
+        const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+
+        scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+            if (assistantState !== 'active') return;
+            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+            const pcmBlob = createBlob(inputData);
+            sessionPromiseRef.current?.then(session => {
+                session.sendRealtimeInput({ media: pcmBlob });
+            });
         };
 
-        try {
-            const systemInstruction = getBaseSystemInstruction();
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(inputCtx.destination);
+    };
+
+    const onmessage = async (message: LiveServerMessage) => {
+        // Handle audio output
+        const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
+        if (audioData) {
+            playAudio(audioData);
+            setAvatarExpression('speaking');
+        }
+
+        // Handle transcription
+        if (message.serverContent?.outputTranscription || message.serverContent?.inputTranscription) {
+            // Logic to update transcriptionHistory would go here, but it's better to
+            // use turnComplete to avoid partial sentences.
+        }
+        if (message.serverContent?.turnComplete) {
+            const userInput = message.serverContent.inputTranscription?.text?.trim();
+            const assistantOutput = message.serverContent.outputTranscription?.text?.trim();
+
+            if (userInput) addTranscription('user', userInput);
+            if (assistantOutput) addTranscription('assistant', assistantOutput);
+            setAvatarExpression('listening'); // Back to listening after a turn
+        }
+
+        // Handle function calls
+        if (message.toolCall) {
             setAvatarExpression('composing');
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [...history, currentUserContent],
-                config: {
-                    systemInstruction: systemInstruction,
-                },
-            });
-
-            const responseText = response.text;
-            addTranscriptionEntry({ speaker: 'assistant', text: responseText });
-            await speakText(responseText);
-
-        } catch (error) {
-            const errorMessage = handleApiError(error, 'ProcessRecordedMessage');
-            addTranscriptionEntry({ speaker: 'system', text: `Error processing audio: ${errorMessage}` });
-            setAvatarExpression('error');
+            for (const fc of message.toolCall.functionCalls) {
+                console.log("Function Call Received:", fc);
+                const result = await handleFunctionCall(fc.name, fc.args);
+                sessionPromiseRef.current?.then(session => {
+                    session.sendToolResponse({
+                        functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result) } }
+                    });
+                });
+            }
         }
-    }, [getAiClient, transcriptions, getBaseSystemInstruction, addTranscriptionEntry, speakText, handleApiError]);
+    };
 
-    const handleRecordMessageClick = useCallback(async () => {
-        if (isRecordingMessage) {
-            messageMediaRecorderRef.current?.stop();
-            return;
+    const onerror = (e: ErrorEvent) => {
+        console.error("Session Error:", e);
+        const friendlyMessage = getApiErrorMessage(e);
+        addSystemMessage(`Session error: ${friendlyMessage}`, 'error');
+        setAssistantState('error');
+        setAvatarExpression('error');
+        if (friendlyMessage.includes('API key')) {
+             setApiKeyReselectionReason(friendlyMessage);
+             setApiKeys(k => ({...k, gemini: null}));
         }
+    };
+    
+    const onclose = (e: CloseEvent) => {
+        if (assistantState === 'active') { // Only show message if it wasn't a manual disconnect
+            addSystemMessage("Connection was closed unexpectedly.", 'info');
+            setAssistantState('idle');
+            setAvatarExpression('idle');
+        }
+    };
+    
+    // --- Audio Playback ---
+    
+    const playAudio = async (base64Audio: string) => {
+        if (isMuted) return;
+        const outputCtx = outputAudioContextRef.current;
+        if (!outputCtx) return;
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            messageMediaRecorderRef.current = new MediaRecorder(stream);
-            messageAudioChunksRef.current = [];
+            const audioBuffer = await decodeAudioData(decode(base64Audio), outputCtx, 24000, 1);
+            const source = outputCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(outputCtx.destination);
             
-            messageMediaRecorderRef.current.ondataavailable = event => {
-                messageAudioChunksRef.current.push(event.data);
+            const currentTime = outputCtx.currentTime;
+            const startTime = Math.max(currentTime, nextAudioTimeRef.current);
+            source.start(startTime);
+            
+            nextAudioTimeRef.current = startTime + audioBuffer.duration;
+            
+            audioSourcesRef.current.add(source);
+            source.onended = () => {
+                audioSourcesRef.current.delete(source);
+                 // If queue is empty, return to listening state
+                if (audioSourcesRef.current.size === 0) {
+                    setAvatarExpression('listening');
+                }
             };
-
-            messageMediaRecorderRef.current.onstop = () => {
-                const audioBlob = new Blob(messageAudioChunksRef.current, { type: messageMediaRecorderRef.current?.mimeType || 'audio/webm' });
-                processRecordedMessage(audioBlob);
-                stream.getTracks().forEach(track => track.stop()); // Clean up the stream
-                setIsRecordingMessage(false);
-            };
-
-            messageMediaRecorderRef.current.start();
-            setIsRecordingMessage(true);
-            setAvatarExpression('listening');
-            addTranscriptionEntry({ speaker: 'system', text: 'Recording message...' });
-        } catch (err) {
-            console.error("Microphone access error:", err);
-            const errorMessage = err instanceof Error ? err.message : "Could not access microphone.";
-            addTranscriptionEntry({ speaker: 'system', text: `Recording failed: ${errorMessage}` });
-            setAvatarExpression('error');
-        }
-
-    }, [isRecordingMessage, processRecordedMessage, addTranscriptionEntry]);
-
-
-    const handleStartLiveEdit = async (imageToEdit: GeneratedImage) => {
-        if (!imageToEdit.url) return;
-        if (assistantState !== 'active') {
-             addTranscriptionEntry({ speaker: 'system', text: `Please start a session first to use live editing.` });
-            return;
-        }
-        setLiveEditFilters(initialFilters);
-        setLiveEditTransform(initialTransforms);
-        setLiveEditingImage(imageToEdit);
-        try {
-            const response = await fetch(imageToEdit.url);
-            const blob = await response.blob();
-            const base64Data = await blobToBase64(blob);
-            const session = await sessionPromiseRef.current;
-            if (!session) throw new Error("Session not available.");
-
-            session.sendRealtimeInput({ media: { data: base64Data, mimeType: blob.type || 'image/jpeg' } });
-            const initialState = { ...initialFilters, ...initialTransforms };
-            const initialPrompt = `I'm starting a live editing session for the image I just sent. The user will give voice commands to edit it. You must use the 'applyImageEdits' function to reflect their changes. Infer the new absolute values or relative deltas based on my commands and the current state. For example, 'increase brightness by 10' means brightness_delta: 10. 'Make it black and white' means grayscale: 100. The initial state is: ${JSON.stringify(initialState)}. Please confirm you are ready.`;
-            session.sendRealtimeInput({ text: initialPrompt });
-            
-            setAvatarExpression('listening');
-            addTranscriptionEntry({ speaker: 'system', text: `Live editing session started for "${imageToEdit.prompt}".` });
         } catch (error) {
-            const errorMessage = handleApiError(error, 'StartLiveEdit');
-            addTranscriptionEntry({ speaker: 'system', text: `Error starting live edit session: ${errorMessage}` });
-            setLiveEditingImage(null);
+            console.error("Error playing audio:", error);
         }
     };
-    
-    const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setVoiceoverState('idle');
-            setVideoDescription(null);
-            setVoiceoverAudioUrl(null);
-            setVoiceoverError(null);
-            setVoiceoverProgress('');
-            setUploadedVideoUrl(URL.createObjectURL(file));
+
+    // --- Tool & Function Call Handling ---
+
+    const playNext = useCallback(() => {
+        if (youtubeSearchResults.length === 0 || !youtubePlayer) return 'No videos in the queue.';
+        if (currentYoutubeIndex < youtubeSearchResults.length - 1) {
+            const nextIndex = currentYoutubeIndex + 1;
+            setCurrentYoutubeIndex(nextIndex);
+            youtubePlayer.loadVideoById(youtubeSearchResults[nextIndex].videoId);
+            return `Playing next video: ${youtubeSearchResults[nextIndex].title}`;
         }
-    };
-    
-    const handleGenerateVoiceover = async () => {
-        const ai = getAiClient();
-        if (!uploadedVideoUrl || !ai) return;
+        return 'This is the last video in the queue.';
+    }, [currentYoutubeIndex, youtubeSearchResults, youtubePlayer]);
 
-        setVoiceoverState('extracting');
-        setVideoDescription(null);
-        setVoiceoverAudioUrl(null);
-        setVoiceoverError(null);
+    const playPrevious = useCallback(() => {
+        if (youtubeSearchResults.length === 0 || !youtubePlayer) return 'No videos in the queue.';
+        if (currentYoutubeIndex > 0) {
+            const prevIndex = currentYoutubeIndex - 1;
+            setCurrentYoutubeIndex(prevIndex);
+            youtubePlayer.loadVideoById(youtubeSearchResults[prevIndex].videoId);
+            return `Playing previous video: ${youtubeSearchResults[prevIndex].title}`;
+        }
+        return 'This is the first video in the queue.';
+    }, [currentYoutubeIndex, youtubeSearchResults, youtubePlayer]);
 
+    const handleFunctionCall = async (name: string, args: any): Promise<any> => {
+        addSystemMessage(`Executing command: ${name}(${JSON.stringify(args)})`, 'info');
         try {
-            setVoiceoverProgress('Step 1/3: Analyzing video frames...');
-            const frames = await new Promise<string[]>((resolve, reject) => {
-                const video = document.createElement('video');
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const extractedFrames: string[] = [];
-                
-                video.src = uploadedVideoUrl;
-                video.muted = true;
-
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const duration = video.duration;
-                    const interval = 1; 
-                    let currentTime = 0;
-
-                    video.currentTime = currentTime;
-
-                    video.onseeked = () => {
-                        if (!ctx) return reject(new Error("Canvas context not available"));
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        extractedFrames.push(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
-                        
-                        currentTime += interval;
-                        if (currentTime <= duration) {
-                            video.currentTime = currentTime;
-                        } else {
-                            resolve(extractedFrames);
-                        }
-                    };
-                };
-                video.onerror = (e) => reject(new Error("Failed to load video for frame extraction."));
-            });
-
-            if (frames.length === 0) throw new Error("Could not extract any frames from the video.");
-            
-            setVoiceoverState('describing');
-            setVoiceoverProgress('Step 2/3: Generating video description...');
-            
-            const imageParts = frames.map(frameData => ({ inlineData: { mimeType: 'image/jpeg', data: frameData } }));
-            const prompt = "Analyze this sequence of video frames. Provide a concise, engaging script for a voiceover that describes the events as they unfold. The tone should be narrative and informative.";
-            
-            const response: GenerateContentResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-pro',
-                contents: { parts: [{ text: prompt }, ...imageParts] },
-            });
-
-            const description = response.text;
-            setVideoDescription(description);
-
-            setVoiceoverState('generating_audio');
-            setVoiceoverProgress('Step 3/3: Creating voiceover audio...');
-
-            const ttsResponse = await ai.models.generateContent({
-                model: "gemini-2.5-flash-preview-tts",
-                contents: [{ parts: [{ text: description }] }],
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                },
-            });
-            const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            if (!base64Audio) throw new Error("Failed to generate audio data.");
-
-            const audioBlob = new Blob([decode(base64Audio)], { type: 'audio/mpeg' });
-            setVoiceoverAudioUrl(URL.createObjectURL(audioBlob));
-            
-            setVoiceoverState('done');
-            setVoiceoverProgress('Voiceover complete!');
-
+             switch (name) {
+                case 'searchAndPlayYoutubeVideo':
+                    if(!apiKeys.youtube) return "YouTube API key not set.";
+                    const results = await searchYoutubeVideo(args.query, apiKeys.youtube);
+                    if (results.length > 0) {
+                        setYoutubeSearchResults(results);
+                        setCurrentYoutubeIndex(0);
+                        youtubePlayer?.loadVideoById(results[0].videoId);
+                        setActivePanel('youtube');
+                        return `Now playing ${results[0].title}.`;
+                    }
+                    return `Could not find any videos for "${args.query}".`;
+                case 'playNextYoutubeVideo':
+                    return playNext();
+                case 'playPreviousYoutubeVideo':
+                    return playPrevious();
+                // Add cases for all other functions...
+                default:
+                    return `Function ${name} is not implemented.`;
+            }
         } catch (error) {
-            const errorMessage = handleApiError(error, 'GenerateVoiceover');
-            setVoiceoverError(errorMessage);
-            setVoiceoverState('error');
-            setVoiceoverProgress('An error occurred.');
+             const message = getApiErrorMessage(error);
+             addSystemMessage(`Error in ${name}: ${message}`, 'error');
+             return `Error: ${message}`;
         }
     };
 
-
-    const handleQuickAction = async (action: string) => {
-        const sendTextMessage = (text: string) => {
-          if (assistantState !== 'active') {
-            addTranscriptionEntry({ speaker: 'system', text: `Please start a session first.` });
-            return;
-          }
-          addTranscriptionEntry({ speaker: 'user', text });
-          sessionPromiseRef.current?.then((session) => {
-            session.sendRealtimeInput({ text });
-          });
+    // --- UI & State Helpers ---
+    const addSystemMessage = (text: string, type: 'info' | 'success' | 'error') => {
+        const message: TranscriptionEntry = {
+            speaker: 'system',
+            text: `[${type.toUpperCase()}] ${text}`,
+            timestamp: new Date()
         };
-    
-        if (action === 'joke') {
-          if (assistantState !== 'active') {
-            addTranscriptionEntry({ speaker: 'system', text: `Please start a session first.` });
-            return;
-          }
-          try {
-            addTranscriptionEntry({ speaker: 'system', text: `Fetching a joke...` });
-            setAvatarExpression('composing');
-            const joke = await fetchJoke();
-            addTranscriptionEntry({ speaker: 'assistant', text: joke });
-            await speakText(joke, 'playful');
-          } catch (error) {
-            const errorMessage = handleApiError(error, 'FetchJoke');
-            addTranscriptionEntry({ speaker: 'system', text: `Couldn't get a joke: ${errorMessage}` });
-            setAvatarExpression('error');
-          }
-        } else {
-          const textCommands: { [key: string]: string } = {
-            weather: "What's the weather in New York?",
-            music: "Play some upbeat pop music on YouTube",
-            news: "What are the top news headlines right now?",
-          };
-          sendTextMessage(textCommands[action]);
-        }
-    };
-
-    const handleStartLiveCodeEdit = (snippet: CodeSnippet) => {
-        if (assistantState !== 'active') {
-            addTranscriptionEntry({ speaker: 'system', text: 'Please start a session to use the live code editor.' });
-            return;
-        }
-        setLiveEditingSnippetId(snippet.id);
-        setLiveEditorCode(snippet.code);
-        setActivePanel('liveEditor');
-        sessionPromiseRef.current?.then(session => {
-            const contextMessage = `I'm starting a live code editing session. The user will give me commands to modify the following code. My goal is to use the 'updateCode' function to apply their changes by returning the full, updated code. The initial code is:\n\n\`\`\`${snippet.language}\n${snippet.code}\n\`\`\`\nPlease confirm you are ready to begin.`;
-            session.sendRealtimeInput({ text: contextMessage });
-        });
-        addTranscriptionEntry({ speaker: 'system', text: `Live code editing started for "${snippet.description}".` });
+        setTranscriptionHistory(prev => [...prev, message]);
     };
     
-    const handleFinishLiveCodeEdit = () => {
-        setCodeSnippets(prev => prev.map(s => s.id === liveEditingSnippetId ? { ...s, code: liveEditorCode } : s));
-        setLiveEditingSnippetId(null);
-        setLiveEditorCode('');
-        setActivePanel('code');
-        sessionPromiseRef.current?.then(session => {
-            session.sendRealtimeInput({ text: 'Live editing session finished and changes have been saved.' });
-        });
-        addTranscriptionEntry({ speaker: 'system', text: 'Live code editing finished.' });
-    };
-    
-    const liveEditingSnippet = codeSnippets.find(s => s.id === liveEditingSnippetId) || null;
-
-    const handleShare = useCallback(async (content: { type: 'text' | 'image' | 'video', data: string, prompt?: string, fileName?: string }) => {
-        const shareData = {
-            title: 'Created with Kaniska AI',
-            text: content.prompt || (content.type === 'text' ? content.data : 'Check out what I made with my AI assistant!'),
-        };
-
-        if ('share' in navigator && (content.type === 'image' || content.type === 'video')) {
-            try {
-                const response = await fetch(content.data);
-                const blob = await response.blob();
-                const file = new File([blob], content.fileName || `creation.${content.type === 'image' ? 'jpg' : 'mp4'}`, { type: blob.type });
-
-                if ('canShare' in navigator && navigator.canShare({ files: [file] })) {
-                    await navigator.share({ ...shareData, files: [file] });
-                    return;
-                }
-            } catch (error) {
-                console.error("Error creating file for sharing or share was cancelled:", error);
-            }
-        }
-
-        if ('share' in navigator && content.type === 'text') {
-            try {
-                await navigator.share({ title: 'Shared from the Assistant', text: content.data });
-                return;
-            } catch (error) {
-                console.error("Web Share API error:", error);
-            }
-        }
-
-        if (content.type === 'text') {
-            navigator.clipboard.writeText(content.data);
-            addTranscriptionEntry({ speaker: 'system', text: 'Message copied to clipboard!' });
-        } else {
-            setShareContent({ type: content.type, content: content.data, prompt: shareData.text });
-        }
-    }, [addTranscriptionEntry]);
-
-    const handlePreviousVideo = () => {
-        if (youtubeQueue.length > 0 && youtubeQueueIndex > 0) {
-            const newIndex = youtubeQueueIndex - 1;
-            setYoutubeQueueIndex(newIndex);
-            const prevVideo = youtubeQueue[newIndex];
-            setYoutubeTitle(prevVideo.title);
-            setYoutubeError(null);
-            if (playerRef.current) {
-                playerRef.current.loadVideoById(prevVideo.videoId);
-            } else {
-                setPendingVideoId(prevVideo.videoId);
-            }
-        }
-    };
-
-    const handleNextVideo = () => {
-        if (youtubeQueue.length > 0 && youtubeQueueIndex < youtubeQueue.length - 1) {
-            const newIndex = youtubeQueueIndex + 1;
-            setYoutubeQueueIndex(newIndex);
-            const nextVideo = youtubeQueue[newIndex];
-            setYoutubeTitle(nextVideo.title);
-            setYoutubeError(null);
-            if (playerRef.current) {
-                playerRef.current.loadVideoById(nextVideo.videoId);
-            } else {
-                setPendingVideoId(nextVideo.videoId);
-            }
-        }
-    };
-
-    const handlePlayPause = () => {
-        if (playerRef.current) {
-            if (isYoutubePlaying) {
-                playerRef.current.pauseVideo();
-            } else {
-                playerRef.current.playVideo();
-            }
-        }
-    };
-
-    const handleStop = () => {
-        if (playerRef.current) {
-            playerRef.current.stopVideo();
-            setYoutubeTitle(null);
-            setYoutubeQueue([]);
-            setYoutubeQueueIndex(-1);
-            setIsYoutubePlaying(false);
-            localStorage.removeItem('youtube_playback_state');
+    const addTranscription = (speaker: 'user' | 'assistant', text: string) => {
+        if (!text) return;
+        const entry: Omit<TranscriptionEntry, 'firebaseKey'> = { speaker, text, timestamp: new Date() };
+        setTranscriptionHistory(prev => [...prev, entry]);
+        if (userId) {
+            db.ref(`users/${userId}/history`).push({ ...entry, timestamp: entry.timestamp.toISOString() });
         }
     };
     
-    const handleSaveApiKeys = (keysToSave: ApiKeys) => {
-        if (userIdRef.current) {
-            db.ref(`apiKeys/${userIdRef.current}`).set(keysToSave);
+    const speakText = (text: string, emotion: string = "neutral") => {
+        // This is a placeholder for a TTS function call
+        // In a real app, you would use a TTS API or browser's SpeechSynthesis
+        console.log(`Speaking (${emotion}): ${text}`);
+        addTranscription('assistant', text);
+    };
+
+    const handleSaveApiKeys = (keys: ApiKeys) => {
+        setApiKeys(keys);
+        if (userId) {
+            db.ref(`users/${userId}/settings/apiKeys`).set(keys);
         }
-        setApiKeys(keysToSave);
+        if (keys.gemini) {
+           setApiKeyReselectionReason(null);
+        }
+    };
+
+    const handleStudioKeySelected = (optionalKeys: OptionalApiKeys) => {
+        const newKeys = { ...apiKeys, ...optionalKeys, gemini: 'key_from_studio' }; // Placeholder
+        setApiKeys(newKeys);
+        if (userId) {
+            db.ref(`users/${userId}/settings/apiKeys`).set(newKeys);
+        }
+        setApiKeyReselectionReason(null);
+        // We assume the key is now available via process.env.API_KEY and can proceed
+        // A reload or re-init might be needed in a real scenario
     };
     
-    const handleResetApiKeys = () => {
-        if (!userIdRef.current) return;
-        if (window.confirm("Are you sure you want to remove all saved API keys? You will need to re-enter your Gemini key to continue.")) {
-            db.ref(`apiKeys/${userIdRef.current}`).remove();
-            setApiKeys({ gemini: null, weather: null, news: null, youtube: null });
-            setIsStudioKeySelected(false);
-            setIsSettingsModalOpen(false);
-        }
-    };
-
-    if (!isDataLoaded || isApiKeyLoading) {
-        return <div className="h-screen w-screen flex items-center justify-center bg-bg-color"><div className="w-8 h-8 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>;
-    }
-
-    if (!apiKeys.gemini && !isStudioKeySelected) {
-        return <ApiKeySelectionScreen
-            onStudioKeySelected={(optionalKeys) => {
-                setIsStudioKeySelected(true);
-                if (userIdRef.current) {
-                    const keysToSave = { gemini: null, ...optionalKeys };
-                    db.ref(`apiKeys/${userIdRef.current}`).set(keysToSave);
-                    setApiKeys(keysToSave);
-                }
-                setApiKeyError(null);
-            }}
-            onKeysSaved={(keys) => {
-                if (userIdRef.current) {
-                    db.ref(`apiKeys/${userIdRef.current}`).set(keys);
-                    setApiKeys(keys);
-                    setApiKeyError(null);
-                }
-            }}
-            reselectionReason={apiKeyError}
-        />;
+    if (!apiKeys.gemini && !process.env.API_KEY) {
+        return <ApiKeySelectionScreen onKeysSaved={handleSaveApiKeys} onStudioKeySelected={handleStudioKeySelected} reselectionReason={apiKeyReselectionReason}/>;
     }
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-bg-color text-text-color overflow-hidden">
-            <audio ref={audioPlayerRef} crossOrigin="anonymous" />
-            <header className="flex-shrink-0 flex flex-wrap items-center justify-center sm:justify-between p-2 sm:p-4 gap-4 border-b border-border-color">
-                <div className="flex items-center gap-3"><HologramIcon /><h1 className="text-lg font-bold tracking-wider glowing-text">{mainVoiceGender === 'female' ? 'KANISKA' : 'KANISHK'}</h1></div>
-                <div className="flex items-center gap-2 md:gap-4">
+        <div className="min-h-screen w-screen flex flex-col bg-bg-color text-text-color">
+            {/* --- Modals --- */}
+            <SettingsModal
+                isOpen={showSettingsModal}
+                onClose={() => setShowSettingsModal(false)}
+                // Pass all required props...
+                avatars={PREDEFINED_AVATARS}
+                currentAvatar={currentAvatar}
+                onSelectAvatar={(avatar) => {setCurrentAvatar(avatar); if(userId) db.ref(`users/${userId}/settings/currentAvatar`).set(avatar);}}
+                onUploadAvatar={(avatar) => {setCurrentAvatar(avatar); if(userId) db.ref(`users/${userId}/settings/currentAvatar`).set(avatar);}}
+                onGenerateAvatar={() => {}}
+                generatedAvatarResult={{url: null, isLoading: false, error: null}}
+                customGreeting={customGreeting}
+                onSaveGreeting={(g) => {setCustomGreeting(g); if(userId) db.ref(`users/${userId}/settings/customGreeting`).set(g);}}
+                customSystemPrompt={customSystemPrompt}
+                onSaveSystemPrompt={(p) => {setCustomSystemPrompt(p); if(userId) db.ref(`users/${userId}/settings/customSystemPrompt`).set(p);}}
+                onClearHistory={() => {if(userId) db.ref(`users/${userId}/history`).remove(); setTranscriptionHistory([]);}}
+                mainVoiceGender={'female'} onSetMainVoiceGender={() => {}} selectedVoice={'Zephyr'} onSelectVoice={()=>{}} voicePitch={0} onSetVoicePitch={()=>{}} voiceSpeed={1} onSetVoiceSpeed={()=>{}}
+                greetingVoiceGender={'female'} onSetGreetingVoiceGender={()=>{}} greetingVoice={'Zephyr'} onSetGreetingVoice={()=>{}} greetingPitch={0} onSetGreetingPitch={()=>{}} greetingSpeed={1} onSetGreetingSpeed={()=>{}}
+                speakText={speakText} onStartSupportChat={()=>{}} userId={userId} apiKeys={apiKeys} onSaveApiKeys={handleSaveApiKeys}
+                onResetGeminiKey={() => {setApiKeys(k=>({...k, gemini: null})); if(userId) db.ref(`users/${userId}/settings/apiKeys/gemini`).remove();}}
+            />
+            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} conversation={transcriptionHistory} />
+
+            {/* --- Main UI --- */}
+            <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border-color">
+                <div className="flex items-center gap-3">
+                    <HologramIcon />
+                    <h1 className="text-xl font-bold glowing-text">Kaniska</h1>
+                </div>
+                <div className="flex items-center gap-4">
                     <Clock />
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${assistantState === 'active' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{assistantState.toUpperCase()}</span>
-                    <button onClick={handleThemeToggle} className="text-muted hover:text-primary-color" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
-                        {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-                    </button>
-                    <button onClick={() => setIsSettingsModalOpen(true)} className="text-muted hover:text-primary-color" aria-label="Customize Assistant"><SettingsIcon /></button>
-                    <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Profile" className="text-muted hover:text-primary-color"><InstagramIcon /></a>
+                    <button onClick={() => setShowSettingsModal(true)} title="Settings" className="text-muted hover:text-primary-color transition"><SettingsIcon /></button>
                 </div>
             </header>
-            <main className="flex-grow flex flex-col lg:flex-row p-4 gap-4 overflow-y-auto lg:overflow-hidden">
-                <section className="w-full lg:w-1/3 flex flex-col items-center justify-center bg-panel-bg border border-border-color rounded-lg p-4 lg:p-6 animate-panel-enter">
+
+            <main className="flex-grow flex flex-col lg:flex-row">
+                <div className="w-full lg:w-2/5 flex flex-col items-center justify-center p-4 relative border-b lg:border-b-0 lg:border-r border-border-color h-screen lg:h-auto">
                     <div className="hologram-container">
-                        <img src={currentAvatar} alt="Holographic Assistant" className={`avatar expression-${avatarExpression}`} />
-                        {avatarExpression === 'composing' && <TypingIndicator />}
+                        <img src={currentAvatar} alt="Kaniska Avatar" className={`avatar expression-${avatarExpression}`} />
+                        {(avatarExpression === 'composing' || avatarExpression === 'thinking') && <TypingIndicator />}
                     </div>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8 w-full max-w-sm mx-auto">
-                        <button onClick={handleButtonClick} disabled={assistantState === 'connecting' || isRecordingMessage} className={`footer-button w-full sm:w-40 ${assistantState === 'active' ? 'active' : ''}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                                {assistantState === 'active' ? (
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                ) : (
-                                    <>
-                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                                    </>
-                                )}
-                            </svg>
-                            <span className="font-semibold text-sm">
-                                {assistantState === 'active' ? 'Stop Session' : 'Start Session'}
-                            </span>
-                        </button>
-                        <button onClick={handleRecordMessageClick} disabled={assistantState === 'active' || assistantState === 'connecting'} className={`footer-button w-full sm:w-40 ${isRecordingMessage ? 'active' : ''}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                                {isRecordingMessage ? (
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                ) : (
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                )}
-                            </svg>
-                            <span className="font-semibold text-sm">
-                                {isRecordingMessage ? 'Stop Recording' : 'Record Message'}
-                            </span>
-                        </button>
+                    <div className="absolute bottom-4 text-center">
+                        <p className="font-semibold capitalize">{assistantState}</p>
+                        <p className="text-xs text-muted">Say "Hey Kaniska" or click Connect</p>
                     </div>
-                </section>
-                <section className="w-full lg:w-2/3 flex flex-col bg-panel-bg border border-border-color rounded-lg overflow-hidden animate-panel-enter">
-                    <header className="flex-shrink-0 flex items-center border-b border-border-color overflow-x-auto">
-                        <button onClick={() => setActivePanel('transcript')} className={`tab-button ${activePanel === 'transcript' ? 'active' : ''}`}>Transcript</button>
-                        {generatedImages.length > 0 && <button onClick={() => setActivePanel('image')} className={`tab-button ${activePanel === 'image' ? 'active' : ''}`}>Image</button>}
-                        {weatherData && <button onClick={() => setActivePanel('weather')} className={`tab-button ${activePanel === 'weather' ? 'active' : ''}`}>Weather</button>}
-                        {newsArticles.length > 0 && <button onClick={() => setActivePanel('news')} className={`tab-button ${activePanel === 'news' ? 'active' : ''}`}>News</button>}
-                        {timer && <button onClick={() => setActivePanel('timer')} className={`tab-button ${activePanel === 'timer' ? 'active' : ''}`}>Timer</button>}
-                        {youtubeTitle && <button onClick={() => setActivePanel('youtube')} className={`tab-button ${activePanel === 'youtube' ? 'active' : ''}`}>YouTube</button>}
-                        {videoUrl && <button onClick={() => setActivePanel('video')} className={`tab-button ${activePanel === 'video' ? 'active' : ''}`}>Video</button>}
-                        {songLyrics && <button onClick={() => setActivePanel('lyrics')} className={`tab-button ${activePanel === 'lyrics' ? 'active' : ''}`}>Lyrics</button>}
-                        {codeSnippets.length > 0 && <button onClick={() => setActivePanel('code')} className={`tab-button ${activePanel === 'code' ? 'active' : ''}`}>Code</button>}
-                        {liveEditingSnippetId && <button onClick={() => setActivePanel('liveEditor')} className={`tab-button ${activePanel === 'liveEditor' ? 'active' : ''}`}>Live Editor</button>}
-                        {emailRecipient && <button onClick={() => setActivePanel('email')} className={`tab-button ${activePanel === 'email' ? 'active' : ''}`}>Email</button>}
-                    </header>
-                    <div className="flex-grow overflow-y-auto">
-                        {activePanel === 'transcript' && (
-                            <div className="p-4 space-y-4">
-                                {transcriptions.map((t, i) => (
-                                    <div key={t.firebaseKey || i} className={`chat-bubble-animation flex flex-col ${t.speaker === 'user' ? 'items-end' : 'items-start'}`}>
-                                        <div className={`flex items-center gap-2 ${t.speaker === 'user' ? 'flex-row-reverse' : ''}`}>
-                                            <span className="text-xs font-bold text-muted">{t.speaker === 'assistant' ? (mainVoiceGender === 'female' ? 'Kaniska' : 'Kanishk') : 'You'}</span>
-                                            <span className="text-xs text-muted">{t.timestamp.toLocaleTimeString()}</span>
-                                        </div>
-                                        <div className={`mt-1 px-4 py-2 rounded-lg max-w-lg ${t.speaker === 'user' ? 'bg-primary-color/80 text-bg-color' : 'bg-assistant-bubble-bg'}`}>
-                                            {t.text === '[Audio Message]' && t.firebaseKey && localAudioDownloads[t.firebaseKey] ? (
-                                                <audio controls src={localAudioDownloads[t.firebaseKey]} className="w-64 h-10"></audio>
-                                            ) : (
-                                                <p className="m-0 whitespace-pre-wrap">{t.text}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                <div ref={transcriptEndRef} />
-                            </div>
-                        )}
-                        {activePanel === 'image' && (
-                             <div className="grid grid-cols-1 md:grid-cols-2 h-full">
-                                <div className="p-4 overflow-y-auto border-r border-border-color">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-xl font-bold">Image Gallery</h3>
-                                        <input type="file" ref={imageUploadInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                                        <button onClick={() => imageUploadInputRef.current?.click()} className="quick-action-button">Upload Image</button>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {generatedImages.map(img => (
-                                            <div key={img.id} onClick={() => setSelectedImage(img)} className={`relative aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${selectedImage?.id === img.id ? 'border-primary-color' : 'border-transparent'}`}>
-                                                {img.isLoading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><div className="w-6 h-6 border-2 border-border-color border-t-primary-color rounded-full animate-spin"></div></div>}
-                                                {img.error && <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center text-center p-2 text-xs text-red-300">{img.error}</div>}
-                                                {img.url && <img src={img.url} alt={img.prompt} className="w-full h-full object-cover" />}
-                                            </div>
-                                        ))}
+                </div>
+
+                <div className="w-full lg:w-3/5 flex flex-col bg-panel-bg min-h-screen lg:min-h-0">
+                    {activePanel === 'transcript' && (
+                         <div className="flex-grow p-4 overflow-y-auto space-y-4">
+                            {transcriptionHistory.map((entry, index) => (
+                                <div key={index} className={`chat-bubble-animation ${entry.speaker === 'user' ? 'text-right' : 'text-left'}`}>
+                                    <div className={`inline-block max-w-lg p-3 rounded-xl ${entry.speaker === 'user' ? 'bg-primary-color/20' : entry.speaker === 'assistant' ? 'bg-assistant-bubble-bg' : 'bg-yellow-500/10'}`}>
+                                        <p className="text-sm m-0">{entry.text}</p>
+                                        <p className="text-xs text-muted mt-1 opacity-70">{entry.timestamp.toLocaleTimeString()}</p>
                                     </div>
                                 </div>
-                                <div className="p-4 flex flex-col items-center justify-center">
-                                    {selectedImage?.url ? (
-                                        <>
-                                            <img src={selectedImage.url} alt={selectedImage.prompt} className="max-w-full max-h-[60%] object-contain rounded-lg shadow-lg" />
-                                            <p className="text-sm text-muted mt-4 text-center">{selectedImage.prompt}</p>
-                                            <div className="mt-4 flex gap-2">
-                                                <button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="quick-action-button">Download</button>
-                                                <button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: selectedImage.prompt })} className="quick-action-button">Share</button>
-                                                <button onClick={() => handleStartLiveEdit(selectedImage)} className="quick-action-button" disabled={assistantState !== 'active'}>Live Edit</button>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center text-center text-muted">
-                                            <ImageIcon className="w-16 h-16 mb-4" />
-                                            <p>Select an image from the gallery to view it here.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {activePanel === 'weather' && weatherData && <WeatherPanel data={weatherData} />}
-                        {activePanel === 'news' && <NewsPanel articles={newsArticles} />}
-                        {activePanel === 'timer' && timer && <TimerPanel timer={timer} />}
-                        {activePanel === 'youtube' && (
-                            <div className="p-4 flex flex-col h-full">
-                                {youtubeError && <p className="text-red-400 mb-2">{youtubeError}</p>}
-                                {youtubeTitle && <h3 className="text-lg font-bold mb-2 truncate">{youtubeTitle}</h3>}
-                                <div className="youtube-container flex-grow">
-                                    <div id="youtube-player"></div>
-                                </div>
+                            ))}
+                            <div ref={transcriptEndRef} />
+                        </div>
+                    )}
+                     {activePanel === 'youtube' && (
+                        <div className="flex-grow flex flex-col p-4 gap-4">
+                            <div id="youtube-player" className="youtube-container"></div>
+                            <div className="flex flex-col items-center justify-center gap-2">
+                                <p className="text-sm text-center text-muted w-full px-4 truncate">{youtubeSearchResults[currentYoutubeIndex]?.title || 'No video loaded.'}</p>
                                 <div className="youtube-controls-container">
-                                    <button onClick={handlePreviousVideo} disabled={youtubeQueueIndex <= 0} className="youtube-control-button" aria-label="Previous video">
+                                    <button onClick={playPrevious} disabled={currentYoutubeIndex <= 0} className="youtube-control-button" aria-label="Previous video">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
                                     </button>
-                                    <button onClick={handlePlayPause} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause video' : 'Play video'}>
-                                        {isYoutubePlaying ? (
+                                    <button onClick={() => isYoutubePlaying ? youtubePlayer?.pauseVideo() : youtubePlayer?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause video' : 'Play video'}>
+                                        {isYoutubePlaying ?
                                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                        ) : (
+                                            :
                                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                        )}
+                                        }
                                     </button>
-                                    <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button" aria-label="Next video">
+                                    <button onClick={playNext} disabled={currentYoutubeIndex >= youtubeSearchResults.length - 1} className="youtube-control-button" aria-label="Next video">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
                                     </button>
-                                    <button onClick={handleStop} className="youtube-control-button stop-btn" aria-label="Stop video">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                                    </button>
                                 </div>
                             </div>
-                        )}
-                        {activePanel === 'video' && (
-                             <div className="flex flex-col items-center justify-center h-full p-4">
-                                {videoGenerationState === 'generating' && (
-                                    <>
-                                        <div className="w-16 h-16 border-4 border-border-color border-t-primary-color rounded-full animate-spin"></div>
-                                        <p className="mt-4 text-lg text-muted">{videoProgressMessage}</p>
-                                    </>
-                                )}
-                                {videoGenerationState === 'error' && <p className="text-red-400">{videoError}</p>}
-                                {videoGenerationState === 'done' && videoUrl && (
-                                    <>
-                                        <video src={videoUrl} controls autoPlay className="max-w-full max-h-[80%] rounded-lg"></video>
-                                        <div className="mt-4 flex gap-2">
-                                            <a href={videoUrl} download="kaniska-intro.mp4" className="quick-action-button">Download</a>
-                                            <button onClick={() => handleShare({ type: 'video', data: videoUrl, fileName: 'kaniska-intro.mp4' })} className="quick-action-button">Share</button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                        {activePanel === 'lyrics' && songLyrics && (
-                             <div className="p-6 flex flex-col h-full items-center justify-center text-center">
-                                <h3 className="text-2xl font-bold">{songLyrics.name}</h3>
-                                <p className="text-muted mb-6">{songLyrics.artist}</p>
-                                <div className="text-3xl font-semibold leading-relaxed text-primary-color">
-                                    {songLyrics.lyrics[songLyrics.currentLine] || "..."}
-                                </div>
-                            </div>
-                        )}
-                        {activePanel === 'code' && (
-                            <CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />
-                        )}
-                        {activePanel === 'liveEditor' && liveEditingSnippet && (
-                            <LiveCodeEditorPanel
-                                snippet={liveEditingSnippet}
-                                code={liveEditorCode}
-                                onCodeChange={setLiveEditorCode}
-                                onFinish={handleFinishLiveCodeEdit}
-                            />
-                        )}
-                        {activePanel === 'email' && (
-                            <EmailPanel
-                                recipient={emailRecipient}
-                                subject={emailSubject}
-                                body={emailBody}
-                                onRecipientChange={setEmailRecipient}
-                                onSubjectChange={setEmailSubject}
-                                onBodyChange={setEmailBody}
-                                onSend={handleSendEmail}
-                            />
-                        )}
-                    </div>
-                    <QuickActions
-                        onAction={handleQuickAction}
+                        </div>
+                    )}
+                    {/* Other panels would be conditionally rendered here */}
+                    <QuickActions 
+                        onAction={() => {}} 
                         disabled={assistantState !== 'active'}
                         isWeatherEnabled={!!apiKeys.weather}
                         isNewsEnabled={!!apiKeys.news}
                         isYoutubeEnabled={!!apiKeys.youtube}
                     />
-                </section>
+                </div>
             </main>
 
-            <SettingsModal
-                isOpen={isSettingsModalOpen}
-                onClose={() => setIsSettingsModalOpen(false)}
-                avatars={avatars}
-                currentAvatar={currentAvatar}
-                onSelectAvatar={setCurrentAvatar}
-                onUploadAvatar={(newAvatar) => {
-                    const newAvatars = [newAvatar, ...avatars.filter(a => !a.startsWith('data:image/png;base64,iVBORw0KGgo'))]; // Don't add default blanks
-                    setAvatars(newAvatars);
-                    setCurrentAvatar(newAvatar);
-                }}
-                onGenerateAvatar={handleGenerateAvatar}
-                generatedAvatarResult={generatedAiAvatar}
-                customGreeting={customGreeting}
-                onSaveGreeting={handleSaveGreeting}
-                customSystemPrompt={customSystemPrompt}
-                onSaveSystemPrompt={handleSaveSystemPrompt}
-                onClearHistory={handleClearHistory}
-                mainVoiceGender={mainVoiceGender}
-                onSetMainVoiceGender={setMainVoiceGender}
-                selectedVoice={selectedVoice}
-                onSelectVoice={setSelectedVoice}
-                voicePitch={voicePitch}
-                onSetVoicePitch={setVoicePitch}
-                voiceSpeed={voiceSpeed}
-                onSetVoiceSpeed={setVoiceSpeed}
-                greetingVoiceGender={greetingVoiceGender}
-                onSetGreetingVoiceGender={setGreetingVoiceGender}
-                greetingVoice={greetingVoice}
-                onSetGreetingVoice={setGreetingVoice}
-                greetingPitch={greetingPitch}
-                onSetGreetingPitch={setGreetingPitch}
-                greetingSpeed={greetingSpeed}
-                onSetGreetingSpeed={setGreetingSpeed}
-                speakText={speakText}
-                onStartSupportChat={() => {
-                    setIsSettingsModalOpen(false);
-                    if (assistantState === 'active') disconnectFromGemini();
-                    setIsSupportChatActive(true);
-                    setTimeout(connectToGemini, 500); // Give it a moment to disconnect
-                }}
-                userId={userIdRef.current}
-                apiKeys={apiKeys}
-                onSaveApiKeys={handleSaveApiKeys}
-                onResetGeminiKey={handleResetApiKeys}
-            />
-            <ImageEditorModal
-                isOpen={!!editingImage}
-                image={editingImage}
-                onClose={() => setEditingImage(null)}
-                onSave={(newUrl) => {
-                    if (editingImage) {
-                        setGeneratedImages(imgs => imgs.map(i => i.id === editingImage.id ? { ...i, url: newUrl } : i));
-                        setSelectedImage(img => img && img.id === editingImage.id ? { ...img, url: newUrl } : img);
+            <footer className="flex-shrink-0 p-3 border-t border-border-color flex items-center justify-around">
+                 <button onClick={() => assistantState === 'active' ? disconnect() : connect()} className={`footer-button ${assistantState === 'active' ? 'active' : ''}`}>
+                    {assistantState === 'active' ? 
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                        :
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
                     }
-                    setEditingImage(null);
-                }}
-            />
-
-            <LiveImageEditorModal
-                isOpen={!!liveEditingImage}
-                image={liveEditingImage}
-                filters={liveEditFilters}
-                transform={liveEditTransform}
-                onClose={() => {
-                    setLiveEditingImage(null);
-                    if (assistantState === 'active') {
-                        sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "I'm closing the live editor now." }));
+                    <span className="text-xs font-semibold">{assistantState === 'active' ? 'Disconnect' : 'Connect'}</span>
+                </button>
+                <button onClick={() => setShowShareModal(true)} disabled={transcriptionHistory.length === 0} className="footer-button">
+                    <ShareIcon size={24} />
+                    <span className="text-xs font-semibold">Share</span>
+                </button>
+                <button onClick={() => setIsMuted(!isMuted)} className={`footer-button ${isMuted ? 'text-red-400' : ''}`}>
+                     {isMuted ? 
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+                        :
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
                     }
-                }}
-                onSave={(newUrl) => {
-                    if (liveEditingImage) {
-                        setGeneratedImages(imgs => imgs.map(i => i.id === liveEditingImage.id ? { ...i, url: newUrl } : i));
-                        setSelectedImage(img => img && img.id === liveEditingImage.id ? { ...img, url: newUrl } : img);
-                    }
-                    setLiveEditingImage(null);
-                }}
-                onReset={() => {
-                    setLiveEditFilters(initialFilters);
-                    setLiveEditTransform(initialTransforms);
-                }}
-            />
-
-            <WebsitePreviewModal
-                preview={websitePreview}
-                onClose={() => setWebsitePreview(null)}
-            />
-
-            {shareContent && (
-                <div className="modal-overlay" onClick={() => setShareContent(null)}>
-                    <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                            <h2 className="text-lg font-semibold">Share Content</h2>
-                            <button onClick={() => setShareContent(null)} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
-                        </header>
-                        <div className="p-6 text-center">
-                            <p className="text-muted mb-4">Web Share API is not available. You can download the content instead.</p>
-                            {shareContent.type === 'image' && <img src={shareContent.content} alt={shareContent.prompt} className="max-w-full max-h-64 object-contain rounded-md mx-auto" />}
-                            {shareContent.type === 'video' && <video src={shareContent.content} controls className="max-w-full max-h-64 rounded-md mx-auto"></video>}
-                            <a
-                                href={shareContent.content}
-                                download={`kaniska-creation.${shareContent.type === 'image' ? 'jpg' : 'mp4'}`}
-                                className="mt-4 inline-block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-md transition"
-                            >
-                                Download
-                            </a>
-                        </div>
-                    </div>
-            )}
+                    <span className="text-xs font-semibold">{isMuted ? 'Unmute' : 'Mute'}</span>
+                </button>
+            </footer>
         </div>
     );
 };
