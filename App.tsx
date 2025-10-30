@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
-import { db } from './firebase';
 
 // --- Audio Utility Functions ---
 const encode = (bytes: Uint8Array): string => {
@@ -96,7 +96,7 @@ declare global {
 type Theme = 'light' | 'dark';
 type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
 type AvatarExpression = 'idle' | 'thinking' | 'composing' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
-type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; firebaseKey?: string; };
+type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; };
 type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics' | 'code' | 'liveEditor' | 'email';
 type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
 type WeatherData = { location: string; temperature: number; condition: string; humidity: number; windSpeed: number; };
@@ -631,15 +631,15 @@ const ApiKeySelectionScreen: React.FC<{
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-sm font-medium text-muted mb-1">Visual Crossing Weather Key</label>
-                                <input type="text" spellCheck="false" autoComplete="off" value={weatherKeyInput} onChange={(e) => setWeatherKeyInput(e.target.value)} placeholder="For weather forecasts" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                <input type="password" spellCheck="false" autoComplete="off" value={weatherKeyInput} onChange={(e) => setWeatherKeyInput(e.target.value)} placeholder="For weather forecasts" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-muted mb-1">GNews API Key</label>
-                                <input type="text" spellCheck="false" autoComplete="off" value={newsKeyInput} onChange={(e) => setNewsKeyInput(e.target.value)} placeholder="For news headlines (from gnews.io)" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                <input type="password" spellCheck="false" autoComplete="off" value={newsKeyInput} onChange={(e) => setNewsKeyInput(e.target.value)} placeholder="For news headlines (from gnews.io)" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-muted mb-1">Google Cloud API Key</label>
-                                <input type="text" spellCheck="false" autoComplete="off" value={youtubeKeyInput} onChange={(e) => setYoutubeKeyInput(e.target.value)} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
+                                <input type="password" spellCheck="false" autoComplete="off" value={youtubeKeyInput} onChange={(e) => setYoutubeKeyInput(e.target.value)} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
                             </div>
                         </div>
                     </div>
@@ -649,7 +649,7 @@ const ApiKeySelectionScreen: React.FC<{
                     Save Manually Pasted Keys & Use
                 </button>
                 <p className="text-xs text-muted mt-4">
-                    Your keys are saved securely in a database for this browser. For info on billing, visit the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">official documentation</a>.
+                    Your keys are saved securely in your browser's local storage. For info on billing, visit the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">official documentation</a>.
                 </p>
             </div>
         </div>
@@ -1119,7 +1119,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                      <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label htmlFor="main-voice-gender" className="block text-sm font-medium text-muted mb-1">Gender</label>
-                                            <select id="main-voice-gender" value={mainVoiceGender} onChange={e => { onSetMainVoiceGender(e.target.value as 'female' | 'male'); onSelectVoice(VOICE_MAP[e.target.value as 'female' | 'male'][0]); }} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
+                                            <select id="main-voice-gender" value={mainVoiceGender} onChange={e => onSetMainVoiceGender(e.target.value as 'female' | 'male')} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
                                                 <option value="female">Female</option>
                                                 <option value="male">Male</option>
                                             </select>
@@ -1151,7 +1151,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label htmlFor="greeting-voice-gender" className="block text-sm font-medium text-muted mb-1">Gender</label>
-                                            <select id="greeting-voice-gender" value={greetingVoiceGender} onChange={e => { onSetGreetingVoiceGender(e.target.value as 'female' | 'male'); onSetGreetingVoice(VOICE_MAP[e.target.value as 'female' | 'male'][0]); }} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
+                                            <select id="greeting-voice-gender" value={greetingVoiceGender} onChange={e => onSetGreetingVoiceGender(e.target.value as 'female' | 'male')} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
                                                 <option value="female">Female</option>
                                                 <option value="male">Male</option>
                                             </select>
@@ -1280,7 +1280,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         <button onClick={() => { if (confirm('Are you sure you want to permanently delete your conversation history? This cannot be undone.')) { onClearHistory(); } }} className="px-4 py-2 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">
                                             Clear Conversation History
                                         </button>
-                                        <p className="text-xs text-muted mt-2">This will remove all conversation transcripts from the database.</p>
+                                        <p className="text-xs text-muted mt-2">This will remove all conversation transcripts from your browser's local storage.</p>
                                     </div>
                                 </div>
                             </section>
@@ -1451,6 +1451,16 @@ export const App: React.FC = () => {
     const [customGreeting, setCustomGreeting] = useState("Hello, I'm Kaniska, your personal AI assistant. How can I help you today?");
     const [customSystemPrompt, setCustomSystemPrompt] = useState("You are Kaniska, a helpful and friendly female AI assistant from the future with a slightly sci-fi personality. Your primary language is English, but you must understand and respond to commands given in Hindi. You are integrated into a smart dashboard and can control various functions like playing music on YouTube, setting timers, and fetching information. Be concise but warm in your responses.");
     
+    // Voice Settings
+    const [mainVoiceGender, setMainVoiceGender] = useState<'female' | 'male'>('female');
+    const [selectedVoice, setSelectedVoice] = useState('Zephyr');
+    const [voicePitch, setVoicePitch] = useState(0);
+    const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+    const [greetingVoiceGender, setGreetingVoiceGender] = useState<'female' | 'male'>('female');
+    const [greetingVoice, setGreetingVoice] = useState('Kore');
+    const [greetingPitch, setGreetingPitch] = useState(2);
+    const [greetingSpeed, setGreetingSpeed] = useState(1.1);
+    
     // Refs for persistent objects
     const aiRef = useRef<GoogleGenAI | null>(null);
     const sessionPromiseRef = useRef<Promise<Session> | null>(null);
@@ -1460,7 +1470,14 @@ export const App: React.FC = () => {
     const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
     const nextAudioTimeRef = useRef(0);
     const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-    const transcriptEndRef = useRef<HTMLDivElement>(null);
+    const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+    const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+    const scriptProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+
+    const VOICE_MAP: { [key in 'female' | 'male']: string[] } = {
+        female: ['Zephyr', 'Kore', 'Charon'],
+        male: ['Puck', 'Fenrir'],
+    };
     
     // --- Core Lifecycle & Setup ---
 
@@ -1520,44 +1537,102 @@ export const App: React.FC = () => {
         };
     }, []);
 
+    // Load settings from Local Storage
     useEffect(() => {
         if (userId) {
-            // Load settings from Firebase once userId is available
-            db.ref(`users/${userId}/settings`).once('value', snapshot => {
-                const settings = snapshot.val();
-                if (settings) {
-                    setApiKeys(k => ({ ...k, ...settings.apiKeys }));
-                    setCurrentAvatar(settings.currentAvatar || PREDEFINED_AVATARS[0]);
-                    setCustomGreeting(settings.customGreeting || customGreeting);
-                    setCustomSystemPrompt(settings.customSystemPrompt || customSystemPrompt);
+            const storedSettings = localStorage.getItem(`kaniska-settings-${userId}`);
+            if (storedSettings) {
+                const settings = JSON.parse(storedSettings);
+                if (settings.apiKeys) setApiKeys(k => ({ ...k, ...settings.apiKeys }));
+                if (settings.currentAvatar) setCurrentAvatar(settings.currentAvatar);
+                if (settings.customGreeting) setCustomGreeting(settings.customGreeting);
+                if (settings.customSystemPrompt) setCustomSystemPrompt(settings.customSystemPrompt);
+                if (settings.voice && typeof settings.voice === 'object') {
+                    const voiceSettings = settings.voice as any;
+                    if (voiceSettings.main) {
+                        setMainVoiceGender(voiceSettings.main.gender || 'female');
+                        setSelectedVoice(voiceSettings.main.voice || 'Zephyr');
+                        setVoicePitch(voiceSettings.main.pitch ?? 0);
+                        setVoiceSpeed(voiceSettings.main.speed ?? 1.0);
+                    }
+                    if (voiceSettings.greeting) {
+                        setGreetingVoiceGender(voiceSettings.greeting.gender || 'female');
+                        setGreetingVoice(voiceSettings.greeting.voice || 'Kore');
+                        setGreetingPitch(voiceSettings.greeting.pitch ?? 2);
+                        setGreetingSpeed(voiceSettings.greeting.speed ?? 1.1);
+                    }
                 }
-            });
-             // Load conversation history
-            const historyRef = db.ref(`users/${userId}/history`).orderByChild('timestamp').limitToLast(50);
-            historyRef.on('child_added', snapshot => {
-                const entry = snapshot.val();
-                setTranscriptionHistory(prev => [...prev, { ...entry, timestamp: new Date(entry.timestamp), firebaseKey: snapshot.key }]);
-            });
-             historyRef.on('child_removed', snapshot => {
-                setTranscriptionHistory(prev => prev.filter(entry => entry.firebaseKey !== snapshot.key));
-            });
-        }
-        return () => {
-            if (userId) {
-                db.ref(`users/${userId}/history`).off();
             }
-        };
+
+            const storedHistory = localStorage.getItem(`kaniska-history-${userId}`);
+            if (storedHistory) {
+                try {
+                    const history = JSON.parse(storedHistory).map((entry: any) => ({
+                        ...entry,
+                        timestamp: new Date(entry.timestamp),
+                    }));
+                    setTranscriptionHistory(history);
+                } catch (e) {
+                    console.error("Failed to parse history from local storage", e);
+                }
+            }
+        }
     }, [userId]);
+
+    // Save settings to Local Storage
+    useEffect(() => {
+        if (userId) {
+            const settings = {
+                apiKeys,
+                currentAvatar,
+                customGreeting,
+                customSystemPrompt,
+                voice: {
+                    main: { gender: mainVoiceGender, voice: selectedVoice, pitch: voicePitch, speed: voiceSpeed },
+                    greeting: { gender: greetingVoiceGender, voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed },
+                },
+            };
+            localStorage.setItem(`kaniska-settings-${userId}`, JSON.stringify(settings));
+        }
+    }, [
+        userId, apiKeys, currentAvatar, customGreeting, customSystemPrompt,
+        mainVoiceGender, selectedVoice, voicePitch, voiceSpeed,
+        greetingVoiceGender, greetingVoice, greetingPitch, greetingSpeed
+    ]);
+    
+    // Save history to Local Storage
+    useEffect(() => {
+        if (userId) {
+            localStorage.setItem(`kaniska-history-${userId}`, JSON.stringify(transcriptionHistory));
+        }
+    }, [userId, transcriptionHistory]);
     
      useEffect(() => {
         transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [transcriptionHistory]);
 
     // --- Core Assistant Connection ---
+    const getGeminiApiKey = (): string | null => {
+        // If a manual key is provided and it's not the studio placeholder, use it.
+        if (apiKeys.gemini && apiKeys.gemini !== 'key_from_studio') {
+            return apiKeys.gemini;
+        }
+        // Otherwise, use the key from the environment (populated by AI Studio).
+        return process.env.API_KEY || null;
+    };
     
     const connect = async () => {
-        if (!process.env.API_KEY) {
-            console.error("Gemini API Key is not set in environment.");
+        // Resume AudioContexts on user gesture
+        if (inputAudioContextRef.current?.state === 'suspended') {
+            await inputAudioContextRef.current.resume();
+        }
+        if (outputAudioContextRef.current?.state === 'suspended') {
+            await outputAudioContextRef.current.resume();
+        }
+        
+        const geminiApiKey = getGeminiApiKey();
+        if (!geminiApiKey) {
+            console.error("Gemini API Key is not set.");
             addSystemMessage("Connection failed: The API key is missing. Please configure it in Settings.", 'error');
             setAssistantState('error');
             return;
@@ -1568,7 +1643,7 @@ export const App: React.FC = () => {
         addSystemMessage("Initializing connection...", 'info');
 
         try {
-            aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            aiRef.current = new GoogleGenAI({ apiKey: geminiApiKey });
             
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             micStreamRef.current = stream;
@@ -1578,7 +1653,13 @@ export const App: React.FC = () => {
                 callbacks: { onopen, onmessage, onerror, onclose },
                 config: {
                     responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: {
+                                voiceName: selectedVoice,
+                            }
+                        }
+                    },
                     systemInstruction: customSystemPrompt,
                     inputAudioTranscription: {},
                     outputAudioTranscription: {},
@@ -1588,12 +1669,16 @@ export const App: React.FC = () => {
 
             sessionPromiseRef.current = sessionPromise;
             
-            // Wait for the session to be established before declaring it 'active'
             await sessionPromise;
             setAssistantState('active');
             setAvatarExpression('listening');
             addSystemMessage("Connection established. I'm listening.", 'success');
-            speakText(customGreeting, 'cheerful');
+            addTranscription('assistant', customGreeting);
+            speakText(customGreeting, 'cheerful', {
+                voice: greetingVoice,
+                pitch: greetingPitch,
+                speed: greetingSpeed
+            });
 
         } catch (error) {
             console.error("Connection failed:", error);
@@ -1611,8 +1696,16 @@ export const App: React.FC = () => {
     const disconnect = () => {
         sessionPromiseRef.current?.then(session => session.close());
         sessionPromiseRef.current = null;
+        
+        // Disconnect and release audio resources
+        scriptProcessorNodeRef.current?.disconnect();
+        micSourceNodeRef.current?.disconnect();
+        scriptProcessorNodeRef.current = null;
+        micSourceNodeRef.current = null;
+
         micStreamRef.current?.getTracks().forEach(track => track.stop());
         micStreamRef.current = null;
+        
         setAssistantState('idle');
         setAvatarExpression('idle');
         addSystemMessage("Connection closed.", 'info');
@@ -1627,9 +1720,11 @@ export const App: React.FC = () => {
 
         const source = inputCtx.createMediaStreamSource(stream);
         const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+        
+        micSourceNodeRef.current = source;
+        scriptProcessorNodeRef.current = scriptProcessor;
 
         scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-            if (assistantState !== 'active') return;
             const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
             const pcmBlob = createBlob(inputData);
             sessionPromiseRef.current?.then(session => {
@@ -1796,25 +1891,64 @@ export const App: React.FC = () => {
     
     const addTranscription = (speaker: 'user' | 'assistant', text: string) => {
         if (!text) return;
-        const entry: Omit<TranscriptionEntry, 'firebaseKey'> = { speaker, text, timestamp: new Date() };
+        const entry: TranscriptionEntry = { speaker, text, timestamp: new Date() };
         setTranscriptionHistory(prev => [...prev, entry]);
-        if (userId) {
-            db.ref(`users/${userId}/history`).push({ ...entry, timestamp: entry.timestamp.toISOString() });
-        }
     };
     
-    const speakText = (text: string, emotion: string = "neutral") => {
-        // This is a placeholder for a TTS function call
-        // In a real app, you would use a TTS API or browser's SpeechSynthesis
-        console.log(`Speaking (${emotion}): ${text}`);
-        addTranscription('assistant', text);
+    const speakText = async (
+        text: string,
+        emotion: string = "neutral",
+        voiceOverride?: { voice: string; pitch: number; speed: number }
+    ) => {
+        const geminiApiKey = getGeminiApiKey();
+        if (!geminiApiKey || !text) {
+            addSystemMessage("Cannot speak: API key is missing or text is empty.", "error");
+            return;
+        }
+    
+        const ai = aiRef.current ?? new GoogleGenAI({ apiKey: geminiApiKey });
+    
+        const voiceToUse = voiceOverride?.voice || selectedVoice;
+        const pitchToUse = voiceOverride?.pitch ?? voicePitch;
+        const speedToUse = voiceOverride?.speed ?? voiceSpeed;
+        const prompt = emotion === 'neutral' ? text : `Say the following in a ${emotion} tone: "${text}"`;
+    
+        try {
+            setAvatarExpression('speaking');
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash-preview-tts",
+                contents: [{ parts: [{ text: prompt }] }],
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: {
+                                voiceName: voiceToUse,
+                            },
+                        },
+                        pitch: pitchToUse,
+                        speakingRate: speedToUse,
+                    }
+                }
+            });
+    
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+                await playAudio(base64Audio);
+            } else {
+                addSystemMessage("Speech generation returned no audio data.", "error");
+                setAvatarExpression('listening');
+            }
+        } catch (error) {
+            console.error("TTS Error:", error);
+            const friendlyMessage = getApiErrorMessage(error);
+            addSystemMessage(`Could not generate speech: ${friendlyMessage}`, 'error');
+            setAvatarExpression('error');
+        }
     };
 
     const handleSaveApiKeys = (keys: ApiKeys) => {
         setApiKeys(keys);
-        if (userId) {
-            db.ref(`users/${userId}/settings/apiKeys`).set(keys);
-        }
         if (keys.gemini) {
            setApiKeyReselectionReason(null);
         }
@@ -1823,40 +1957,76 @@ export const App: React.FC = () => {
     const handleStudioKeySelected = (optionalKeys: OptionalApiKeys) => {
         const newKeys = { ...apiKeys, ...optionalKeys, gemini: 'key_from_studio' }; // Placeholder
         setApiKeys(newKeys);
-        if (userId) {
-            db.ref(`users/${userId}/settings/apiKeys`).set(newKeys);
-        }
         setApiKeyReselectionReason(null);
-        // We assume the key is now available via process.env.API_KEY and can proceed
-        // A reload or re-init might be needed in a real scenario
+    };
+
+    const handleSetMainVoiceGender = (gender: 'female' | 'male') => {
+        const newVoice = VOICE_MAP[gender][0];
+        setMainVoiceGender(gender);
+        setSelectedVoice(newVoice);
+    };
+
+    const handleSetSelectedVoice = (voice: string) => {
+        setSelectedVoice(voice);
+    };
+
+    const handleSetVoicePitch = (pitch: number) => {
+        setVoicePitch(pitch);
+    };
+
+    const handleSetVoiceSpeed = (speed: number) => {
+        setVoiceSpeed(speed);
+    };
+
+    const handleSetGreetingVoiceGender = (gender: 'female' | 'male') => {
+        const newVoice = VOICE_MAP[gender][0];
+        setGreetingVoiceGender(gender);
+        setGreetingVoice(newVoice);
+    };
+
+    const handleSetGreetingVoice = (voice: string) => {
+        setGreetingVoice(voice);
+    };
+
+    const handleSetGreetingPitch = (pitch: number) => {
+        setGreetingPitch(pitch);
+    };
+
+    const handleSetGreetingSpeed = (speed: number) => {
+        setGreetingSpeed(speed);
     };
     
-    if (!apiKeys.gemini && !process.env.API_KEY) {
+    if (!getGeminiApiKey()) {
         return <ApiKeySelectionScreen onKeysSaved={handleSaveApiKeys} onStudioKeySelected={handleStudioKeySelected} reselectionReason={apiKeyReselectionReason}/>;
     }
 
     return (
-        <div className="min-h-screen w-screen flex flex-col bg-bg-color text-text-color pb-24">
+        <div className="min-h-screen w-screen flex flex-col bg-bg-color text-text-color">
             {/* --- Modals --- */}
             <SettingsModal
                 isOpen={showSettingsModal}
                 onClose={() => setShowSettingsModal(false)}
-                // Pass all required props...
                 avatars={PREDEFINED_AVATARS}
                 currentAvatar={currentAvatar}
-                onSelectAvatar={(avatar) => {setCurrentAvatar(avatar); if(userId) db.ref(`users/${userId}/settings/currentAvatar`).set(avatar);}}
-                onUploadAvatar={(avatar) => {setCurrentAvatar(avatar); if(userId) db.ref(`users/${userId}/settings/currentAvatar`).set(avatar);}}
+                onSelectAvatar={setCurrentAvatar}
+                onUploadAvatar={setCurrentAvatar}
                 onGenerateAvatar={() => {}}
                 generatedAvatarResult={{url: null, isLoading: false, error: null}}
                 customGreeting={customGreeting}
-                onSaveGreeting={(g) => {setCustomGreeting(g); if(userId) db.ref(`users/${userId}/settings/customGreeting`).set(g);}}
+                onSaveGreeting={setCustomGreeting}
                 customSystemPrompt={customSystemPrompt}
-                onSaveSystemPrompt={(p) => {setCustomSystemPrompt(p); if(userId) db.ref(`users/${userId}/settings/customSystemPrompt`).set(p);}}
-                onClearHistory={() => {if(userId) db.ref(`users/${userId}/history`).remove(); setTranscriptionHistory([]);}}
-                mainVoiceGender={'female'} onSetMainVoiceGender={() => {}} selectedVoice={'Zephyr'} onSelectVoice={()=>{}} voicePitch={0} onSetVoicePitch={()=>{}} voiceSpeed={1} onSetVoiceSpeed={()=>{}}
-                greetingVoiceGender={'female'} onSetGreetingVoiceGender={()=>{}} greetingVoice={'Zephyr'} onSetGreetingVoice={()=>{}} greetingPitch={0} onSetGreetingPitch={()=>{}} greetingSpeed={1} onSetGreetingSpeed={()=>{}}
+                onSaveSystemPrompt={setCustomSystemPrompt}
+                onClearHistory={() => setTranscriptionHistory([])}
+                mainVoiceGender={mainVoiceGender} onSetMainVoiceGender={handleSetMainVoiceGender}
+                selectedVoice={selectedVoice} onSelectVoice={handleSetSelectedVoice}
+                voicePitch={voicePitch} onSetVoicePitch={handleSetVoicePitch}
+                voiceSpeed={voiceSpeed} onSetVoiceSpeed={handleSetVoiceSpeed}
+                greetingVoiceGender={greetingVoiceGender} onSetGreetingVoiceGender={handleSetGreetingVoiceGender}
+                greetingVoice={greetingVoice} onSetGreetingVoice={handleSetGreetingVoice}
+                greetingPitch={greetingPitch} onSetGreetingPitch={handleSetGreetingPitch}
+                greetingSpeed={greetingSpeed} onSetGreetingSpeed={handleSetGreetingSpeed}
                 speakText={speakText} onStartSupportChat={()=>{}} userId={userId} apiKeys={apiKeys} onSaveApiKeys={handleSaveApiKeys}
-                onResetGeminiKey={() => {setApiKeys(k=>({...k, gemini: null})); if(userId) db.ref(`users/${userId}/settings/apiKeys/gemini`).remove();}}
+                onResetGeminiKey={() => setApiKeys(k=>({...k, gemini: null}))}
             />
             <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} conversation={transcriptionHistory} />
 
@@ -1864,7 +2034,7 @@ export const App: React.FC = () => {
             <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border-color">
                 <div className="flex items-center gap-3">
                     <HologramIcon />
-                    <h1 className="text-xl font-bold glowing-text font-mono tracking-widest uppercase">Kaniska</h1>
+                    <h1 className="text-xl font-bold glowing-text">Kaniska</h1>
                 </div>
                 <div className="flex items-center gap-4">
                     <Clock />
@@ -1872,8 +2042,8 @@ export const App: React.FC = () => {
                 </div>
             </header>
 
-            <main className="flex-grow flex flex-col lg:flex-row">
-                <div className="w-full lg:w-2/5 flex flex-col items-center justify-center p-4 relative border-b lg:border-b-0 lg:border-r border-border-color h-screen lg:h-auto">
+            <main className="flex-grow flex flex-col lg:flex-row min-h-0">
+                <div className="w-full lg:w-2/5 flex flex-col items-center justify-center p-4 relative border-b lg:border-b-0 lg:border-r border-border-color">
                     <div className="hologram-container">
                         <img src={currentAvatar} alt="Kaniska Avatar" className={`avatar expression-${avatarExpression}`} />
                         {(avatarExpression === 'composing' || avatarExpression === 'thinking') && <TypingIndicator />}
@@ -1884,43 +2054,45 @@ export const App: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="w-full lg:w-3/5 flex flex-col bg-panel-bg min-h-screen lg:min-h-0">
-                    {activePanel === 'transcript' && (
-                         <div className="flex-grow p-4 overflow-y-auto space-y-4">
-                            {transcriptionHistory.map((entry, index) => (
-                                <div key={index} className={`chat-bubble-animation ${entry.speaker === 'user' ? 'text-right' : 'text-left'}`}>
-                                    <div className={`inline-block max-w-lg p-3 rounded-xl ${entry.speaker === 'user' ? 'bg-primary-color/20' : entry.speaker === 'assistant' ? 'bg-assistant-bubble-bg' : 'bg-yellow-500/10'}`}>
-                                        <p className="text-sm m-0">{entry.text}</p>
-                                        <p className="text-xs text-muted mt-1 opacity-70">{entry.timestamp.toLocaleTimeString()}</p>
-                                    </div>
-                                </div>
-                            ))}
-                            <div ref={transcriptEndRef} />
-                        </div>
-                    )}
-                     {activePanel === 'youtube' && (
-                        <div className="flex-grow flex flex-col p-4 gap-4">
-                            <div id="youtube-player" className="youtube-container"></div>
-                            <div className="flex flex-col items-center justify-center gap-2">
-                                <p className="text-sm text-center text-muted w-full px-4 truncate">{youtubeSearchResults[currentYoutubeIndex]?.title || 'No video loaded.'}</p>
-                                <div className="youtube-controls-container">
-                                    <button onClick={playPrevious} disabled={currentYoutubeIndex <= 0} className="youtube-control-button" aria-label="Previous video">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
-                                    </button>
-                                    <button onClick={() => isYoutubePlaying ? youtubePlayer?.pauseVideo() : youtubePlayer?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause video' : 'Play video'}>
-                                        {isYoutubePlaying ?
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                            :
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                        }
-                                    </button>
-                                    <button onClick={playNext} disabled={currentYoutubeIndex >= youtubeSearchResults.length - 1} className="youtube-control-button" aria-label="Next video">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                                    </button>
+                <div className="w-full lg:w-3/5 flex flex-col bg-panel-bg flex-grow min-h-0">
+                    <div className={`flex-grow p-4 overflow-y-auto space-y-4 ${activePanel === 'transcript' ? '' : 'hidden'}`}>
+                        {transcriptionHistory.map((entry, index) => (
+                            <div key={index} className={`chat-bubble-animation ${entry.speaker === 'user' ? 'text-right' : 'text-left'}`}>
+                                <div className={`inline-block max-w-lg p-3 rounded-xl ${entry.speaker === 'user' ? 'bg-primary-color/20' : entry.speaker === 'assistant' ? 'bg-assistant-bubble-bg' : 'bg-yellow-500/10'}`}>
+                                    <p className="text-sm m-0">{entry.text ?? '[empty message]'}</p>
+                                    <p className="text-xs text-muted mt-1 opacity-70">
+                                        {entry.timestamp instanceof Date && !isNaN(entry.timestamp.getTime())
+                                            ? entry.timestamp.toLocaleTimeString()
+                                            : ''}
+                                    </p>
                                 </div>
                             </div>
+                        ))}
+                        <div ref={transcriptEndRef} />
+                    </div>
+                    
+                    <div className={`flex-grow flex-col p-4 gap-4 ${activePanel === 'youtube' ? 'flex' : 'hidden'}`}>
+                        <div id="youtube-player" className="youtube-container"></div>
+                        <div className="flex flex-col items-center justify-center gap-2">
+                            <p className="text-sm text-center text-muted w-full px-4 truncate">{youtubeSearchResults[currentYoutubeIndex]?.title || 'No video loaded.'}</p>
+                            <div className="youtube-controls-container">
+                                <button onClick={playPrevious} disabled={currentYoutubeIndex <= 0} className="youtube-control-button" aria-label="Previous video">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                                </button>
+                                <button onClick={() => isYoutubePlaying ? youtubePlayer?.pauseVideo() : youtubePlayer?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause video' : 'Play video'}>
+                                    {isYoutubePlaying ?
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                        :
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                    }
+                                </button>
+                                <button onClick={playNext} disabled={currentYoutubeIndex >= youtubeSearchResults.length - 1} className="youtube-control-button" aria-label="Next video">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                                </button>
+                            </div>
                         </div>
-                    )}
+                    </div>
+
                     {/* Other panels would be conditionally rendered here */}
                     <QuickActions 
                         onAction={() => {}} 
