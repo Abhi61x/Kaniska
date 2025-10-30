@@ -422,6 +422,7 @@
         justify-content: center;
         gap: 1rem;
         padding: 0.75rem 0;
+        flex-wrap: wrap;
       }
       .youtube-control-button {
         background-color: var(--assistant-bubble-bg);
@@ -592,6 +593,40 @@
         height: 85vh;
         max-height: 750px;
       }
+      
+      @media (max-width: 767px) { /* Tailwind 'md' breakpoint */
+        .settings-modal-content {
+          width: 95vw;
+          height: 90vh;
+        }
+        .settings-layout {
+          flex-direction: column;
+        }
+        .settings-nav {
+          width: 100%;
+          flex-direction: row;
+          flex-shrink: 0;
+          border-right: none;
+          border-bottom: 1px solid var(--border-color);
+          padding: 0.5rem;
+          overflow-x: auto;
+          /* Hide scrollbar for a cleaner look */
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+        .settings-nav::-webkit-scrollbar {
+          display: none;
+        }
+        .settings-nav-button {
+          width: auto;
+          flex-shrink: 0;
+          justify-content: center;
+        }
+        .settings-content {
+          padding: 1rem;
+        }
+      }
+
       .settings-layout {
         display: flex;
         flex-grow: 1;

@@ -3047,8 +3047,8 @@ export const App: React.FC = () => {
                         <img src={currentAvatar} alt="Holographic Assistant" className={`avatar expression-${avatarExpression}`} />
                         {avatarExpression === 'composing' && <TypingIndicator />}
                     </div>
-                    <div className="flex items-center justify-center gap-4 mt-8">
-                        <button onClick={handleButtonClick} disabled={assistantState === 'connecting' || isRecordingMessage} className={`footer-button w-40 ${assistantState === 'active' ? 'active' : ''}`}>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8 w-full max-w-sm mx-auto">
+                        <button onClick={handleButtonClick} disabled={assistantState === 'connecting' || isRecordingMessage} className={`footer-button w-full sm:w-40 ${assistantState === 'active' ? 'active' : ''}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
                                 {assistantState === 'active' ? (
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -3064,7 +3064,7 @@ export const App: React.FC = () => {
                                 {assistantState === 'active' ? 'Stop Session' : 'Start Session'}
                             </span>
                         </button>
-                        <button onClick={handleRecordMessageClick} disabled={assistantState === 'active' || assistantState === 'connecting'} className={`footer-button w-40 ${isRecordingMessage ? 'active' : ''}`}>
+                        <button onClick={handleRecordMessageClick} disabled={assistantState === 'active' || assistantState === 'connecting'} className={`footer-button w-full sm:w-40 ${isRecordingMessage ? 'active' : ''}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
                                 {isRecordingMessage ? (
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -3138,13 +3138,15 @@ export const App: React.FC = () => {
                                             <p className="text-sm text-muted mt-4 text-center">{selectedImage.prompt}</p>
                                             <div className="mt-4 flex gap-2">
                                                 <button onClick={() => handleDownloadImage(selectedImage.url!, selectedImage.prompt)} className="quick-action-button">Download</button>
-                                                <button onClick={() => setEditingImage(selectedImage)} className="quick-action-button">Manual Edit</button>
-                                                <button onClick={() => handleStartLiveEdit(selectedImage)} disabled={assistantState !== 'active'} title={assistantState !== 'active' ? 'Start a session to use live editing' : ''} className="quick-action-button">Live Edit</button>
-                                                <button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: selectedImage.prompt, fileName: 'generated-image.jpg' })} className="quick-action-button"><ShareIcon size={14}/> Share</button>
+                                                <button onClick={() => handleShare({ type: 'image', data: selectedImage.url!, prompt: selectedImage.prompt })} className="quick-action-button">Share</button>
+                                                <button onClick={() => handleStartLiveEdit(selectedImage)} className="quick-action-button" disabled={assistantState !== 'active'}>Live Edit</button>
                                             </div>
                                         </>
                                     ) : (
-                                        <p className="text-muted">Select an image to view it here.</p>
+                                        <div className="flex flex-col items-center justify-center text-center text-muted">
+                                            <ImageIcon className="w-16 h-16 mb-4" />
+                                            <p>Select an image from the gallery to view it here.</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -3153,58 +3155,105 @@ export const App: React.FC = () => {
                         {activePanel === 'news' && <NewsPanel articles={newsArticles} />}
                         {activePanel === 'timer' && timer && <TimerPanel timer={timer} />}
                         {activePanel === 'youtube' && (
-                            <div className="flex flex-col items-center justify-center h-full p-2 gap-2">
-                                <h3 className="text-lg font-semibold truncate max-w-full">{youtubeTitle || 'YouTube Player'}</h3>
-                                {youtubeError ? (
-                                     <div className="flex-grow w-full flex items-center justify-center bg-black/50 rounded-lg p-4 text-center text-red-400">
-                                        <p>{youtubeError}</p>
-                                     </div>
-                                ) : (
-                                    <div id="youtube-player" className="w-full h-full flex-grow rounded-lg overflow-hidden bg-black"></div>
-                                )}
+                            <div className="p-4 flex flex-col h-full">
+                                {youtubeError && <p className="text-red-400 mb-2">{youtubeError}</p>}
+                                {youtubeTitle && <h3 className="text-lg font-bold mb-2 truncate">{youtubeTitle}</h3>}
+                                <div className="youtube-container flex-grow">
+                                    <div id="youtube-player"></div>
+                                </div>
                                 <div className="youtube-controls-container">
-                                    <button onClick={handlePreviousVideo} disabled={youtubeQueueIndex <= 0} className="youtube-control-button"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg></button>
-                                    <button onClick={handlePlayPause} disabled={!youtubeTitle} className="youtube-control-button play-pause-btn">{isYoutubePlaying ? <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> : <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>}</button>
-                                    <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg></button>
-                                    <button onClick={handleStop} disabled={!youtubeTitle} className="youtube-control-button stop-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>
+                                    <button onClick={handlePreviousVideo} disabled={youtubeQueueIndex <= 0} className="youtube-control-button" aria-label="Previous video">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                                    </button>
+                                    <button onClick={handlePlayPause} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause video' : 'Play video'}>
+                                        {isYoutubePlaying ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                        )}
+                                    </button>
+                                    <button onClick={handleNextVideo} disabled={youtubeQueueIndex >= youtubeQueue.length - 1} className="youtube-control-button" aria-label="Next video">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                                    </button>
+                                    <button onClick={handleStop} className="youtube-control-button stop-btn" aria-label="Stop video">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                                    </button>
                                 </div>
                             </div>
                         )}
                         {activePanel === 'video' && (
-                            <div className="flex flex-col items-center justify-center h-full p-4 gap-4">
-                                 {videoGenerationState === 'generating' && <div className="text-center"><div className="w-12 h-12 border-4 border-border-color border-t-primary-color rounded-full animate-spin mx-auto mb-4"></div><p className="font-semibold">{videoProgressMessage}</p></div>}
-                                {videoGenerationState === 'error' && <div className="text-center text-red-400"><p className="font-bold">Generation Failed</p><p className="text-sm">{videoError}</p></div>}
-                                {videoGenerationState === 'done' && videoUrl && <video src={videoUrl} controls autoPlay className="max-w-full max-h-full rounded-lg"></video>}
+                             <div className="flex flex-col items-center justify-center h-full p-4">
+                                {videoGenerationState === 'generating' && (
+                                    <>
+                                        <div className="w-16 h-16 border-4 border-border-color border-t-primary-color rounded-full animate-spin"></div>
+                                        <p className="mt-4 text-lg text-muted">{videoProgressMessage}</p>
+                                    </>
+                                )}
+                                {videoGenerationState === 'error' && <p className="text-red-400">{videoError}</p>}
+                                {videoGenerationState === 'done' && videoUrl && (
+                                    <>
+                                        <video src={videoUrl} controls autoPlay className="max-w-full max-h-[80%] rounded-lg"></video>
+                                        <div className="mt-4 flex gap-2">
+                                            <a href={videoUrl} download="kaniska-intro.mp4" className="quick-action-button">Download</a>
+                                            <button onClick={() => handleShare({ type: 'video', data: videoUrl, fileName: 'kaniska-intro.mp4' })} className="quick-action-button">Share</button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
                         {activePanel === 'lyrics' && songLyrics && (
-                            <div className="p-4 flex flex-col items-center justify-center text-center h-full">
+                             <div className="p-6 flex flex-col h-full items-center justify-center text-center">
                                 <h3 className="text-2xl font-bold">{songLyrics.name}</h3>
                                 <p className="text-muted mb-6">{songLyrics.artist}</p>
-                                <div className="w-full max-w-2xl">
-                                    {songLyrics.lyrics.map((line, index) => (
-                                        <p key={index} className={`text-lg transition-all duration-300 ${songLyrics.currentLine === index ? 'font-bold text-primary-color scale-110' : 'text-muted'}`}>{line || '...'}</p>
-                                    ))}
+                                <div className="text-3xl font-semibold leading-relaxed text-primary-color">
+                                    {songLyrics.lyrics[songLyrics.currentLine] || "..."}
                                 </div>
                             </div>
                         )}
-                        {activePanel === 'code' && <CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />}
-                        {activePanel === 'liveEditor' && liveEditingSnippet && <LiveCodeEditorPanel snippet={liveEditingSnippet} code={liveEditorCode} onCodeChange={setLiveEditorCode} onFinish={handleFinishLiveCodeEdit} />}
-                        {activePanel === 'email' && <EmailPanel recipient={emailRecipient} subject={emailSubject} body={emailBody} onRecipientChange={setEmailRecipient} onSubjectChange={setEmailSubject} onBodyChange={setEmailBody} onSend={handleSendEmail} />}
+                        {activePanel === 'code' && (
+                            <CodePanel snippets={codeSnippets} onPreview={setWebsitePreview} onLiveEdit={handleStartLiveCodeEdit} />
+                        )}
+                        {activePanel === 'liveEditor' && liveEditingSnippet && (
+                            <LiveCodeEditorPanel
+                                snippet={liveEditingSnippet}
+                                code={liveEditorCode}
+                                onCodeChange={setLiveEditorCode}
+                                onFinish={handleFinishLiveCodeEdit}
+                            />
+                        )}
+                        {activePanel === 'email' && (
+                            <EmailPanel
+                                recipient={emailRecipient}
+                                subject={emailSubject}
+                                body={emailBody}
+                                onRecipientChange={setEmailRecipient}
+                                onSubjectChange={setEmailSubject}
+                                onBodyChange={setEmailBody}
+                                onSend={handleSendEmail}
+                            />
+                        )}
                     </div>
-                    <QuickActions onAction={handleQuickAction} disabled={assistantState !== 'active'} isWeatherEnabled={!!apiKeys.weather} isNewsEnabled={!!apiKeys.news} isYoutubeEnabled={!!apiKeys.youtube} />
+                    <QuickActions
+                        onAction={handleQuickAction}
+                        disabled={assistantState !== 'active'}
+                        isWeatherEnabled={!!apiKeys.weather}
+                        isNewsEnabled={!!apiKeys.news}
+                        isYoutubeEnabled={!!apiKeys.youtube}
+                    />
                 </section>
             </main>
-            <ImageEditorModal isOpen={!!editingImage} image={editingImage} onClose={() => setEditingImage(null)} onSave={(url) => { if(editingImage) { setGeneratedImages(p => p.map(i => i.id === editingImage.id ? {...i, url} : i)); setSelectedImage(p => p?.id === editingImage.id ? {...p, url} : p); } setEditingImage(null); }} />
-            <LiveImageEditorModal isOpen={!!liveEditingImage} image={liveEditingImage} filters={liveEditFilters} transform={liveEditTransform} onClose={() => { setLiveEditingImage(null); sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: 'Live editing session finished.' })); }} onSave={(url) => { if(liveEditingImage) { setGeneratedImages(p => p.map(i => i.id === liveEditingImage.id ? {...i, url} : i)); setSelectedImage(p => p?.id === liveEditingImage.id ? {...p, url} : p); } setLiveEditingImage(null); }} onReset={() => { setLiveEditFilters(initialFilters); setLiveEditTransform(initialTransforms); sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: 'Reset the image to its original state.' })); }} />
-            <WebsitePreviewModal preview={websitePreview} onClose={() => setWebsitePreview(null)} />
-            <SettingsModal 
-                isOpen={isSettingsModalOpen} 
+
+            <SettingsModal
+                isOpen={isSettingsModalOpen}
                 onClose={() => setIsSettingsModalOpen(false)}
                 avatars={avatars}
                 currentAvatar={currentAvatar}
                 onSelectAvatar={setCurrentAvatar}
-                onUploadAvatar={(newAvatar) => { setAvatars(prev => [...prev.filter(a => !a.startsWith('data:')), newAvatar]); setCurrentAvatar(newAvatar); }}
+                onUploadAvatar={(newAvatar) => {
+                    const newAvatars = [newAvatar, ...avatars.filter(a => !a.startsWith('data:image/png;base64,iVBORw0KGgo'))]; // Don't add default blanks
+                    setAvatars(newAvatars);
+                    setCurrentAvatar(newAvatar);
+                }}
                 onGenerateAvatar={handleGenerateAvatar}
                 generatedAvatarResult={generatedAiAvatar}
                 customGreeting={customGreeting}
@@ -3231,15 +3280,78 @@ export const App: React.FC = () => {
                 speakText={speakText}
                 onStartSupportChat={() => {
                     setIsSettingsModalOpen(false);
-                    if (assistantState === 'active') { disconnectFromGemini(); }
+                    if (assistantState === 'active') disconnectFromGemini();
                     setIsSupportChatActive(true);
-                    setTimeout(connectToGemini, 500); // Wait a bit before reconnecting
+                    setTimeout(connectToGemini, 500); // Give it a moment to disconnect
                 }}
                 userId={userIdRef.current}
                 apiKeys={apiKeys}
                 onSaveApiKeys={handleSaveApiKeys}
                 onResetGeminiKey={handleResetApiKeys}
             />
+            <ImageEditorModal
+                isOpen={!!editingImage}
+                image={editingImage}
+                onClose={() => setEditingImage(null)}
+                onSave={(newUrl) => {
+                    if (editingImage) {
+                        setGeneratedImages(imgs => imgs.map(i => i.id === editingImage.id ? { ...i, url: newUrl } : i));
+                        setSelectedImage(img => img && img.id === editingImage.id ? { ...img, url: newUrl } : img);
+                    }
+                    setEditingImage(null);
+                }}
+            />
+
+            <LiveImageEditorModal
+                isOpen={!!liveEditingImage}
+                image={liveEditingImage}
+                filters={liveEditFilters}
+                transform={liveEditTransform}
+                onClose={() => {
+                    setLiveEditingImage(null);
+                    if (assistantState === 'active') {
+                        sessionPromiseRef.current?.then(s => s.sendRealtimeInput({ text: "I'm closing the live editor now." }));
+                    }
+                }}
+                onSave={(newUrl) => {
+                    if (liveEditingImage) {
+                        setGeneratedImages(imgs => imgs.map(i => i.id === liveEditingImage.id ? { ...i, url: newUrl } : i));
+                        setSelectedImage(img => img && img.id === liveEditingImage.id ? { ...img, url: newUrl } : img);
+                    }
+                    setLiveEditingImage(null);
+                }}
+                onReset={() => {
+                    setLiveEditFilters(initialFilters);
+                    setLiveEditTransform(initialTransforms);
+                }}
+            />
+
+            <WebsitePreviewModal
+                preview={websitePreview}
+                onClose={() => setWebsitePreview(null)}
+            />
+
+            {shareContent && (
+                <div className="modal-overlay" onClick={() => setShareContent(null)}>
+                    <div className="modal-content w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
+                            <h2 className="text-lg font-semibold">Share Content</h2>
+                            <button onClick={() => setShareContent(null)} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
+                        </header>
+                        <div className="p-6 text-center">
+                            <p className="text-muted mb-4">Web Share API is not available. You can download the content instead.</p>
+                            {shareContent.type === 'image' && <img src={shareContent.content} alt={shareContent.prompt} className="max-w-full max-h-64 object-contain rounded-md mx-auto" />}
+                            {shareContent.type === 'video' && <video src={shareContent.content} controls className="max-w-full max-h-64 rounded-md mx-auto"></video>}
+                            <a
+                                href={shareContent.content}
+                                download={`kaniska-creation.${shareContent.type === 'image' ? 'jpg' : 'mp4'}`}
+                                className="mt-4 inline-block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-md transition"
+                            >
+                                Download
+                            </a>
+                        </div>
+                    </div>
+            )}
         </div>
     );
 };
