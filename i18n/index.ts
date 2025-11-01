@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, FC } from 'react';
 
 const en = {
@@ -60,7 +61,8 @@ const en = {
       "title": "Your conversation will appear here.",
       "info": "[INFO] Connection closed."
     },
-    "sources": "Sources:"
+    "sources": "Sources:",
+    "goToApiSettings": "Go to API Key Settings"
   },
   "settings": {
     "title": "Settings",
@@ -293,7 +295,8 @@ const hi = {
       "title": "आपकी बातचीत यहाँ दिखाई देगी।",
       "info": "[जानकारी] कनेक्शन बंद हो गया।"
     },
-    "sources": "स्रोत:"
+    "sources": "स्रोत:",
+    "goToApiSettings": "एपीआई कुंजी सेटिंग्स पर जाएं"
   },
   "settings": {
     "title": "सेटिंग्स",

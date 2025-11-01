@@ -22,12 +22,13 @@ export interface ChatMessage {
   sources?: Source[];
   isError?: boolean;
   onRetry?: () => void;
+  isApiKeyError?: boolean;
 }
 
 export type Emotion = 'neutral' | 'happy' | 'sad' | 'excited' | 'empathetic' | 'singing' | 'formal' | 'chirpy' | 'surprised' | 'curious' | 'thoughtful' | 'joking';
 
 export interface GeminiResponse {
-  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG';
+  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG' | 'DEACTIVATE_LISTENING';
   reply: string;
   // FIX: youtubeQuery is always present as per the system prompt (can be an empty string).
   youtubeQuery: string;

@@ -1,5 +1,14 @@
+
 import { GoogleGenAI, Type, Content, Modality } from '@google/genai';
 import type { GeminiResponse, Emotion, Source, ChatMessage } from '../types.ts';
+
+// A custom error class to signal API key issues
+export class ApiKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApiKeyError';
+  }
+}
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const VALID_EMOTIONS: Emotion[] = ['neutral', 'happy', 'sad', 'excited', 'empathetic', 'singing', 'formal', 'chirpy', 'surprised', 'curious', 'thoughtful', 'joking'];
@@ -115,7 +124,7 @@ Your 'emotion' value in the JSON output should reflect these settings.
 
 export async function fetchWeatherSummary(location: string, apiKey: string): Promise<string> {
     if (!apiKey) {
-      throw new Error("I'm sorry, the weather service isn't configured. The administrator needs to provide a Visual Crossing API key in the settings.");
+      throw new ApiKeyError("I'm sorry, the weather service isn't configured. Please add a Visual Crossing API key in Settings > API Keys.");
     }
 
     const encodedLocation = encodeURIComponent(location);
@@ -132,7 +141,7 @@ export async function fetchWeatherSummary(location: string, apiKey: string): Pro
             location: location 
         });
         if (weatherResponse.status === 401 || errorText.toLowerCase().includes("api key")) {
-            throw new Error("I can't fetch weather information because the API key is invalid or missing. Please check your settings.");
+            throw new ApiKeyError("The weather API key seems to be invalid. Please check it in Settings > API Keys.");
         }
         if (errorText.includes('Bad data') || errorText.includes('find location')) {
              throw new Error(`I couldn't find any weather data for "${location}". Please try another location.`);
@@ -186,7 +195,7 @@ export async function fetchWeatherSummary(location: string, apiKey: string): Pro
       console.error("Error fetching or processing weather data:", error);
       
       // If it's one of our specific, user-friendly errors, pass it along.
-      if (error instanceof Error && (error.message.startsWith("I can't") || error.message.startsWith("I couldn't") || error.message.startsWith("I'm sorry"))) {
+      if (error instanceof ApiKeyError || (error instanceof Error && (error.message.startsWith("I couldn't") || error.message.startsWith("I'm sorry")))) {
         throw error;
       }
 
@@ -197,7 +206,7 @@ export async function fetchWeatherSummary(location: string, apiKey: string): Pro
 
 export async function fetchNews(apiKey: string, query: string): Promise<string> {
     if (!apiKey) {
-        throw new Error("I'm sorry, the news service isn't configured. An administrator needs to provide a GNews API key in the settings to fetch news.");
+        throw new ApiKeyError("I'm sorry, the news service isn't configured. Please add a GNews API key in Settings > API Keys to fetch news.");
     }
 
     const encodedQuery = encodeURIComponent(query);
@@ -214,7 +223,7 @@ export async function fetchNews(apiKey: string, query: string): Promise<string> 
                 query: query
             });
             if (newsResponse.status === 401 || newsResponse.status === 403) {
-                throw new Error("I can't fetch news because the GNews API key is invalid or missing. Please check your settings.");
+                throw new ApiKeyError("The GNews API key appears to be invalid. Please go to Settings > API Keys to update it.");
             }
             throw new Error("I couldn't fetch the news right now. The news service might be temporarily unavailable.");
         }
@@ -241,7 +250,7 @@ export async function fetchNews(apiKey: string, query: string): Promise<string> 
         console.error("Error fetching or processing news:", error);
 
         // If it's one of our specific, user-friendly errors, pass it along.
-        if (error instanceof Error && (error.message.startsWith("I can't") || error.message.startsWith("I couldn't"))) {
+        if (error instanceof ApiKeyError || (error instanceof Error && error.message.startsWith("I couldn't"))) {
           throw error;
         }
         
@@ -253,7 +262,7 @@ export async function fetchNews(apiKey: string, query: string): Promise<string> 
 
 export async function searchYouTube(apiKey: string, query: string): Promise<string | null> {
     if (!apiKey) {
-        throw new Error("I'm sorry, the YouTube search isn't configured. An administrator needs to provide a Google Cloud API key in the settings to search videos.");
+        throw new ApiKeyError("I'm sorry, YouTube search isn't configured. You'll need to add a Google Cloud API key in Settings > API Keys.");
     }
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodedQuery}&type=video&maxResults=1&key=${apiKey}`;
@@ -269,7 +278,7 @@ export async function searchYouTube(apiKey: string, query: string): Promise<stri
             });
             const errorMessage = errorData?.error?.message || '';
             if (ytResponse.status === 400 && errorMessage.toLowerCase().includes('api key not valid')) {
-                throw new Error("I can't search YouTube because the Google Cloud API key is invalid. Please check your settings.");
+                throw new ApiKeyError("The Google Cloud API key for YouTube is invalid. Please correct it in Settings > API Keys.");
             }
             throw new Error("I couldn't search YouTube at the moment. The service may be temporarily unavailable.");
         }
@@ -280,7 +289,7 @@ export async function searchYouTube(apiKey: string, query: string): Promise<stri
         console.error("Error searching YouTube:", error);
 
         // If it's one of our specific, user-friendly errors, pass it along.
-        if (error instanceof Error && (error.message.startsWith("I can't") || error.message.startsWith("I couldn't") || error.message.startsWith("I'm sorry"))) {
+        if (error instanceof ApiKeyError || (error instanceof Error && (error.message.startsWith("I couldn't") || error.message.startsWith("I'm sorry")))) {
           throw error;
         }
 

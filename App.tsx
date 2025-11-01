@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { AssistantState, ChatMessage, Emotion, Source, Gender } from './types.ts';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, ApiKeyError } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.ts';
 
 declare global {
@@ -53,7 +54,7 @@ ABOUT YOU:
 JSON OUTPUT STRUCTURE:
 Your entire response must be a single JSON object with this exact structure:
 {
-  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG",
+  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG" | "DEACTIVATE_LISTENING",
   "reply": "Your verbal response to the user. This is what will be spoken out loud. IMPORTANT: This text will be fed directly into a text-to-speech (TTS) engine. It MUST contain only plain, speakable words. Do not include markdown, emojis, or parenthetical non-speech descriptions like '(laughs)' or '♪'. Keep it concise and conversational.",
   "youtubeQuery": "A simplified keyword for the YouTube search. Examples: 'music', 'news', 'cats'. Otherwise, an empty string.",
   "newsQuery": "The topic for the news search. Examples: 'technology', 'world headlines'. Otherwise, an empty string.",
@@ -66,6 +67,7 @@ Your entire response must be a single JSON object with this exact structure:
 HOW TO DECIDE THE JSON VALUES:
 
 1. COMMAND:
+- If the user explicitly asks you to stop listening, go to sleep, or deactivate (e.g., "stop listening", "deactivate", "that's all for now", "go to sleep"), set command to "DEACTIVATE_LISTENING". Your reply should be a simple confirmation like "Okay, shutting down." or "Goodbye."
 - If the user asks you to sing a specific song (e.g., "sing Kesariya by Arijit Singh"), set command to "SING_SONG".
 - If the user asks you to search for or play a video on YouTube (e.g., "play some music", "find a video about cats"), set command to "YOUTUBE_SEARCH".
 - If the user asks about the weather (e.g., "what's the weather like?", "is it going to rain in Paris?"), set command to "GET_WEATHER".
@@ -334,11 +336,17 @@ const Clock = () => {
 };
 
 const SettingsModal = ({
-    isOpen, onClose, settings, onSettingChange, onTestVoice, onLogout
+    isOpen, onClose, settings, onSettingChange, onTestVoice, onLogout, initialTab
 }) => {
     const { t } = useTranslation();
     if (!isOpen) return null;
-    const [activeTab, setActiveTab] = useState('persona');
+    const [activeTab, setActiveTab] = useState(initialTab || 'persona');
+    
+    useEffect(() => {
+        if (isOpen && initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [isOpen, initialTab]);
 
     const navItems = [
         { id: 'persona', label: t('settings.tabs.persona'), icon: <PersonaIcon /> },
@@ -1095,7 +1103,7 @@ const HelpSupportContent = () => {
 };
 
 
-const ChatLog = ({ history }: { history: ChatMessage[] }) => {
+const ChatLog = ({ history, onOpenSettings }: { history: ChatMessage[]; onOpenSettings: () => void; }) => {
     const { t } = useTranslation();
     const getCurrentTime = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
@@ -1123,11 +1131,18 @@ const ChatLog = ({ history }: { history: ChatMessage[] }) => {
                             : 'bg-assistant-bubble-bg text-text-color rounded-bl-none'
                 }`}>
                     <p className="whitespace-pre-wrap">{msg.text}</p>
-                    {msg.onRetry && (
-                        <div className="mt-3 pt-2 border-t border-red-500/30">
-                            <button onClick={msg.onRetry} className="quick-action-button text-xs !text-yellow-400 !border-yellow-500/80 hover:!bg-yellow-500/20">
-                                {t('settings.common.retry')}
-                            </button>
+                    {(msg.onRetry || msg.isApiKeyError) && (
+                        <div className="mt-3 pt-2 border-t border-red-500/30 flex items-center gap-2">
+                            {msg.isApiKeyError && (
+                                <button onClick={onOpenSettings} className="quick-action-button text-xs !text-yellow-400 !border-yellow-500/80 hover:!bg-yellow-500/20">
+                                    {t('chat.goToApiSettings')}
+                                </button>
+                            )}
+                            {msg.onRetry && (
+                                <button onClick={msg.onRetry} className="quick-action-button text-xs !text-yellow-400 !border-yellow-500/80 hover:!bg-yellow-500/20">
+                                    {t('settings.common.retry')}
+                                </button>
+                            )}
                         </div>
                     )}
                     {msg.sources && msg.sources.length > 0 && (
@@ -1203,6 +1218,7 @@ export const App = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('persona');
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isYTReady, setIsYTReady] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
@@ -1479,8 +1495,14 @@ export const App = () => {
             speechSourceRef.current = null;
             if (onEndCallback) {
                 onEndCallback();
-            } else if (!isContinuousListeningActiveRef.current) {
-                setAssistantState('idle');
+            } else {
+                // Default behavior if no callback is provided
+                if (isContinuousListeningActiveRef.current) {
+                    setIsAwake(false); // Return to listening for the wake word
+                    setAssistantState('listening');
+                } else {
+                    setAssistantState('idle');
+                }
             }
         };
         source.start();
@@ -1517,12 +1539,15 @@ export const App = () => {
       }
   }, [playAudio]);
 
-  const addErrorMessageToChat = useCallback((message: string, onRetry?: () => void) => {
+  const addErrorMessageToChat = useCallback((error: any, onRetry?: () => void) => {
     if (speechSourceRef.current) {
         speechSourceRef.current.onended = null;
         speechSourceRef.current.stop();
     }
     isSpeakingRef.current = false;
+
+    const message = error.message || String(error);
+    const isApiKeyError = error instanceof ApiKeyError;
 
     setChatHistory(prev => [
         ...prev.filter(m => !m.onRetry), 
@@ -1532,6 +1557,7 @@ export const App = () => {
             text: message,
             isError: true,
             onRetry: onRetry,
+            isApiKeyError: isApiKeyError,
         },
     ]);
     speak(message, settings.voice[settings.gender].main, () => setAssistantState('error'));
@@ -1712,10 +1738,11 @@ export const App = () => {
           if (!isContinuousListeningActiveRef.current) {
             setAssistantState('idle');
           } else {
+            setIsAwake(false);
             setAssistantState('listening');
           }
       } catch (e: any) {
-          addErrorMessageToChat(e.message, () => executeYoutubeSearch(query));
+          addErrorMessageToChat(e, () => executeYoutubeSearch(query));
       }
   }, [settings.apiKeys.youtube, addErrorMessageToChat, speak, settings.voice, settings.gender]);
 
@@ -1726,7 +1753,7 @@ export const App = () => {
           setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: weatherSummary }]);
           await speak(weatherSummary, settings.voice[settings.gender].main);
       } catch (e: any) {
-          addErrorMessageToChat(e.message, () => executeWeatherFetch(location));
+          addErrorMessageToChat(e, () => executeWeatherFetch(location));
       }
   }, [settings.apiKeys.weather, addErrorMessageToChat, speak, settings.voice, settings.gender]);
 
@@ -1737,7 +1764,7 @@ export const App = () => {
           setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: newsSummary }]);
           await speak(newsSummary, settings.voice[settings.gender].main);
       } catch (e: any) {
-          addErrorMessageToChat(e.message, () => executeNewsFetch(query));
+          addErrorMessageToChat(e, () => executeNewsFetch(query));
       }
   }, [settings.apiKeys.news, addErrorMessageToChat, speak, settings.voice, settings.gender]);
 
@@ -1757,6 +1784,7 @@ export const App = () => {
         
         const onSongEnd = () => {
           if (isContinuousListeningActiveRef.current) {
+            setIsAwake(false);
             setAssistantState('listening');
           } else {
             setAssistantState('idle');
@@ -1766,7 +1794,7 @@ export const App = () => {
         await playAudio(base64Audio, onSongEnd);
 
     } catch (e: any) {
-        addErrorMessageToChat(e.message, () => executeSingSong(artist, title));
+        addErrorMessageToChat(e, () => executeSingSong(artist, title));
     }
   }, [settings.voice, settings.gender, addErrorMessageToChat, speak, playAudio]);
 
@@ -1783,7 +1811,7 @@ export const App = () => {
       try {
         response = await processUserCommand(updatedHistory, systemInstruction, BIAS_TEMPERATURE_MAP[settings.bias], settings.emotionTuning);
       } catch(error: any) {
-          addErrorMessageToChat(error.message, () => handleCommand(transcript));
+          addErrorMessageToChat(error, () => handleCommand(transcript));
           return;
       }
       
@@ -1817,15 +1845,16 @@ export const App = () => {
                       commandExecuted = true;
                   }
                   break;
+              case 'DEACTIVATE_LISTENING':
+                  stopAll();
+                  commandExecuted = true;
+                  break;
           }
 
           if (!commandExecuted) { // Only for REPLY, SEND_EMAIL, or if other commands had no query
               if (isContinuousListeningActiveRef.current) {
+                setIsAwake(false);
                 setAssistantState('listening');
-                if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
-                awakeTimeoutRef.current = window.setTimeout(() => {
-                  setIsAwake(false);
-                }, 15000);
               } else {
                 setAssistantState('idle');
               }
@@ -2005,17 +2034,17 @@ const goToSleep = useCallback(() => {
           break;
         case 'not-allowed':
         case 'service-not-allowed':
-          addErrorMessageToChat(t('errors.micNotAllowed'));
+          addErrorMessageToChat(new Error(t('errors.micNotAllowed')));
           break;
         case 'audio-capture':
-          addErrorMessageToChat(t('errors.micAudioCapture'));
+          addErrorMessageToChat(new Error(t('errors.micAudioCapture')));
           break;
         case 'network':
-          addErrorMessageToChat(t('errors.network'));
+          addErrorMessageToChat(new Error(t('errors.network')));
           break;
         default:
           // For other errors, set the state to error.
-          addErrorMessageToChat(t('errors.speechRecognitionGeneric'));
+          addErrorMessageToChat(new Error(t('errors.speechRecognitionGeneric')));
           setAssistantState('error');
           break;
       }
@@ -2096,6 +2125,11 @@ const goToSleep = useCallback(() => {
     handleSettingChange({ theme: settings.theme === 'dark' ? 'light' : 'dark' });
   };
   
+  const openApiSettings = () => {
+    setSettingsInitialTab('apiKeys');
+    setIsSettingsOpen(true);
+  };
+  
   if (!currentUser) {
       return <Auth onLogin={handleLogin} onSignUp={handleSignUp} />;
   }
@@ -2135,7 +2169,7 @@ const goToSleep = useCallback(() => {
                   </div>
               )}
           </div>
-          <button onClick={() => setIsSettingsOpen(true)} className="footer-button" aria-label={t('header.settings')}>
+          <button onClick={() => { setSettingsInitialTab('persona'); setIsSettingsOpen(true); }} className="footer-button" aria-label={t('header.settings')}>
             <SettingsIcon />
           </button>
         </div>
@@ -2186,7 +2220,7 @@ const goToSleep = useCallback(() => {
             </div>
           ) : (
             <div ref={chatLogRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
-              <ChatLog history={chatHistory} />
+              <ChatLog history={chatHistory} onOpenSettings={openApiSettings} />
             </div>
           )}
         </aside>
@@ -2228,6 +2262,7 @@ const goToSleep = useCallback(() => {
         onSettingChange={handleSettingChange}
         onTestVoice={handleTestVoice}
         onLogout={handleLogout}
+        initialTab={settingsInitialTab}
       />
       <audio ref={ambientAudioRef} loop />
       <audio ref={connectionAudioRef} />
