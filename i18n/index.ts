@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { createContext, useContext, useState, useCallback, FC } from 'react';
 
 const en = {
@@ -46,7 +41,6 @@ const en = {
       "speaking": "Speaking...",
       "error": "An error occurred.",
       "idle": "Idle",
-      "disconnectedInactivity": "Disconnected due to inactivity.",
       "listeningForWakeWord": "Listening for '{{wakeWord}}'",
       "awake": "Awake. Listening for command...",
       "sleep": "Sleeping. Click the mic to wake me up.",
@@ -228,6 +222,12 @@ const en = {
       "copy": "Copy",
       "copied": "Copied!",
       "retry": "Retry"
+    },
+    "errors": {
+      "micNotAllowed": "Microphone access is not allowed. Please enable it in your browser settings to continue.",
+      "micAudioCapture": "I can't hear you. Please check if your microphone is connected and working correctly.",
+      "network": "A network error occurred with the speech service. Please check your internet connection.",
+      "speechRecognitionGeneric": "An unexpected error occurred with speech recognition."
     }
   }
 };
@@ -273,7 +273,6 @@ const hi = {
       "speaking": "बोल रही हूँ...",
       "error": "एक त्रुटि हुई।",
       "idle": "निष्क्रिय",
-      "disconnectedInactivity": "निष्क्रियता के कारण डिस्कनेक्ट हो गया।",
       "listeningForWakeWord": "'{{wakeWord}}' के लिए सुन रही हूँ",
       "awake": "जागृत। कमांड के लिए सुन रही हूँ...",
       "sleep": "सो रही हूँ। मुझे जगाने के लिए माइक पर क्लिक करें।",
@@ -455,6 +454,12 @@ const hi = {
       "copy": "कॉपी करें",
       "copied": "कॉपी किया गया!",
       "retry": "पुनः प्रयास करें"
+    },
+    "errors": {
+      "micNotAllowed": "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। जारी रखने के लिए कृपया इसे अपनी ब्राउज़र सेटिंग्स में सक्षम करें।",
+      "micAudioCapture": "मैं आपको सुन नहीं सकती। कृपया जांचें कि आपका माइक्रोफ़ोन जुड़ा हुआ है और ठीक से काम कर रहा है।",
+      "network": "स्पीच सेवा में नेटवर्क त्रुटि हुई। कृपया अपना इंटरनेट कनेक्शन जांचें।",
+      "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई।"
     }
   }
 };

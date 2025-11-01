@@ -1924,15 +1924,36 @@ const goToSleep = useCallback(() => {
     
     recognition.onerror = (event: any) => {
       if (event.error === 'aborted') return;
-      console.error("Speech recognition error", event.error);
-      if (event.error === 'no-speech') {
-        noSpeechErrorCountRef.current += 1;
-        setListeningHint(t('main.noSpeechHint'));
-        if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
-        hintTimeoutRef.current = window.setTimeout(() => setListeningHint(null), 2500);
-      } else {
-        noSpeechErrorCountRef.current = 0;
-        setAssistantState('error');
+      console.error("Speech recognition error", event.error, event.message);
+
+      // Stop listening hint if it's active
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      setListeningHint(null);
+
+      noSpeechErrorCountRef.current = 0; // Reset for most errors
+
+      switch (event.error) {
+        case 'no-speech':
+          noSpeechErrorCountRef.current += 1;
+          setListeningHint(t('main.noSpeechHint'));
+          hintTimeoutRef.current = window.setTimeout(() => setListeningHint(null), 2500);
+          // Don't set global error state for this, it's common.
+          break;
+        case 'not-allowed':
+        case 'service-not-allowed':
+          addErrorMessageToChat(t('errors.micNotAllowed'));
+          break;
+        case 'audio-capture':
+          addErrorMessageToChat(t('errors.micAudioCapture'));
+          break;
+        case 'network':
+          addErrorMessageToChat(t('errors.network'));
+          break;
+        default:
+          // For other errors, set the state to error.
+          addErrorMessageToChat(t('errors.speechRecognitionGeneric'));
+          setAssistantState('error');
+          break;
       }
     };
 
@@ -1954,7 +1975,7 @@ const goToSleep = useCallback(() => {
         recognitionRef.current.stop();
       }
     };
-  }, [lang, handleCommand, t, isAwake, resetInactivityTimer]);
+  }, [lang, handleCommand, t, isAwake, resetInactivityTimer, addErrorMessageToChat]);
 
   const handleRecordButtonClick = () => {
     if (settings.enableContinuousListening) {

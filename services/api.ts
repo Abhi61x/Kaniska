@@ -74,12 +74,21 @@ Your 'emotion' value in the JSON output should reflect these settings.
             sources,
         };
     } catch (jsonError) {
-        console.warn("Failed to parse Gemini response as JSON, indicating a misunderstanding.", {
+        console.warn("Failed to parse Gemini response as JSON. Falling back to plain text reply.", {
             error: jsonError,
             originalText: response.text
         });
-        // This is a model misunderstanding, not a service failure, so a simple reply is better than a retry.
-        throw new Error("I'm sorry, I didn't quite understand that. Could you try rephrasing?");
+        // If JSON parsing fails, the model likely returned a plain text response.
+        // We can salvage this by wrapping it in a default REPLY command, making the assistant more robust.
+        return {
+            command: 'REPLY',
+            reply: response.text.trim(),
+            youtubeQuery: '',
+            newsQuery: '',
+            location: '',
+            emotion: 'neutral',
+            sources,
+        };
     }
   } catch (apiError: any) {
     console.error("Error calling the Gemini API:", apiError);

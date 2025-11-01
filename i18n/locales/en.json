@@ -221,6 +221,12 @@
       "copy": "Copy",
       "copied": "Copied!",
       "retry": "Retry"
+    },
+    "errors": {
+      "micNotAllowed": "Microphone access is not allowed. Please enable it in your browser settings to continue.",
+      "micAudioCapture": "I can't hear you. Please check if your microphone is connected and working correctly.",
+      "network": "A network error occurred with the speech service. Please check your internet connection.",
+      "speechRecognitionGeneric": "An unexpected error occurred with speech recognition."
     }
   }
 }
