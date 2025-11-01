@@ -1,6 +1,4 @@
 
-
-
 export type AssistantState =
   | 'idle'
   | 'listening'
