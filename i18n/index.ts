@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useCallback, FC } from 'react';
 
 const en = {
@@ -94,6 +95,12 @@ const en = {
         "title": "Custom System Prompt",
         "description": "Define the core personality and instructions. A restart is needed for changes to take full effect.",
         "save": "Save Prompt"
+      },
+       "gender": {
+        "title": "Gender Persona",
+        "description": "Choose the assistant's gender, which affects its name and default greeting.",
+        "female": "Female",
+        "male": "Male"
       }
     },
     "biasTab": {
@@ -187,7 +194,8 @@ const en = {
     "common": {
       "save": "Save",
       "copy": "Copy",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "retry": "Retry"
     }
   }
 };
@@ -285,6 +293,12 @@ const hi = {
         "title": "कस्टम सिस्टम प्रॉम्प्ट",
         "description": "मूल व्यक्तित्व और निर्देशों को परिभाषित करें। परिवर्तनों को पूरी तरह से प्रभावी होने के लिए पुनरारंभ की आवश्यकता है।",
         "save": "प्रॉम्प्ट सहेजें"
+      },
+      "gender": {
+        "title": "लिंग व्यक्तित्व",
+        "description": "सहायक का लिंग चुनें, जो उसके नाम और डिफ़ॉल्ट अभिवादन को प्रभावित करता है।",
+        "female": "महिला",
+        "male": "पुरुष"
       }
     },
     "biasTab": {
@@ -378,7 +392,8 @@ const hi = {
     "common": {
       "save": "सहेजें",
       "copy": "कॉपी करें",
-      "copied": "कॉपी किया गया!"
+      "copied": "कॉपी किया गया!",
+      "retry": "पुनः प्रयास करें"
     }
   }
 };

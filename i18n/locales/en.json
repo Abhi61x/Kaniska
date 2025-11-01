@@ -1,4 +1,5 @@
 
+
 {
   "appName": "Kaniska",
   "auth": {
@@ -91,6 +92,12 @@
         "title": "Custom System Prompt",
         "description": "Define the core personality and instructions. A restart is needed for changes to take full effect.",
         "save": "Save Prompt"
+      },
+      "gender": {
+        "title": "Gender Persona",
+        "description": "Choose the assistant's gender, which affects its name and default greeting.",
+        "female": "Female",
+        "male": "Male"
       }
     },
     "biasTab": {
@@ -184,7 +191,8 @@
     "common": {
       "save": "Save",
       "copy": "Copy",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "retry": "Retry"
     }
   }
 }

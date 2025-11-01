@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { AssistantState, ChatMessage, Emotion, Source, Gender } from './types.ts';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech } from './services/api.ts';
@@ -918,8 +919,21 @@ const ChatLog = ({ history }: { history: ChatMessage[] }) => {
       <>
         {history.map((msg) => (
             <div key={msg.id} className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation`}>
-                <div className={`max-w-xl p-3 rounded-xl ${msg.sender === 'user' ? 'bg-primary-color/20 text-text-color rounded-br-none' : 'bg-assistant-bubble-bg text-text-color rounded-bl-none'}`}>
+                <div className={`max-w-xl p-3 rounded-xl ${
+                    msg.sender === 'user' 
+                        ? 'bg-primary-color/20 text-text-color rounded-br-none' 
+                        : msg.isError
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/40 rounded-bl-none'
+                            : 'bg-assistant-bubble-bg text-text-color rounded-bl-none'
+                }`}>
                     <p className="whitespace-pre-wrap">{msg.text}</p>
+                    {msg.onRetry && (
+                        <div className="mt-3 pt-2 border-t border-red-500/30">
+                            <button onClick={msg.onRetry} className="quick-action-button text-xs !text-yellow-400 !border-yellow-500/80 hover:!bg-yellow-500/20">
+                                {t('settings.common.retry')}
+                            </button>
+                        </div>
+                    )}
                     {msg.sources && msg.sources.length > 0 && (
                         <div className="mt-3 pt-2 border-t border-border-color text-xs">
                             <p className="font-semibold mb-1 text-text-color-muted">{t('chat.sources')}</p>
@@ -1209,7 +1223,7 @@ export const App = () => {
         }
     }
   }, []);
-
+  
   const speak = useCallback(async (text: string, config: VoiceConfig, onEndCallback?: () => void) => {
     if (speechSourceRef.current) {
         speechSourceRef.current.onended = null;
@@ -1251,9 +1265,42 @@ export const App = () => {
         console.error("Error generating or playing speech:", error);
         isSpeakingRef.current = false;
         setAssistantState('error');
-        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: `[Voice Error] ${error.message}` }]);
+
+        const retrySpeak = () => {
+            setChatHistory(prev => prev.filter(m => !m.onRetry));
+            speak(text, config, onEndCallback);
+        };
+
+        setChatHistory(prev => [...prev, { 
+            id: Date.now(), 
+            sender: 'assistant', 
+            text: error.message,
+            isError: true,
+            onRetry: retrySpeak 
+        }]);
     }
   }, []);
+
+  const addErrorMessageToChat = useCallback((message: string, onRetry?: () => void) => {
+    if (speechSourceRef.current) {
+        speechSourceRef.current.onended = null;
+        speechSourceRef.current.stop();
+    }
+    isSpeakingRef.current = false;
+
+    setChatHistory(prev => [
+        ...prev.filter(m => !m.onRetry), 
+        {
+            id: Date.now(),
+            sender: 'assistant',
+            text: message,
+            isError: true,
+            onRetry: onRetry,
+        },
+    ]);
+    speak(message, settings.voice.main, () => setAssistantState('error'));
+    setAssistantState('error');
+  }, [speak, settings.voice.main]);
 
   const handleTestVoice = (text: string, config: VoiceConfig) => {
     speak(text, config);
@@ -1404,6 +1451,48 @@ export const App = () => {
     }
   }, []);
 
+    const executeYoutubeSearch = useCallback(async (query: string) => {
+        try {
+            setAssistantState('thinking');
+            setChatHistory(prev => prev.filter(m => !m.onRetry));
+            const videoId = await searchYouTube(settings.apiKeys.youtube, query);
+            if (videoId) {
+                setYoutubeVideoId(videoId);
+            } else {
+                const notFoundMsg = `I couldn't find a suitable video for "${query}".`;
+                 speak(notFoundMsg, settings.voice.main);
+                 setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: notFoundMsg }]);
+            }
+        } catch (e: any) {
+            addErrorMessageToChat(e.message, () => executeYoutubeSearch(query));
+        }
+    }, [settings.apiKeys.youtube, addErrorMessageToChat, speak, settings.voice.main]);
+
+    const executeWeatherFetch = useCallback(async (location: string) => {
+        try {
+            setAssistantState('thinking');
+            setChatHistory(prev => prev.filter(m => !m.onRetry));
+            const weatherSummary = await fetchWeatherSummary(location, settings.apiKeys.weather);
+            speak(weatherSummary, settings.voice.main);
+            setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: weatherSummary }]);
+        } catch (e: any) {
+            addErrorMessageToChat(e.message, () => executeWeatherFetch(location));
+        }
+    }, [settings.apiKeys.weather, addErrorMessageToChat, speak, settings.voice.main]);
+
+    const executeNewsFetch = useCallback(async (query: string) => {
+        try {
+            setAssistantState('thinking');
+            setChatHistory(prev => prev.filter(m => !m.onRetry));
+            const newsSummary = await fetchNews(settings.apiKeys.news, query);
+            speak(newsSummary, settings.voice.main);
+            setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: newsSummary }]);
+        } catch (e: any) {
+            addErrorMessageToChat(e.message, () => executeNewsFetch(query));
+        }
+    }, [settings.apiKeys.news, addErrorMessageToChat, speak, settings.voice.main]);
+
+
   const handleCommand = useCallback(async (transcript: string) => {
       stopRecognition();
       setAssistantState('thinking');
@@ -1412,7 +1501,14 @@ export const App = () => {
       setChatHistory(updatedHistory);
 
       const systemInstruction = getSystemPrompt(settings.gender);
-      const response = await processUserCommand(updatedHistory, systemInstruction, BIAS_TEMPERATURE_MAP[settings.bias], settings.emotionTuning);
+      
+      let response;
+      try {
+        response = await processUserCommand(updatedHistory, systemInstruction, BIAS_TEMPERATURE_MAP[settings.bias], settings.emotionTuning);
+      } catch(error: any) {
+          addErrorMessageToChat(error.message, () => handleCommand(transcript));
+          return;
+      }
       
       const assistantMessage: ChatMessage = { id: Date.now() + 1, sender: 'assistant', text: response.reply, sources: response.sources };
       setChatHistory(prev => [...prev, assistantMessage]);
@@ -1425,50 +1521,28 @@ export const App = () => {
           }
       });
       
-      const handleError = (e: any) => {
-          speak(e.message, settings.voice.main);
-          setChatHistory(prev => [...prev, { id: Date.now() + 2, sender: 'assistant', text: `[Error] ${e.message}` }]);
-      };
-      
       switch (response.command) {
           case 'YOUTUBE_SEARCH':
               if (response.youtubeQuery) {
-                  try {
-                    const videoId = await searchYouTube(settings.apiKeys.youtube, response.youtubeQuery);
-                    if (videoId) {
-                        setYoutubeVideoId(videoId);
-                    } else {
-                        throw new Error(`I couldn't find a suitable video for "${response.youtubeQuery}".`);
-                    }
-                  } catch (e: any) {
-                    handleError(e);
-                  }
+                  await executeYoutubeSearch(response.youtubeQuery);
               }
               break;
           case 'GET_WEATHER':
               if (response.location) {
-                  try {
-                      const weatherSummary = await fetchWeatherSummary(response.location, settings.apiKeys.weather);
-                      speak(weatherSummary, settings.voice.main);
-                      setChatHistory(prev => [...prev, { id: Date.now() + 2, sender: 'assistant', text: weatherSummary }]);
-                  } catch (e: any) {
-                      handleError(e);
-                  }
+                  await executeWeatherFetch(response.location);
               }
               break;
           case 'GET_NEWS':
               if(response.newsQuery) {
-                  try {
-                      const newsSummary = await fetchNews(settings.apiKeys.news, response.newsQuery);
-                      speak(newsSummary, settings.voice.main);
-                      setChatHistory(prev => [...prev, { id: Date.now() + 2, sender: 'assistant', text: newsSummary }]);
-                  } catch (e: any) {
-                      handleError(e);
-                  }
+                  await executeNewsFetch(response.newsQuery);
               }
               break;
       }
-  }, [chatHistory, settings, isConnected, speak, stopRecognition, startRecognition]);
+  }, [
+      chatHistory, settings.gender, settings.bias, settings.emotionTuning, 
+      settings.voice.main, isConnected, speak, stopRecognition, startRecognition, 
+      addErrorMessageToChat, executeYoutubeSearch, executeWeatherFetch, executeNewsFetch
+  ]);
 
   const handleConnect = useCallback(() => {
     if (!hasInteracted) setHasInteracted(true);

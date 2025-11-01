@@ -1,5 +1,6 @@
 
 
+
 export type AssistantState =
   | 'idle'
   | 'listening'
@@ -19,6 +20,8 @@ export interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   sources?: Source[];
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 export type Emotion = 'neutral' | 'happy' | 'sad' | 'excited' | 'empathetic' | 'singing' | 'formal' | 'chirpy' | 'surprised' | 'curious' | 'thoughtful' | 'joking';

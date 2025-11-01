@@ -12,15 +12,8 @@ export async function processUserCommand(
 ): Promise<GeminiResponse> {
   const lastMessage = history[history.length - 1];
   if (!lastMessage || lastMessage.sender !== 'user' || !lastMessage.text.trim()) {
-    return {
-      command: 'REPLY',
-      reply: "I didn't hear that. Could you please say it again?",
-      youtubeQuery: '',
-      newsQuery: '',
-      location: '',
-      emotion: 'empathetic',
-      sources: [],
-    };
+      // This case should ideally not be retried as it's not an API failure.
+      throw new Error("I didn't hear that. Could you please say it again?");
   }
   try {
     const contents: Content[] = history.map(msg => ({
@@ -78,27 +71,19 @@ Your 'emotion' value in the JSON output should reflect these settings.
             error: jsonError,
             originalText: response.text
         });
-        return {
-            command: 'REPLY',
-            reply: "I'm sorry, I didn't quite understand that. Could you try rephrasing?",
-            youtubeQuery: '',
-            newsQuery: '',
-            location: '',
-            emotion: 'empathetic',
-            sources: [],
-        };
+        // This is a model misunderstanding, not a service failure, so a simple reply is better than a retry.
+        throw new Error("I'm sorry, I didn't quite understand that. Could you try rephrasing?");
     }
-  } catch (apiError) {
+  } catch (apiError: any) {
     console.error("Error calling the Gemini API:", apiError);
-    return {
-      command: 'REPLY',
-      reply: "I'm having a little trouble connecting at the moment. Please try again shortly.",
-      youtubeQuery: '',
-      newsQuery: '',
-      location: '',
-      emotion: 'sad',
-      sources: [],
-    };
+    if (apiError.message?.includes('API key not valid')) {
+        throw new Error("I can't connect because the main Gemini API key is invalid. Please ask the administrator to check it.");
+    }
+    if (apiError instanceof TypeError && apiError.message.includes('fetch')) {
+         throw new Error("I'm having trouble connecting to my core services. Please check your internet connection and try again.");
+    }
+    // Generic error for other cases (500 errors, rate limiting, etc.)
+    throw new Error("I'm having a little trouble thinking right now. My core service might be temporarily unavailable. Please try again shortly.");
   }
 }
 
@@ -299,6 +284,6 @@ export async function generateSpeech(text: string, voiceName: string): Promise<s
         return base64Audio;
     } catch (error) {
         console.error("Error generating speech with Gemini API:", error);
-        throw new Error("I'm having trouble with my voice right now. Please try again in a moment.");
+        throw new Error("I'm having trouble with my voice right now. The speech generation service may be down. Please try again in a moment.");
     }
 }
