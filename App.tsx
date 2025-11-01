@@ -1223,7 +1223,7 @@ export const App = () => {
   const fadeIntervalRef = useRef<number | null>(null);
   const hintTimeoutRef = useRef<number | null>(null);
   const noSpeechErrorCountRef = useRef(0);
-  const sleepTimeoutRef = useRef<number | null>(null);
+  const awakeTimeoutRef = useRef<number | null>(null);
   const inactivityTimeoutRef = useRef<number | null>(null);
 
 
@@ -1409,7 +1409,7 @@ export const App = () => {
     if (!hasInteracted) return;
     
     const targetVolume = settings.ambientVolume;
-    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused'];
+    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused', 'sleep'];
 
     if (playStates.includes(assistantState) && isConnected) {
         fadeAmbientSound(targetVolume);
@@ -1429,18 +1429,17 @@ export const App = () => {
         setAssistantState('listening');
     }
     if (recognitionRef.current) {
-        // FIX: Dynamically set 'continuous' based on the listening mode.
-        // This ensures push-to-talk mode properly finalizes after one utterance, fixing the audio input bug.
-        recognitionRef.current.continuous = settings.enableContinuousListening;
+        recognitionRef.current.continuous = settingsRef.current.enableContinuousListening;
         try {
             recognitionRef.current.start();
         } catch (e) {
+            // Errors are expected if recognition is already running, especially with continuous mode.
             if (e.name !== 'InvalidStateError') {
-                console.warn("Recognition already started.", e);
+                console.warn("Could not start recognition:", e);
             }
         }
     }
-  }, [settings.enableContinuousListening]);
+  }, []);
   
   const speak = useCallback(async (text: string, config: VoiceConfig, onEndCallback?: () => void) => {
     if (speechSourceRef.current) {
@@ -1745,8 +1744,8 @@ export const App = () => {
           if (isContinuousListeningActiveRef.current) {
             setAssistantState('listening');
             // Keep the assistant "awake" for follow-up commands
-            if (sleepTimeoutRef.current) clearTimeout(sleepTimeoutRef.current);
-            sleepTimeoutRef.current = window.setTimeout(() => {
+            if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
+            awakeTimeoutRef.current = window.setTimeout(() => {
               setIsAwake(false);
             }, 15000); // 15 seconds for a follow-up
           } else {
@@ -1793,7 +1792,6 @@ export const App = () => {
     setCurrentTranscript('');
   }, []);
   
-// FIX: Moved goToSleep declaration before its usage in resetInactivityTimer to fix block-scoped variable error.
 const goToSleep = useCallback(() => {
   setIsContinuousListeningActive(false);
   setIsAwake(false);
@@ -1852,7 +1850,7 @@ const goToSleep = useCallback(() => {
     
     recognitionRef.current = new SpeechRecognition();
     const recognition = recognitionRef.current;
-    recognition.continuous = true; // Set dynamically in startRecognition now, but default can be true
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
 
@@ -1864,13 +1862,11 @@ const goToSleep = useCallback(() => {
 
     recognition.onresult = (event: any) => {
         if (isSpeakingRef.current) {
-            // BUG FIX: If the assistant is speaking, ignore anything the mic picks up (i.e., its own voice).
             return;
         }
         
         const currentSettings = settingsRef.current;
 
-        // Any speech recognition activity resets the inactivity timer.
         if (currentSettings.enableContinuousListening) {
           resetInactivityTimer();
         }
@@ -1903,7 +1899,7 @@ const goToSleep = useCallback(() => {
             if (isAwake) {
                 setCurrentTranscript(interimTranscript);
                 if (finalTranscript) {
-                    if (sleepTimeoutRef.current) clearTimeout(sleepTimeoutRef.current);
+                    if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
                     const command = finalTranscript.toLowerCase().replace(wakeWordWithHey, '').replace(wakeWord, '').trim();
                     if (command) handleCommand(command);
                 }
@@ -1911,8 +1907,8 @@ const goToSleep = useCallback(() => {
                 if (currentText.includes(wakeWordWithHey) || currentText.includes(wakeWord)) {
                     setIsAwake(true);
                     wakeAudioRef.current?.play().catch(e => console.error("Error playing wake sound:", e));
-                    if (sleepTimeoutRef.current) clearTimeout(sleepTimeoutRef.current);
-                    sleepTimeoutRef.current = window.setTimeout(() => setIsAwake(false), 15000); // Stays "awake" for 15s
+                    if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
+                    awakeTimeoutRef.current = window.setTimeout(() => setIsAwake(false), 15000); // Stays "awake" for 15s
                     setCurrentTranscript('');
                 } else {
                     setCurrentTranscript(interimTranscript);
