@@ -58,7 +58,7 @@ Your 'emotion' value in the JSON output should reflect these settings.
         const cleanJsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
         const parsed = JSON.parse(cleanJsonText);
 
-        if (typeof parsed.command !== 'string' || typeof parsed.reply !== 'string' || typeof parsed.youtubeQuery !== 'string' || typeof parsed.location !== 'string' || typeof parsed.emotion !== 'string') {
+        if (typeof parsed.command !== 'string' || typeof parsed.reply !== 'string' || typeof parsed.youtubeQuery !== 'string' || typeof parsed.location !== 'string' || typeof parsed.emotion !== 'string' || typeof parsed.newsQuery !== 'string') {
             throw new Error('Invalid JSON structure from Gemini');
         }
 

@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { AssistantState, ChatMessage, Emotion, Source, Gender } from './types.ts';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech } from './services/api.ts';
@@ -420,6 +414,18 @@ const PersonaContent = ({ settings, onUpdate }) => {
     const [customWakeWordInput, setCustomWakeWordInput] = useState(settings.customWakeWord);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const testAudioRef = useRef<HTMLAudioElement>(null);
+
+    useEffect(() => {
+        setGreetingInput(settings.greeting);
+    }, [settings.greeting]);
+
+    useEffect(() => {
+        setSystemPromptInput(settings.systemPrompt);
+    }, [settings.systemPrompt]);
+
+    useEffect(() => {
+        setCustomWakeWordInput(settings.customWakeWord);
+    }, [settings.customWakeWord]);
     
     const emotionTuning = settings.emotionTuning || defaultSettings.emotionTuning;
     const defaultWakeWord = settings.gender === 'female' ? 'Hey Kaniska' : 'Hey Kanishk';
@@ -447,7 +453,6 @@ const PersonaContent = ({ settings, onUpdate }) => {
             : "Hello, I am Kanishk. How may I help you?";
         onUpdate('gender', gender);
         onUpdate('greeting', newGreeting);
-        setGreetingInput(newGreeting);
     };
     
     const handleWakeWordModeChange = (mode: 'default' | 'custom') => {
