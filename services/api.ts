@@ -72,6 +72,8 @@ Your 'emotion' value in the JSON output should reflect these settings.
             location: parsed.location,
             emotion: validatedEmotion,
             sources,
+            songTitle: parsed.songTitle || '',
+            songArtist: parsed.songArtist || '',
         };
     } catch (jsonError) {
         console.warn("Failed to parse Gemini response as JSON. Falling back to plain text reply.", {
@@ -310,5 +312,54 @@ export async function generateSpeech(text: string, voiceName: string): Promise<s
     } catch (error) {
         console.error("Error generating speech with Gemini API:", error);
         throw new Error("I'm having trouble with my voice right now. The speech generation service may be down. Please try again in a moment.");
+    }
+}
+
+export async function fetchLyrics(artist: string, title: string): Promise<string | null> {
+    const artistEnc = encodeURIComponent(artist.trim());
+    const titleEnc = encodeURIComponent(title.trim());
+    const url = `https://api.lyrics.ovh/v1/${artistEnc}/${titleEnc}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            if (response.status === 404) {
+                 return null;
+            }
+            throw new Error(`Lyrics.ovh API error: ${response.status}`);
+        }
+        const data = await response.json();
+        // Clean up lyrics: remove RCR line and extra newlines
+        return data.lyrics
+            ? data.lyrics.replace(/Paroles de la chanson.*\r\n/, '').trim() 
+            : null;
+    } catch (error) {
+        console.error("Error fetching lyrics:", error);
+        return null;
+    }
+}
+
+export async function generateSong(lyrics: string, voiceName: string): Promise<string> {
+    try {
+        const instructionalText = `You are a professional singer. Sing the following lyrics with emotion, proper melody, and rhythm. The output should be only the sung audio. Lyrics: ${lyrics}`;
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: instructionalText }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: voiceName || 'Kore' },
+                    },
+                },
+            },
+        });
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!base64Audio) {
+            throw new Error("API did not return audio data for the song.");
+        }
+        return base64Audio;
+    } catch (error) {
+        console.error("Error generating song with Gemini API:", error);
+        throw new Error("I'm having trouble singing right now. My vocal synthesizer might be down.");
     }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { AssistantState, ChatMessage, Emotion, Source, Gender } from './types.ts';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.ts';
 
 declare global {
@@ -53,22 +53,25 @@ ABOUT YOU:
 JSON OUTPUT STRUCTURE:
 Your entire response must be a single JSON object with this exact structure:
 {
-  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL",
+  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG",
   "reply": "Your verbal response to the user. This is what will be spoken out loud. IMPORTANT: This text will be fed directly into a text-to-speech (TTS) engine. It MUST contain only plain, speakable words. Do not include markdown, emojis, or parenthetical non-speech descriptions like '(laughs)' or '♪'. Keep it concise and conversational.",
   "youtubeQuery": "A simplified keyword for the YouTube search. Examples: 'music', 'news', 'cats'. Otherwise, an empty string.",
   "newsQuery": "The topic for the news search. Examples: 'technology', 'world headlines'. Otherwise, an empty string.",
   "location": "The city or place for the weather query. Examples: 'London', 'Tokyo'. Otherwise, an empty string.",
-  "emotion": "neutral" | "happy" | "sad" | "excited" | "empathetic" | "singing" | "formal" | "chirpy" | "surprised" | "curious" | "thoughtful" | "joking"
+  "emotion": "neutral" | "happy" | "sad" | "excited" | "empathetic" | "singing" | "formal" | "chirpy" | "surprised" | "curious" | "thoughtful" | "joking",
+  "songTitle": "The title of the song to sing. Example: 'Kesariya'. Otherwise, an empty string.",
+  "songArtist": "The artist of the song. Example: 'Arijit Singh'. Otherwise, an empty string."
 }
 
 HOW TO DECIDE THE JSON VALUES:
 
 1. COMMAND:
+- If the user asks you to sing a specific song (e.g., "sing Kesariya by Arijit Singh"), set command to "SING_SONG".
 - If the user asks you to search for or play a video on YouTube (e.g., "play some music", "find a video about cats"), set command to "YOUTUBE_SEARCH".
 - If the user asks about the weather (e.g., "what's the weather like?", "is it going to rain in Paris?"), set command to "GET_WEATHER".
 - If the user asks for news (e.g., "latest headlines", "news about space exploration"), set command to "GET_NEWS".
 - If the user asks to send an email (e.g., "send an email to John"), set command to "SEND_EMAIL". Your 'reply' should confirm the request, like "Certainly, who should the email be addressed to and what is the message?".
-- For ALL other queries (greetings, questions, singing requests), set command to "REPLY".
+- For ALL other queries (greetings, questions, generic singing requests like "sing me a song"), set command to "REPLY".
 
 2. LOCATION:
 - This field is ONLY for "GET_WEATHER" commands.
@@ -81,7 +84,7 @@ HOW TO DECIDE THE JSON VALUES:
 - 'empathetic' or 'sad': For responding to user's troubles or sad topics.
 - 'excited': For celebratory moments or exciting news.
 - 'formal': For providing factual information like news or weather summaries.
-- 'singing': This is a special case. You MUST use this emotion if the user asks you to sing (e.g., "sing a song," "can you sing?"). When this happens, the 'command' MUST be "REPLY", and the 'reply' field MUST contain ONLY the lyrics of a short, well-known song (e.g., "Twinkle, twinkle, little star, how I wonder what you are."). Do not say "Sure, I can sing that for you" or anything similar; just provide the lyrics directly.
+- 'singing': You MUST use this emotion if the user asks you to sing. If it's a generic request ("sing a song"), the 'command' MUST be "REPLY", and the 'reply' field MUST contain ONLY the lyrics of a short, well-known song (e.g., "Twinkle, twinkle, little star, how I wonder what you are."). If it is a specific song request, the command will be "SING_SONG".
 - 'surprised': For reacting to unexpected information from the user.
 - 'curious' or 'thoughtful': When asking clarifying questions or pondering a complex topic.
 - 'joking': When you are being playful or telling a joke.
@@ -110,6 +113,7 @@ const DEFAULT_AVATAR_MAP: Record<AssistantState, string> = {
   composing: PLACEHOLDER_AVATAR_URL,
   confused: PLACEHOLDER_AVATAR_URL,
   sleep: PLACEHOLDER_AVATAR_URL,
+  singing: PLACEHOLDER_AVATAR_URL,
 };
 
 const GEMINI_TTS_VOICES = [
@@ -1450,29 +1454,23 @@ export const App = () => {
     }
   }, []);
   
-  const speak = useCallback(async (text: string, config: VoiceConfig, onEndCallback?: () => void) => {
+  const playAudio = useCallback(async (base64Audio: string, onEndCallback?: () => void) => {
     if (speechSourceRef.current) {
         speechSourceRef.current.onended = null;
         speechSourceRef.current.stop();
         speechSourceRef.current.disconnect();
     }
-
     isSpeakingRef.current = true;
-    setAssistantState('speaking');
-    
     try {
-        const base64Audio = await generateSpeech(text, config.name);
         if (!audioContextRef.current || !gainNodeRef.current) {
             throw new Error("AudioContext not initialized");
         }
-        
         const audioBuffer = await decodeAudioData(
             decode(base64Audio),
             audioContextRef.current,
             24000,
             1,
         );
-        
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(gainNodeRef.current);
@@ -1481,31 +1479,43 @@ export const App = () => {
             speechSourceRef.current = null;
             if (onEndCallback) {
                 onEndCallback();
-            } else if (!isContinuousListeningActiveRef.current) { // Only go idle if not in continuous mode
+            } else if (!isContinuousListeningActiveRef.current) {
                 setAssistantState('idle');
             }
         };
         source.start();
         speechSourceRef.current = source;
     } catch (error: any) {
-        console.error("Error generating or playing speech:", error);
+        console.error("Error playing audio:", error);
         isSpeakingRef.current = false;
-        setAssistantState('error');
-
-        const retrySpeak = () => {
-            setChatHistory(prev => prev.filter(m => !m.onRetry));
-            speak(text, config, onEndCallback);
-        };
-
-        setChatHistory(prev => [...prev, { 
-            id: Date.now(), 
-            sender: 'assistant', 
-            text: error.message,
-            isError: true,
-            onRetry: retrySpeak 
-        }]);
+        throw error;
     }
   }, []);
+
+  const speak = useCallback(async (text: string, config: VoiceConfig, onEndCallback?: () => void) => {
+      setAssistantState('speaking');
+      try {
+          const base64Audio = await generateSpeech(text, config.name);
+          await playAudio(base64Audio, onEndCallback);
+      } catch (error: any) {
+          console.error("Error generating or playing speech:", error);
+          isSpeakingRef.current = false;
+          setAssistantState('error');
+
+          const retrySpeak = () => {
+              setChatHistory(prev => prev.filter(m => !m.onRetry));
+              speak(text, config, onEndCallback);
+          };
+
+          setChatHistory(prev => [...prev, { 
+              id: Date.now(), 
+              sender: 'assistant', 
+              text: error.message,
+              isError: true,
+              onRetry: retrySpeak 
+          }]);
+      }
+  }, [playAudio]);
 
   const addErrorMessageToChat = useCallback((message: string, onRetry?: () => void) => {
     if (speechSourceRef.current) {
@@ -1688,46 +1698,77 @@ export const App = () => {
     }
   }, []);
 
-    const executeYoutubeSearch = useCallback(async (query: string) => {
-        try {
-            setAssistantState('thinking');
-            setChatHistory(prev => prev.filter(m => !m.onRetry));
-            const videoId = await searchYouTube(settings.apiKeys.youtube, query);
-            if (videoId) {
-                setYoutubeVideoId(videoId);
-            } else {
-                const notFoundMsg = `I couldn't find a suitable video for "${query}".`;
-                 speak(notFoundMsg, settings.voice[settings.gender].main);
-                 setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: notFoundMsg }]);
-            }
-        } catch (e: any) {
-            addErrorMessageToChat(e.message, () => executeYoutubeSearch(query));
-        }
-    }, [settings.apiKeys.youtube, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+  const executeYoutubeSearch = useCallback(async (query: string) => {
+      try {
+          setAssistantState('thinking');
+          const videoId = await searchYouTube(settings.apiKeys.youtube, query);
+          if (videoId) {
+              setYoutubeVideoId(videoId);
+          } else {
+              const notFoundMsg = `I couldn't find a suitable video for "${query}".`;
+              setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: notFoundMsg }]);
+              await speak(notFoundMsg, settings.voice[settings.gender].main);
+          }
+          if (!isContinuousListeningActiveRef.current) {
+            setAssistantState('idle');
+          } else {
+            setAssistantState('listening');
+          }
+      } catch (e: any) {
+          addErrorMessageToChat(e.message, () => executeYoutubeSearch(query));
+      }
+  }, [settings.apiKeys.youtube, addErrorMessageToChat, speak, settings.voice, settings.gender]);
 
-    const executeWeatherFetch = useCallback(async (location: string) => {
-        try {
-            setAssistantState('thinking');
-            setChatHistory(prev => prev.filter(m => !m.onRetry));
-            const weatherSummary = await fetchWeatherSummary(location, settings.apiKeys.weather);
-            speak(weatherSummary, settings.voice[settings.gender].main);
-            setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: weatherSummary }]);
-        } catch (e: any) {
-            addErrorMessageToChat(e.message, () => executeWeatherFetch(location));
-        }
-    }, [settings.apiKeys.weather, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+  const executeWeatherFetch = useCallback(async (location: string) => {
+      try {
+          setAssistantState('thinking');
+          const weatherSummary = await fetchWeatherSummary(location, settings.apiKeys.weather);
+          setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: weatherSummary }]);
+          await speak(weatherSummary, settings.voice[settings.gender].main);
+      } catch (e: any) {
+          addErrorMessageToChat(e.message, () => executeWeatherFetch(location));
+      }
+  }, [settings.apiKeys.weather, addErrorMessageToChat, speak, settings.voice, settings.gender]);
 
-    const executeNewsFetch = useCallback(async (query: string) => {
-        try {
-            setAssistantState('thinking');
-            setChatHistory(prev => prev.filter(m => !m.onRetry));
-            const newsSummary = await fetchNews(settings.apiKeys.news, query);
-            speak(newsSummary, settings.voice[settings.gender].main);
-            setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: newsSummary }]);
-        } catch (e: any) {
-            addErrorMessageToChat(e.message, () => executeNewsFetch(query));
+  const executeNewsFetch = useCallback(async (query: string) => {
+      try {
+          setAssistantState('thinking');
+          const newsSummary = await fetchNews(settings.apiKeys.news, query);
+          setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: newsSummary }]);
+          await speak(newsSummary, settings.voice[settings.gender].main);
+      } catch (e: any) {
+          addErrorMessageToChat(e.message, () => executeNewsFetch(query));
+      }
+  }, [settings.apiKeys.news, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+
+  const executeSingSong = useCallback(async (artist: string, title: string) => {
+    setAssistantState('composing');
+    try {
+        const lyrics = await fetchLyrics(artist, title);
+        if (!lyrics) {
+            const notFoundMsg = `I'm sorry, I couldn't find the lyrics for "${title}" by ${artist}.`;
+            setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: notFoundMsg }]);
+            await speak(notFoundMsg, settings.voice[settings.gender].main);
+            return;
         }
-    }, [settings.apiKeys.news, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+
+        setAssistantState('singing');
+        const base64Audio = await generateSong(lyrics, settings.voice[settings.gender].main.name);
+        
+        const onSongEnd = () => {
+          if (isContinuousListeningActiveRef.current) {
+            setAssistantState('listening');
+          } else {
+            setAssistantState('idle');
+          }
+        };
+
+        await playAudio(base64Audio, onSongEnd);
+
+    } catch (e: any) {
+        addErrorMessageToChat(e.message, () => executeSingSong(artist, title));
+    }
+  }, [settings.voice, settings.gender, addErrorMessageToChat, speak, playAudio]);
 
 
   const handleCommand = useCallback(async (transcript: string) => {
@@ -1749,40 +1790,54 @@ export const App = () => {
       const assistantMessage: ChatMessage = { id: Date.now() + 1, sender: 'assistant', text: response.reply, sources: response.sources };
       setChatHistory(prev => [...prev, assistantMessage]);
 
-      speak(response.reply, settings.voice[settings.gender].main, () => {
-          if (isContinuousListeningActiveRef.current) {
-            setAssistantState('listening');
-            // Keep the assistant "awake" for follow-up commands
-            if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
-            awakeTimeoutRef.current = window.setTimeout(() => {
-              setIsAwake(false);
-            }, 15000); // 15 seconds for a follow-up
-          } else {
-            setAssistantState('idle');
+      const onReplyEnd = () => {
+          let commandExecuted = false;
+          switch (response.command) {
+              case 'YOUTUBE_SEARCH':
+                  if (response.youtubeQuery) {
+                      executeYoutubeSearch(response.youtubeQuery);
+                      commandExecuted = true;
+                  }
+                  break;
+              case 'GET_WEATHER':
+                  if (response.location) {
+                      executeWeatherFetch(response.location);
+                      commandExecuted = true;
+                  }
+                  break;
+              case 'GET_NEWS':
+                  if(response.newsQuery) {
+                      executeNewsFetch(response.newsQuery);
+                      commandExecuted = true;
+                  }
+                  break;
+              case 'SING_SONG':
+                  if (response.songTitle && response.songArtist) {
+                      executeSingSong(response.songArtist, response.songTitle);
+                      commandExecuted = true;
+                  }
+                  break;
           }
-      });
+
+          if (!commandExecuted) { // Only for REPLY, SEND_EMAIL, or if other commands had no query
+              if (isContinuousListeningActiveRef.current) {
+                setAssistantState('listening');
+                if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
+                awakeTimeoutRef.current = window.setTimeout(() => {
+                  setIsAwake(false);
+                }, 15000);
+              } else {
+                setAssistantState('idle');
+              }
+          }
+      };
       
-      switch (response.command) {
-          case 'YOUTUBE_SEARCH':
-              if (response.youtubeQuery) {
-                  await executeYoutubeSearch(response.youtubeQuery);
-              }
-              break;
-          case 'GET_WEATHER':
-              if (response.location) {
-                  await executeWeatherFetch(response.location);
-              }
-              break;
-          case 'GET_NEWS':
-              if(response.newsQuery) {
-                  await executeNewsFetch(response.newsQuery);
-              }
-              break;
-      }
+      speak(response.reply, settings.voice[settings.gender].main, onReplyEnd);
+      
   }, [
       chatHistory, settings.gender, settings.bias, settings.emotionTuning, 
       settings.voice, speak,
-      addErrorMessageToChat, executeYoutubeSearch, executeWeatherFetch, executeNewsFetch
+      addErrorMessageToChat, executeYoutubeSearch, executeWeatherFetch, executeNewsFetch, executeSingSong
   ]);
   
   const stopAll = useCallback(() => {
@@ -2000,7 +2055,7 @@ const goToSleep = useCallback(() => {
             resetInactivityTimer();
         }
     } else { // Push-to-talk
-        const isBusy = ['listening', 'thinking', 'speaking'].includes(assistantState);
+        const isBusy = ['listening', 'thinking', 'speaking', 'singing'].includes(assistantState);
         if (isBusy) {
             stopAll();
         } else {
@@ -2030,6 +2085,7 @@ const goToSleep = useCallback(() => {
         case 'listening': return <span className="listening-text-pulse">{currentTranscript || t('main.status.listening')}</span>;
         case 'thinking': return t('main.status.thinking');
         case 'speaking': return t('main.status.speaking');
+        case 'singing': return t('main.status.singing');
         case 'error': return <span className="text-red-400">{t('main.status.error')}</span>;
         case 'sleep': return <span className="state-text-animation">{t('main.status.sleep')}</span>;
         default: return isConnected ? t('main.status.idle') : t('main.status.offline');
@@ -2044,7 +2100,7 @@ const goToSleep = useCallback(() => {
       return <Auth onLogin={handleLogin} onSignUp={handleSignUp} />;
   }
 
-  const isBusy = !settings.enableContinuousListening && ['listening', 'thinking', 'speaking'].includes(assistantState);
+  const isBusy = !settings.enableContinuousListening && ['listening', 'thinking', 'speaking', 'singing'].includes(assistantState);
 
   return (
     <div className="bg-bg-color text-text-color w-screen h-screen flex flex-col overflow-hidden">
@@ -2088,7 +2144,7 @@ const goToSleep = useCallback(() => {
       <main className="flex-grow flex min-h-0">
         <div className="flex-grow flex flex-col items-center justify-center p-4 relative">
             <div className={`hologram-container ${assistantState === 'listening' || isAwake ? 'listening-hologram' : ''}`}>
-                {assistantState === 'thinking' && (
+                {(assistantState === 'thinking' || assistantState === 'composing') && (
                     <div className="typing-indicator">
                         <div className="typing-dot"></div>
                         <div className="typing-dot"></div>

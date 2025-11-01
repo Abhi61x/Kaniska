@@ -7,7 +7,8 @@ export type AssistantState =
   | 'error'
   | 'composing'
   | 'confused'
-  | 'sleep';
+  | 'sleep'
+  | 'singing';
 
 export interface Source {
   uri: string;
@@ -26,7 +27,7 @@ export interface ChatMessage {
 export type Emotion = 'neutral' | 'happy' | 'sad' | 'excited' | 'empathetic' | 'singing' | 'formal' | 'chirpy' | 'surprised' | 'curious' | 'thoughtful' | 'joking';
 
 export interface GeminiResponse {
-  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL';
+  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG';
   reply: string;
   // FIX: youtubeQuery is always present as per the system prompt (can be an empty string).
   youtubeQuery: string;
@@ -34,6 +35,8 @@ export interface GeminiResponse {
   location: string;
   emotion: Emotion;
   sources: Source[];
+  songTitle?: string;
+  songArtist?: string;
 }
 
 export type Gender = 'female' | 'male';
