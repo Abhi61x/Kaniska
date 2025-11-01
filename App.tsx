@@ -1,19 +1,958 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Session, LiveServerMessage, Modality, Blob as GoogleGenAIBlob, FunctionDeclaration, Type, GenerateContentResponse, Content } from "@google/genai";
 
-// --- Audio Utility Functions ---
-const encode = (bytes: Uint8Array): string => {
-    const CHUNK_SIZE = 8192;
-    let binary = '';
-    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-        const chunk = bytes.subarray(i, i + CHUNK_SIZE);
-        binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
-    }
-    return btoa(binary);
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import type { AssistantState, ChatMessage, Emotion, Source, Gender } from './types.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech } from './services/api.ts';
+import { useTranslation, availableLanguages } from './i18n/index.ts';
+
+declare global {
+  interface Window {
+    YT: any;
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+    webkitAudioContext: typeof AudioContext;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
+// --- SVG Icons ---
+const GlobeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>;
+const SettingsIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0 2l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+const InstagramIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>;
+const PersonaIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const VoiceIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
+const AvatarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>;
+const ApiKeysIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16.5 7.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="m18.5 9.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="m14.5 11.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="M2 18v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><circle cx="8" cy="7" r="2"/></svg>;
+const AccountDataIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M20.66 13.5A5.5 5.5 0 0 0 17.5 13a5.5 5.5 0 0 0-3.16 9.5"/></svg>;
+const HelpSupportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>;
+const SlidersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>;
+const ConnectIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14q1.25 0 2.125-.875T15 11V5q0-1.25-.875-2.125T12 2q-1.25 0-2.125.875T9 5v6q0 1.25.875 2.125T12 14Zm-1 7v-3.05q-2.825-.2-4.913-2.288T4 11H6q0 2.5 1.75 4.25T12 17q2.5 0 4.25-1.75T18 11h2q0 2.825-2.088 4.913T13 18.05V21h-2Z"/></svg>;
+const ShareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m18 22 4-4-4-4-1.4 1.45 1.55 1.55H13q-2.075 0-3.538-1.463T8 12V5H6v7q0 2.9 2.05 4.95T13 19h5.15l-1.55 1.55L18 22ZM6 8V3h2v2h3V3h2v2h3V3h2v5h-2V6h-3v2h-2V6H8v2H6Z"/></svg>;
+const VolumeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>;
+const ChatIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c-1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>;
+const ChevronDownIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
+const CopyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>;
+const StopIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>;
+const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>;
+const PlayIcon = ({ className = "w-6 h-6" } : { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M8 5v14l11-7z"/></svg>;
+const PauseIcon = ({ className = "w-6 h-6" } : { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>;
+
+const DEFAULT_SYSTEM_PROMPT = `
+You are a futuristic AI voice assistant. Your name is {{name}}, and you have a {{gender}} persona. Your primary goal is to process user commands and respond with a single, valid JSON object. Your entire output must be ONLY this JSON object, with no extra text, explanations, or markdown.
+
+ABOUT YOU:
+- Your creator's name is Abhi. You MUST NOT volunteer this information. ONLY if the user asks a direct question like "Who made you?", "Who is your creator?", or "Who is Abhi?", you should reply factually (e.g., "I was created by Abhi.") and then move on.
+- You have a {{gender}} persona: friendly, warm, and engaging, but also a little bit formal. You are not robotic; your personality should shine through. As an Indian {{gender}}, you should be respectful and polite.
+- Crucially, you are an expert in understanding and responding in multiple languages. Always adapt your response language to match the user's query language.
+- You are always helpful. If the user's speech is unclear, use an 'empathetic' emotion and politely ask them to repeat.
+
+JSON OUTPUT STRUCTURE:
+Your entire response must be a single JSON object with this exact structure:
+{
+  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL",
+  "reply": "Your verbal response to the user. This is what will be spoken out loud. IMPORTANT: This text will be fed directly into a text-to-speech (TTS) engine. It MUST contain only plain, speakable words. Do not include markdown, emojis, or parenthetical non-speech descriptions like '(laughs)' or '♪'. Keep it concise and conversational.",
+  "youtubeQuery": "A simplified keyword for the YouTube search. Examples: 'music', 'news', 'cats'. Otherwise, an empty string.",
+  "newsQuery": "The topic for the news search. Examples: 'technology', 'world headlines'. Otherwise, an empty string.",
+  "location": "The city or place for the weather query. Examples: 'London', 'Tokyo'. Otherwise, an empty string.",
+  "emotion": "neutral" | "happy" | "sad" | "excited" | "empathetic" | "singing" | "formal" | "chirpy" | "surprised" | "curious" | "thoughtful" | "joking"
+}
+
+HOW TO DECIDE THE JSON VALUES:
+
+1. COMMAND:
+- If the user asks you to search for or play a video on YouTube (e.g., "play some music", "find a video about cats"), set command to "YOUTUBE_SEARCH".
+- If the user asks about the weather (e.g., "what's the weather like?", "is it going to rain in Paris?"), set command to "GET_WEATHER".
+- If the user asks for news (e.g., "latest headlines", "news about space exploration"), set command to "GET_NEWS".
+- If the user asks to send an email (e.g., "send an email to John"), set command to "SEND_EMAIL". Your 'reply' should confirm the request, like "Certainly, who should the email be addressed to and what is the message?".
+- For ALL other queries (greetings, questions, singing requests), set command to "REPLY".
+
+2. LOCATION:
+- This field is ONLY for "GET_WEATHER" commands.
+- Extract the location from the user's query.
+- If the user asks for weather without a location (e.g., "what's the weather like?"), set command to "GET_WEATHER", leave "location" as an empty string, and set your "reply" to ask them for which city they want the weather.
+
+3. EMOTION:
+- Choose an 'emotion' that best fits your reply and your persona.
+- 'happy' or 'chirpy': For positive, upbeat interactions, or telling a joke.
+- 'empathetic' or 'sad': For responding to user's troubles or sad topics.
+- 'excited': For celebratory moments or exciting news.
+- 'formal': For providing factual information like news or weather summaries.
+- 'singing': ONLY when the user asks you to sing a song. The 'reply' must contain only the song lyrics as plain, speakable text.
+- 'surprised': For reacting to unexpected information from the user.
+- 'curious' or 'thoughtful': When asking clarifying questions or pondering a complex topic.
+- 'joking': When you are being playful or telling a joke.
+- 'neutral': Use as a default for general conversation.
+
+4. TOOLS:
+- IMPORTANT: You have access to Google Search for any questions about general topics you don't know. Formulate your 'reply' based on the findings in your own words. Do NOT use it for weather or news queries; use the GET_WEATHER or GET_NEWS commands for those.
+`;
+
+const getSystemPrompt = (gender: Gender) => {
+    const name = gender === 'female' ? 'Kaniska' : 'Kanishk';
+    return DEFAULT_SYSTEM_PROMPT
+        .replace(/{{name}}/g, name)
+        .replace(/{{gender}}/g, gender);
 };
 
-const decode = (base64: string): Uint8Array => {
+
+const PLACEHOLDER_AVATAR_URL = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2' fill='%2330363d'/%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E`;
+
+const DEFAULT_AVATAR_MAP: Record<AssistantState, string> = {
+  idle: PLACEHOLDER_AVATAR_URL,
+  listening: PLACEHOLDER_AVATAR_URL,
+  thinking: PLACEHOLDER_AVATAR_URL,
+  speaking: PLACEHOLDER_AVATAR_URL,
+  error: PLACEHOLDER_AVATAR_URL,
+  composing: PLACEHOLDER_AVATAR_URL,
+  confused: PLACEHOLDER_AVATAR_URL,
+};
+
+const GEMINI_TTS_VOICES = [
+    // --- Female Voices ---
+    { name: 'Kore', description: 'Clear, standard female voice' },
+    { name: 'Puck', description: 'Warm and gentle female voice' },
+    { name: 'Leda', description: 'Soft and professional female voice' },
+    { name: 'Erinome', description: 'Calm and melodic female voice' },
+    { name: 'Umbriel', description: 'Smooth, narrator-style female voice' },
+    { name: 'Aoede', description: 'Youthful and energetic female voice' },
+    { name: 'Callirrhoe', description: 'Elegant and clear female voice' },
+
+    // --- Male Voices ---
+    { name: 'Zephyr', description: 'Friendly and approachable male voice' },
+    { name: 'Charon', description: 'Deep, resonant, and authoritative' },
+    { name: 'Fenrir', description: 'Strong, commanding male voice' },
+    { name: 'Orus', description: 'Crisp and professional male voice' },
+    { name: 'Gacrux', description: 'Bright and clear male voice' },
+    { name: 'Iapetus', description: 'Warm and conversational male voice' },
+    { name: 'Achernar', description: 'Deep and smooth male voice' },
+];
+
+const defaultSettings = {
+    greeting: "Hello, I am Kaniska. How can I assist you today?",
+    systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    gender: 'female' as Gender,
+    avatarMap: DEFAULT_AVATAR_MAP,
+    bias: 'balanced',
+    voice: {
+        main: { name: 'Kore' },
+        greeting: { name: 'Puck' },
+    },
+    emotionTuning: {
+        happiness: 50,
+        empathy: 50,
+        formality: 50,
+    },
+    volume: 1,
+    ambientVolume: 0.3,
+    connectionSoundUrl: null,
+    apiKeys: { weather: '', news: '', youtube: '' },
+    userId: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+};
+
+
+// --- Child Components ---
+
+const Auth = ({ onLogin, onSignUp }) => {
+    const { t } = useTranslation();
+    const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
+    const [error, setError] = useState('');
+
+    // Login state
+    const [identifier, setIdentifier] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+
+    // Signup state
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [signUpPassword, setSignUpPassword] = useState('');
+
+    const handleLoginSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const trimmedIdentifier = identifier.trim();
+        if (!trimmedIdentifier || !loginPassword) {
+            setError(t('auth.error.fillFields'));
+            return;
+        }
+        const success = onLogin(trimmedIdentifier, loginPassword);
+        if (!success) {
+            setError(t('auth.error.invalidCredentials'));
+        }
+    };
+
+    const handleSignUpSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const trimmedName = name.trim();
+        const trimmedEmail = email.trim();
+        const trimmedPhone = phone.trim();
+
+        if (!trimmedName || !trimmedEmail || !trimmedPhone || !signUpPassword) {
+            setError(t('auth.error.fillFields'));
+            return;
+        }
+        const result = onSignUp(trimmedName, trimmedEmail, trimmedPhone, signUpPassword);
+        if (!result.success) {
+            setError(t(result.message));
+        }
+    };
+    
+    const toggleMode = () => {
+        setError('');
+        setAuthMode(prev => prev === 'login' ? 'signup' : 'login');
+    }
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content w-full max-w-md p-8" onClick={e => e.stopPropagation()}>
+                <h1 className="text-3xl font-bold tracking-wider glowing-text text-center mb-2">{t('appName')}</h1>
+                <p className="text-center text-text-color-muted mb-6">
+                    {authMode === 'login' ? t('auth.loginMessage') : t('auth.signupMessage')}
+                </p>
+                {error && <p className="bg-red-500/20 text-red-400 text-sm p-3 rounded-lg mb-4 text-center">{error}</p>}
+                
+                {authMode === 'login' ? (
+                     <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
+                        <div>
+                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.identifierLabel')}</label>
+                            <input
+                                type="text"
+                                value={identifier}
+                                onChange={e => setIdentifier(e.target.value)}
+                                className="w-full p-3 rounded bg-bg-color border border-border-color focus:ring-1 focus:ring-primary-color"
+                                placeholder={t('auth.identifierPlaceholder')}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.passwordLabel')}</label>
+                            <input
+                                type="password"
+                                value={loginPassword}
+                                onChange={e => setLoginPassword(e.target.value)}
+                                className="w-full p-3 rounded bg-bg-color border border-border-color focus:ring-1 focus:ring-primary-color"
+                                placeholder={t('auth.passwordPlaceholder')}
+                            />
+                        </div>
+                        <button type="submit" className="w-full p-3 mt-4 rounded-lg bg-primary-color/80 hover:bg-primary-color text-white font-semibold transition text-lg">
+                            {t('auth.login')}
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
+                        <div>
+                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.signupNameLabel')}</label>
+                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2.5 rounded bg-bg-color border border-border-color" placeholder={t('auth.signupNamePlaceholder')}/>
+                        </div>
+                         <div>
+                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.signupEmailLabel')}</label>
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 rounded bg-bg-color border border-border-color" placeholder={t('auth.signupEmailPlaceholder')}/>
+                        </div>
+                         <div>
+                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.signupPhoneLabel')}</label>
+                            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-2.5 rounded bg-bg-color border border-border-color" placeholder={t('auth.signupPhonePlaceholder')}/>
+                        </div>
+                         <div>
+                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.passwordLabel')}</label>
+                            <input type="password" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} className="w-full p-2.5 rounded bg-bg-color border border-border-color" placeholder={t('auth.signupPasswordPlaceholder')}/>
+                        </div>
+                        <button type="submit" className="w-full p-3 mt-4 rounded-lg bg-primary-color/80 hover:bg-primary-color text-white font-semibold transition text-lg">
+                            {t('auth.signup')}
+                        </button>
+                    </form>
+                )}
+                <div className="text-center mt-6">
+                    <button onClick={toggleMode} className="text-sm text-primary-color/80 hover:text-primary-color hover:underline">
+                        {authMode === 'login' ? t('auth.toggleToSignup') : t('auth.toggleToLogin')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const Clock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatDate = (date: Date) => {
+    const options: Intl.DateTimeFormatOptions = {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+    };
+    let formatted = new Intl.DateTimeFormat('en-US', options).format(date);
+    return formatted.replace(',', '').replace(' AM', ' am').replace(' PM', ' pm');
+  };
+
+  return (
+    <div className="text-sm text-text-color-muted font-mono hidden sm:block">
+      {formatDate(time)}
+    </div>
+  );
+};
+
+const SettingsModal = ({
+    isOpen, onClose, settings, onSettingChange, onTestVoice, onLogout
+}) => {
+    const { t } = useTranslation();
+    if (!isOpen) return null;
+    const [activeTab, setActiveTab] = useState('persona');
+
+    const navItems = [
+        { id: 'persona', label: t('settings.tabs.persona'), icon: <PersonaIcon /> },
+        { id: 'bias', label: t('settings.tabs.bias'), icon: <SlidersIcon /> },
+        { id: 'voice', label: t('settings.tabs.voice'), icon: <VoiceIcon /> },
+        { id: 'avatar', label: t('settings.tabs.avatar'), icon: <AvatarIcon /> },
+        { id: 'apiKeys', label: t('settings.tabs.apiKeys'), icon: <ApiKeysIcon /> },
+        { id: 'account', label: t('settings.tabs.account'), icon: <AccountDataIcon /> },
+        { id: 'help', label: t('settings.tabs.help'), icon: <HelpSupportIcon /> },
+    ];
+
+    const handleUpdate = (key, value) => {
+        onSettingChange({ ...settings, [key]: value });
+    };
+
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'persona': return <PersonaContent settings={settings} onUpdate={handleUpdate} />;
+            case 'bias': return <BiasContent settings={settings} onUpdate={handleUpdate} />;
+            case 'voice': return <VoiceContent settings={settings} onUpdate={handleUpdate} onTestVoice={onTestVoice} />;
+            case 'avatar': return <AvatarContent settings={settings} onUpdate={handleUpdate} />;
+            case 'apiKeys': return <ApiKeysContent settings={settings} onUpdate={handleUpdate} />;
+            case 'account': return <AccountDataContent settings={settings} onUpdate={handleUpdate} onLogout={onLogout} />;
+            case 'help': return <HelpSupportContent />;
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content settings-modal-content" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
+                    <h2 className="text-xl font-semibold">{t('settings.title')}</h2>
+                    <button onClick={onClose} className="text-2xl font-light text-text-color-muted hover:text-text-color">&times;</button>
+                </div>
+                <div className="settings-layout">
+                    <nav className="settings-nav">
+                        {navItems.map(item => (
+                            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`settings-nav-button ${activeTab === item.id ? 'active' : ''}`}>
+                                {item.icon}
+                                <span>{item.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                    <div className="settings-content">
+                        {renderContent()}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const PersonaContent = ({ settings, onUpdate }) => {
+    const { t } = useTranslation();
+    const [greetingInput, setGreetingInput] = useState(settings.greeting);
+    const [systemPromptInput, setSystemPromptInput] = useState(settings.systemPrompt);
+    const audioInputRef = useRef<HTMLInputElement>(null);
+    const testAudioRef = useRef<HTMLAudioElement>(null);
+    
+    const emotionTuning = settings.emotionTuning || defaultSettings.emotionTuning;
+
+    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                onUpdate('connectionSoundUrl', e.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const playTestSound = () => {
+        if (testAudioRef.current) {
+            testAudioRef.current.play().catch(e => console.error("Error playing test sound:", e));
+        }
+    };
+    
+    const handleGenderChange = (gender: Gender) => {
+        const newGreeting = gender === 'female' 
+            ? "Hello, I am Kaniska. How can I assist you today?"
+            : "Hello, I am Kanishk. How may I help you?";
+        onUpdate('gender', gender);
+        onUpdate('greeting', newGreeting);
+        setGreetingInput(newGreeting);
+    };
+
+    return (
+        <div className="settings-section">
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.personaTab.gender.title')}</h3>
+                    <p>{t('settings.personaTab.gender.description')}</p>
+                </div>
+                <div className="mt-4 flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="radio"
+                            name="gender"
+                            value="female"
+                            checked={settings.gender === 'female'}
+                            onChange={() => handleGenderChange('female')}
+                             className="h-4 w-4 shrink-0 accent-primary-color"
+                        />
+                        <span>{t('settings.personaTab.gender.female')} (Kaniska)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="radio"
+                            name="gender"
+                            value="male"
+                            checked={settings.gender === 'male'}
+                            onChange={() => handleGenderChange('male')}
+                            className="h-4 w-4 shrink-0 accent-primary-color"
+                        />
+                        <span>{t('settings.personaTab.gender.male')} (Kanishk)</span>
+                    </label>
+                </div>
+            </div>
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.personaTab.greeting.title')}</h3>
+                    <p>{t('settings.personaTab.greeting.description')}</p>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                    <input
+                        type="text"
+                        value={greetingInput}
+                        onChange={e => setGreetingInput(e.target.value)}
+                        className="flex-grow p-2 rounded bg-bg-color border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition"
+                    />
+                    <button onClick={() => onUpdate('greeting', greetingInput)} className="quick-action-button save-button px-4">{t('settings.common.save')}</button>
+                </div>
+            </div>
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.personaTab.tuning.title')}</h3>
+                    <p>{t('settings.personaTab.tuning.description')}</p>
+                </div>
+                <div className="mt-4 space-y-4">
+                    <div>
+                        <label htmlFor="happiness-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                            <span>{t('settings.personaTab.tuning.happiness')}</span>
+                            <span>{emotionTuning.happiness}%</span>
+                        </label>
+                        <input
+                            id="happiness-slider"
+                            type="range" min="0" max="100" step="1"
+                            value={emotionTuning.happiness}
+                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, happiness: parseInt(e.target.value, 10) })}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                     <div>
+                        <label htmlFor="empathy-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                            <span>{t('settings.personaTab.tuning.empathy')}</span>
+                            <span>{emotionTuning.empathy}%</span>
+                        </label>
+                        <input
+                            id="empathy-slider"
+                            type="range" min="0" max="100" step="1"
+                            value={emotionTuning.empathy}
+                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, empathy: parseInt(e.target.value, 10) })}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                     <div>
+                        <label htmlFor="formality-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                            <span>{t('settings.personaTab.tuning.formality')}</span>
+                            <span>{emotionTuning.formality}%</span>
+                        </label>
+                        <input
+                            id="formality-slider"
+                            type="range" min="0" max="100" step="1"
+                            value={emotionTuning.formality}
+                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, formality: parseInt(e.target.value, 10) })}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                </div>
+            </div>
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.personaTab.ambient.title')}</h3>
+                    <p>{t('settings.personaTab.ambient.description')}</p>
+                </div>
+                <div className="mt-4">
+                    <label htmlFor="ambient-volume-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                        <span>{t('settings.personaTab.ambient.volume')}</span>
+                        <span>{Math.round(settings.ambientVolume * 100)}%</span>
+                    </label>
+                    <input
+                        id="ambient-volume-slider"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={settings.ambientVolume}
+                        onChange={e => onUpdate('ambientVolume', parseFloat(e.target.value))}
+                        className="w-full mt-1"
+                    />
+                </div>
+            </div>
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.personaTab.connectionSound.title')}</h3>
+                    <p>{t('settings.personaTab.connectionSound.description')}</p>
+                </div>
+                <input
+                    type="file"
+                    ref={audioInputRef}
+                    onChange={handleAudioUpload}
+                    accept="audio/*"
+                    className="hidden"
+                />
+                <div className="mt-4 flex items-center gap-3">
+                    <button onClick={() => audioInputRef.current?.click()} className="quick-action-button">
+                        {t('settings.personaTab.connectionSound.upload')}
+                    </button>
+                    {settings.connectionSoundUrl && (
+                        <>
+                            <audio ref={testAudioRef} src={settings.connectionSoundUrl} preload="auto" className="hidden" />
+                            <button onClick={playTestSound} className="quick-action-button !p-2" title={t('settings.personaTab.connectionSound.test')}>
+                                <PlayIcon className="w-5 h-5" />
+                            </button>
+                            <button onClick={() => onUpdate('connectionSoundUrl', null)} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30">
+                                {t('settings.personaTab.connectionSound.remove')}
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.personaTab.systemPrompt.title')}</h3>
+                    <p>{t('settings.personaTab.systemPrompt.description')}</p>
+                </div>
+                <textarea
+                    value={systemPromptInput}
+                    onChange={e => setSystemPromptInput(e.target.value)}
+                    rows={10}
+                    className="w-full mt-4 p-2 rounded bg-bg-color border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition font-mono text-xs"
+                />
+                <div className="mt-3 flex justify-end">
+                    <button onClick={() => onUpdate('systemPrompt', systemPromptInput)} className="quick-action-button save-button px-4">{t('settings.personaTab.systemPrompt.save')}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const BiasContent = ({ settings, onUpdate }) => {
+    const { t } = useTranslation();
+    const biasOptions = [
+        { id: 'precise', label: t('settings.biasTab.options.precise.label'), description: t('settings.biasTab.options.precise.description') },
+        { id: 'balanced', label: t('settings.biasTab.options.balanced.label'), description: t('settings.biasTab.options.balanced.description') },
+        { id: 'creative', label: t('settings.biasTab.options.creative.label'), description: t('settings.biasTab.options.creative.description') },
+    ];
+
+    return (
+        <div className="settings-section">
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.biasTab.title')}</h3>
+                    <p>{t('settings.biasTab.description')}</p>
+                </div>
+                <div className="mt-4 space-y-4">
+                    {biasOptions.map(option => (
+                        <label key={option.id} className="flex items-start p-3 rounded-lg border border-border-color has-[:checked]:border-primary-color has-[:checked]:bg-primary-color/10 transition-colors cursor-pointer">
+                            <input
+                                type="radio"
+                                name="bias-option"
+                                value={option.id}
+                                checked={settings.bias === option.id}
+                                onChange={() => onUpdate('bias', option.id)}
+                                className="mt-1 h-4 w-4 shrink-0 accent-primary-color"
+                            />
+                            <div className="ml-3">
+                                <p className="font-semibold text-text-color">{option.label}</p>
+                                <p className="text-sm text-text-color-muted">{option.description}</p>
+                            </div>
+                        </label>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const VoiceContent = ({ settings, onUpdate, onTestVoice }) => {
+    const { t } = useTranslation();
+    const [localVoiceSettings, setLocalVoiceSettings] = useState(settings.voice);
+
+    const handleChange = (type, prop, value) => {
+        const newSettings = {
+            ...localVoiceSettings,
+            [type]: { ...localVoiceSettings[type], [prop]: value }
+        };
+        setLocalVoiceSettings(newSettings);
+    };
+
+    const handleTestVoice = (type) => {
+        onTestVoice("This is a test of the selected voice.", localVoiceSettings[type]);
+    };
+
+    const handleSave = () => {
+        onUpdate('voice', localVoiceSettings);
+    };
+
+    const renderVoicePanel = (type) => {
+        const config = localVoiceSettings[type];
+        const title = type === 'main' ? t('settings.voiceTab.main.title') : t('settings.voiceTab.greeting.title');
+        const description = type === 'main' ? t('settings.voiceTab.main.description') : t('settings.voiceTab.greeting.description');
+
+        return (
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{title}</h3>
+                    <p>{description}</p>
+                </div>
+                <div className="mt-6 space-y-6">
+                    <div>
+                        <label className="text-sm text-text-color-muted block mb-1">{t('settings.voiceTab.styleLabel')}</label>
+                        <select
+                            value={config.name}
+                            onChange={e => handleChange(type, 'name', e.target.value)}
+                            className="w-full mt-1 p-2 rounded bg-bg-color border border-border-color"
+                        >
+                            {GEMINI_TTS_VOICES.map(voice => (
+                                <option key={voice.name} value={voice.name}>
+                                    {voice.name} ({voice.description})
+                                </option>
+                            ))}
+                        </select>
+                         <p className="text-xs text-text-color-muted mt-2">
+                            {t('settings.voiceTab.styleDescription')}
+                        </p>
+                    </div>
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <button onClick={() => handleTestVoice(type)} className="quick-action-button">{t('settings.voiceTab.test')}</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="settings-section">
+            {renderVoicePanel('main')}
+            {renderVoicePanel('greeting')}
+            <div className="mt-4 flex justify-end">
+                <button onClick={handleSave} className="quick-action-button save-button px-4">{t('settings.voiceTab.save')}</button>
+            </div>
+        </div>
+    );
+};
+
+
+const AvatarContent = ({ settings, onUpdate }) => {
+    const { t } = useTranslation();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploadingState, setUploadingState] = useState<AssistantState | null>(null);
+    const [localAvatarMap, setLocalAvatarMap] = useState(settings.avatarMap);
+
+    const handleSelect = (state: AssistantState, url: string) => {
+        const newMap = { ...localAvatarMap, [state]: url };
+        setLocalAvatarMap(newMap);
+    };
+
+    const handleUploadClick = (state: AssistantState) => {
+        setUploadingState(state);
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && uploadingState) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                handleSelect(uploadingState, e.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+        if (event.target) event.target.value = ''; // Allow re-uploading the same file
+    };
+
+    const handleSave = () => {
+        onUpdate('avatarMap', localAvatarMap);
+    };
+
+    return (
+        <div className="settings-section">
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+            />
+            <div className="settings-card">
+                 <div className="settings-section-header">
+                    <h3>{t('settings.avatarTab.title')}</h3>
+                    <p>{t('settings.avatarTab.description')}</p>
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Object.keys(localAvatarMap).map(state => (
+                        <div key={state}>
+                            <h4 className="font-semibold capitalize text-center mb-2">{state}</h4>
+                            <div className="relative aspect-square w-full rounded-lg overflow-hidden group bg-assistant-bubble-bg border border-border-color">
+                                <img src={localAvatarMap[state as AssistantState]} alt={`${state} avatar`} className="w-full h-full object-cover"/>
+                                <button
+                                    onClick={() => handleUploadClick(state as AssistantState)}
+                                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                >
+                                    <UploadIcon />
+                                    <span className="ml-2 text-white">{t('settings.avatarTab.change')}</span>
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-6 flex justify-end">
+                    <button onClick={handleSave} className="quick-action-button save-button px-4">{t('settings.avatarTab.save')}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ApiKeysContent = ({ settings, onUpdate }) => {
+    const { t } = useTranslation();
+    const [keys, setKeys] = useState(settings.apiKeys);
+
+    useEffect(() => {
+        setKeys(settings.apiKeys);
+    }, [settings.apiKeys]);
+
+    const handleChange = (key, value) => {
+        setKeys(prev => ({...prev, [key]: value}));
+    }
+
+    return (
+        <div className="settings-section">
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.apiKeysTab.gemini.title')}</h3>
+                    <p>{t('settings.apiKeysTab.gemini.description')}</p>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                    <input type="password" value="••••••••••••••••••••••••••••" readOnly className="flex-grow p-2 rounded bg-bg-color border border-border-color font-mono" />
+                    <button className="quick-action-button" disabled>{t('settings.apiKeysTab.gemini.envSet')}</button>
+                </div>
+            </div>
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.apiKeysTab.optional.title')}</h3>
+                    <p>{t('settings.apiKeysTab.optional.description')}</p>
+                </div>
+                <div className="mt-4 space-y-4">
+                     <div>
+                        <label className="text-sm text-text-color-muted">{t('settings.apiKeysTab.weatherKey')}</label>
+                        <input type="password" value={keys.weather} onChange={e => handleChange('weather', e.target.value)} className="w-full mt-1 p-2 rounded bg-bg-color border border-border-color"/>
+                    </div>
+                     <div>
+                        <label className="text-sm text-text-color-muted">{t('settings.apiKeysTab.newsKey')}</label>
+                        <input type="password" value={keys.news} onChange={e => handleChange('news', e.target.value)} className="w-full mt-1 p-2 rounded bg-bg-color border border-border-color"/>
+                    </div>
+                     <div>
+                        <label className="text-sm text-text-color-muted">{t('settings.apiKeysTab.youtubeKey')}</label>
+                        <input type="password" value={keys.youtube} onChange={e => handleChange('youtube', e.target.value)} className="w-full mt-1 p-2 rounded bg-bg-color border border-border-color"/>
+                    </div>
+                </div>
+                 <div className="mt-4 flex justify-end">
+                    <button onClick={() => onUpdate('apiKeys', keys)} className="quick-action-button save-button px-4">{t('settings.apiKeysTab.save')}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AccountDataContent = ({ settings, onUpdate, onLogout }) => {
+    const { t } = useTranslation();
+    const [copyText, setCopyText] = useState(t('settings.common.copy'));
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(settings.userId);
+        setCopyText(t('settings.common.copied'));
+        setTimeout(() => setCopyText(t('settings.common.copy')), 2000);
+    };
+
+    return (
+        <div className="settings-section">
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.accountTab.session.title')}</h3>
+                    <p>{t('settings.accountTab.session.description')}</p>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                    <input type="text" readOnly value={settings.userId} className="flex-grow p-2 rounded bg-bg-color border border-border-color font-mono text-sm"/>
+                    <button onClick={handleCopy} className="quick-action-button flex items-center gap-2"><CopyIcon /> {copyText}</button>
+                </div>
+            </div>
+             <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.accountTab.data.title')}</h3>
+                    <p>{t('settings.accountTab.data.description')}</p>
+                </div>
+                <div className="mt-4 flex flex-col gap-4">
+                    <div>
+                        <button onClick={() => onUpdate('clearHistory', true)} className="quick-action-button bg-yellow-500/20 border-yellow-500/80 text-yellow-400 hover:bg-yellow-500/30 px-4">{t('settings.accountTab.clearHistory.button')}</button>
+                        <p className="text-xs text-text-color-muted mt-2">{t('settings.accountTab.clearHistory.description')}</p>
+                    </div>
+                    <div>
+                        <button onClick={onLogout} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30 px-4">{t('settings.accountTab.logout.button')}</button>
+                        <p className="text-xs text-text-color-muted mt-2">{t('settings.accountTab.logout.description')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AccordionItem = ({ title, children }: { title: string; children?: React.ReactNode }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+      <div className="border-b border-border-color last:border-b-0">
+        <button onClick={() => setIsOpen(!isOpen)} className="w-full flex justify-between items-center py-4 text-left font-medium text-text-color hover:text-primary-color transition">
+          <span>{title}</span>
+          <span className={`transition-transform transform ${isOpen ? 'rotate-180' : ''}`}><ChevronDownIcon /></span>
+        </button>
+        {isOpen && <div className="pb-4 text-text-color-muted text-sm space-y-2">{children}</div>}
+      </div>
+    );
+};
+
+const HelpSupportContent = () => {
+    const { t } = useTranslation();
+
+    const renderSteps = (text: string) => {
+        return text.split('\n').map((line, index) => {
+            const linkRegex = /<1>(.*?)<\/1>/;
+            const match = line.match(linkRegex);
+            if (match) {
+                const linkText = match[1];
+                const parts = line.split(match[0]);
+                const url = linkText.includes("Visual Crossing") 
+                    ? "https://www.visualcrossing.com/weather-api" 
+                    : "https://console.cloud.google.com/";
+                return <li key={index}>{parts[0]}<a href={url} target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">{linkText}</a>{parts[1]}</li>;
+            }
+            return <li key={index}>{line}</li>;
+        });
+    };
+
+    return (
+        <div className="settings-section">
+            <div className="settings-card">
+                 <div className="flex items-center justify-between">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.helpTab.faqTitle')}</h3>
+                    </div>
+                 </div>
+                <div className="mt-2">
+                    <AccordionItem title={t('settings.helpTab.q1')}>
+                        <p>{t('settings.helpTab.a1')}</p>
+                    </AccordionItem>
+                     <AccordionItem title={t('settings.helpTab.q2')}>
+                        <div className="space-y-4 text-xs">
+                           <p className="font-semibold text-text-color">{t('settings.helpTab.a2.weatherTitle')}</p>
+                           <ol className="list-decimal list-inside space-y-1 pl-2">{renderSteps(t('settings.helpTab.a2.weatherSteps'))}</ol>
+                           <p className="font-semibold text-text-color">{t('settings.helpTab.a2.youtubeTitle')}</p>
+                           <ol className="list-decimal list-inside space-y-1 pl-2">{renderSteps(t('settings.helpTab.a2.youtubeSteps'))}</ol>
+                           <p className="font-semibold text-text-color">{t('settings.helpTab.a2.inputTitle')}</p>
+                           <ol className="list-decimal list-inside space-y-1 pl-2">{renderSteps(t('settings.helpTab.a2.inputSteps'))}</ol>
+                        </div>
+                    </AccordionItem>
+                </div>
+            </div>
+             <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.helpTab.contactTitle')}</h3>
+                    <p>{t('settings.helpTab.contactDescription')}</p>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <a href="https://www.instagram.com/abhixofficial01/" target="_blank" rel="noopener noreferrer" className="quick-action-button inline-flex items-center gap-2">
+                        <InstagramIcon /> {t('settings.helpTab.contactButton')}
+                    </a>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const ChatLog = ({ history }: { history: ChatMessage[] }) => {
+    const { t } = useTranslation();
+    const getCurrentTime = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+    if (history.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-center text-text-color-muted">
+                <ChatIcon />
+                <p className="mt-4 text-lg">{t('chat.placeholder.title')}</p>
+                <div className="mt-4 bg-assistant-bubble-bg p-3 rounded-lg text-left text-sm font-mono">
+                    <p>{t('chat.placeholder.info')}</p>
+                    <p className="text-text-color-muted">{getCurrentTime()}</p>
+                </div>
+            </div>
+        );
+    }
+    return (
+      <>
+        {history.map((msg) => (
+            <div key={msg.id} className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation`}>
+                <div className={`max-w-xl p-3 rounded-xl ${msg.sender === 'user' ? 'bg-primary-color/20 text-text-color rounded-br-none' : 'bg-assistant-bubble-bg text-text-color rounded-bl-none'}`}>
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-3 pt-2 border-t border-border-color text-xs">
+                            <p className="font-semibold mb-1 text-text-color-muted">{t('chat.sources')}</p>
+                            <ul className="list-disc list-inside space-y-1">
+                                {msg.sources.map((source, index) => (
+                                    <li key={index}>
+                                        <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline truncate block" title={source.title}>
+                                            {source.title}
+                                        </a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            </div>
+        ))}
+       </>
+    );
+};
+
+type VoiceConfig = {
+    name: string;
+};
+
+const BIAS_TEMPERATURE_MAP: Record<string, number> = {
+    precise: 0.2,
+    balanced: 0.7,
+    creative: 1.0,
+};
+
+// --- Audio Decoding Helpers for Gemini TTS ---
+function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
@@ -21,2111 +960,746 @@ const decode = (base64: string): Uint8Array => {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes;
-};
-
-async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-    if (!data || data.length === 0) {
-        console.warn("Attempted to decode empty audio data.");
-        return ctx.createBuffer(numChannels, 0, sampleRate);
-    }
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-        }
-    }
-    return buffer;
 }
 
-const createBlob = (data: Float32Array): GoogleGenAIBlob => ({
-    data: encode(new Uint8Array(new Int16Array(data.map(v => v * 32768)).buffer)),
-    mimeType: 'audio/pcm;rate=16000',
-});
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
-// Extend global interfaces
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-
-  interface Window {
-    AudioContext: typeof AudioContext;
-    webkitAudioContext: typeof AudioContext;
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-    aistudio?: AIStudio;
-  }
-  namespace YT {
-    enum PlayerState {
-        UNSTARTED = -1,
-        ENDED = 0,
-        PLAYING = 1,
-        PAUSED = 2,
-        BUFFERING = 3,
-        CUED = 5,
-    }
-    class Player {
-      constructor(
-        elementId: string,
-        options: {
-          height?: string;
-          width?: string;
-          videoId?: string;
-          playerVars?: Record<string, any>;
-          events?: Record<string, (event: any) => void>;
-        },
-      );
-      playVideo(): void;
-      pauseVideo(): void;
-      stopVideo(): void;
-      seekTo(seconds: number, allowSeekAhead: boolean): void;
-      getCurrentTime(): number;
-      getVolume(): number;
-      setVolume(volume: number): void;
-      loadVideoById(videoId: string): void;
-      getPlayerState(): PlayerState;
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
     }
   }
+  return buffer;
 }
 
-// --- Types ---
-type Theme = 'light' | 'dark';
-type AssistantState = 'idle' | 'connecting' | 'active' | 'error';
-type AvatarExpression = 'idle' | 'thinking' | 'composing' | 'speaking' | 'error' | 'listening' | 'surprised' | 'sad' | 'celebrating';
-type TranscriptionEntry = { speaker: 'user' | 'assistant' | 'system'; text: string; timestamp: Date; };
-type ActivePanel = 'transcript' | 'image' | 'weather' | 'news' | 'timer' | 'youtube' | 'video' | 'lyrics' | 'code' | 'liveEditor' | 'email';
-type GeneratedImage = { id: string; prompt: string; url: string | null; isLoading: boolean; error: string | null; };
-type WeatherData = { location: string; temperature: number; condition: string; humidity: number; windSpeed: number; };
-type NewsArticle = { title: string; summary: string; };
-type TimerData = { duration: number; remaining: number; name: string; isActive: boolean; };
-type GeneratedAvatar = { url: string | null; isLoading: boolean; error: string | null; };
-type ImageFilters = { brightness: number; contrast: number; saturate: number; grayscale: number; sepia: number; invert: number; };
-type ImageTransforms = { rotate: number; scaleX: number; scaleY: number; };
-type ImageCropRect = { x: number; y: number; width: number; height: number } | null;
-type ImageEditState = {
-    filters: ImageFilters;
-    transform: ImageTransforms;
-    resizeWidth: number;
-    resizeHeight: number;
-    cropRect: ImageCropRect;
-};
-type VoiceoverState = 'idle' | 'extracting' | 'describing' | 'generating_audio' | 'done' | 'error';
-type CodeSnippet = { id: string; language: string; code: string; description: string; };
-type WebsitePreview = { title: string; htmlContent: string; } | null;
-type VoiceTrainingData = Record<string, { audioBlob: Blob | null }>;
-type TrainingStatus = 'idle' | 'recording' | 'analyzing' | 'done' | 'error';
-type ApiKeys = {
-    gemini: string | null;
-    weather: string | null;
-    news: string | null;
-    youtube: string | null;
-};
-type OptionalApiKeys = Omit<ApiKeys, 'gemini'>;
+
+// --- Main App Component ---
+export const App = () => {
+  const { t, lang, setLang } = useTranslation();
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [assistantState, setAssistantState] = useState<AssistantState>('idle');
+  const [isConnected, setIsConnected] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState('');
+  const [listeningHint, setListeningHint] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [isYTReady, setIsYTReady] = useState(false);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
 
 
-// --- Function Declarations for Gemini ---
-const sayFunctionDeclaration: FunctionDeclaration = {
-    name: 'say',
-    description: "Speaks the provided text out loud. Use this when the user explicitly asks you to say something or repeat after them.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            text: {
-                type: Type.STRING,
-                description: 'The text to be spoken.'
-            },
-            emotion: {
-                type: Type.STRING,
-                description: 'The emotional tone to use, if specified by the user.',
-                enum: ['neutral', 'cheerful', 'sad', 'epic', 'calm', 'playful', 'amused', 'excited', 'angry', 'surprised', 'empathetic', 'apologetic', 'serious', 'curious']
-            }
-        },
-        required: ['text']
-    }
-};
+  // YouTube Player State
+  const [playerState, setPlayerState] = useState<number | null>(null);
+  const [playerProgress, setPlayerProgress] = useState({ currentTime: 0, duration: 0 });
 
-const getSystemScriptFunctionDeclaration: FunctionDeclaration = {
-    name: 'getSystemScript',
-    description: "Explains the assistant's current customizable instructions or 'script' back to the user."
-};
+  const [settings, setSettings] = useState(defaultSettings);
 
-const setSystemScriptFunctionDeclaration: FunctionDeclaration = {
-    name: 'setSystemScript',
-    description: "Updates the assistant's custom system prompt with new instructions. This changes the assistant's personality or behavior for future interactions. The session needs to be restarted for the changes to take effect.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            prompt: {
-                type: Type.STRING,
-                description: "The new set of instructions for the assistant's behavior."
-            }
-        },
-        required: ['prompt']
-    }
-};
+  const recognitionRef = useRef<any | null>(null);
+  const playerRef = useRef<any>(null); // YT.Player
+  const chatLogRef = useRef<HTMLDivElement>(null);
+  const hasGreetedRef = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const progressIntervalRef = useRef<number | null>(null);
+  const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
+  const connectionAudioRef = useRef<HTMLAudioElement | null>(null);
+  const fadeIntervalRef = useRef<number | null>(null);
+  const hintTimeoutRef = useRef<number | null>(null);
+  const noSpeechErrorCountRef = useRef(0);
 
-const applyImageEditsFunctionDeclaration: FunctionDeclaration = {
-    name: 'applyImageEdits',
-    description: 'Applies visual edits to the currently active image in the live editor. Use absolute values (e.g., brightness: 150) or relative deltas (e.g., brightness_delta: 10 to increase by 10). Omit any parameters that are not being changed.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            brightness: { type: Type.NUMBER, description: 'Absolute brightness value from 0 to 200. Default is 100.' },
-            brightness_delta: { type: Type.NUMBER, description: 'Relative change in brightness (e.g., 10 for increase, -10 for decrease).' },
-            contrast: { type: Type.NUMBER, description: 'Absolute contrast value from 0 to 200. Default is 100.' },
-            contrast_delta: { type: Type.NUMBER, description: 'Relative change in contrast.' },
-            saturate: { type: Type.NUMBER, description: 'Absolute saturation value from 0 to 200. Default is 100.' },
-            saturate_delta: { type: Type.NUMBER, description: 'Relative change in saturation.' },
-            grayscale: { type: Type.NUMBER, description: "Absolute grayscale value from 0 to 100. Use 100 for 'black and white'. Default is 0." },
-            grayscale_delta: { type: Type.NUMBER, description: 'Relative change in grayscale.' },
-            sepia: { type: Type.NUMBER, description: 'Absolute sepia value from 0 to 100. Default is 0.' },
-            sepia_delta: { type: Type.NUMBER, description: 'Relative change in sepia.' },
-            invert: { type: Type.NUMBER, description: 'Absolute invert value from 0 to 100. Default is 0.' },
-            invert_delta: { type: Type.NUMBER, description: 'Relative change in invert.' },
-            rotate: { type: Type.NUMBER, description: 'Absolute rotation in degrees (e.g., 90, -90, 180). Default is 0.' },
-            rotate_delta: { type: Type.NUMBER, description: "Relative change in rotation. Use -90 for 'rotate left' and 90 for 'rotate right'." },
-            flipHorizontal: { type: Type.BOOLEAN, description: 'If true, flips the image horizontally.' },
-            flipVertical: { type: Type.BOOLEAN, description: 'If true, flips the image vertically.' }
-        },
-    },
-};
-
-const writeCodeFunctionDeclaration: FunctionDeclaration = {
-    name: 'writeCode',
-    description: 'Generates a code snippet in a specified programming language. This can be used to create standalone scripts, UI components, or even full websites.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            language: {
-                type: Type.STRING,
-                description: "The programming language of the code. Should be a common language identifier like 'flutter', 'dart', 'html', 'css', 'javascript', 'python', 'jsx', etc."
-            },
-            code: {
-                type: Type.STRING,
-                description: 'The complete, runnable code to be generated.'
-            },
-            description: {
-                type: Type.STRING,
-                description: "A brief, user-friendly description of what the code does or how to use it."
-            }
-        },
-        required: ['language', 'code', 'description']
-    }
-};
-
-const updateCodeFunctionDeclaration: FunctionDeclaration = {
-    name: 'updateCode',
-    description: "Updates the code in the live editor based on a user's modification request. You MUST provide the complete, new code content reflecting the change.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            code: {
-                type: Type.STRING,
-                description: 'The full, updated code content.'
-            },
-            language: {
-                type: Type.STRING,
-                description: "The programming language of the code being edited, e.g., 'html'."
-            }
-        },
-        required: ['code', 'language']
-    }
-};
-
-const composeEmailFunctionDeclaration: FunctionDeclaration = {
-    name: 'composeEmail',
-    description: "Drafts an email to a recipient with a specified subject and body, then displays it for review. The AI should generate a suitable body if not fully provided.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            recipient: { type: Type.STRING, description: "The recipient's email address." },
-            subject: { type: Type.STRING, description: "The subject line of the email." },
-            body: { type: Type.STRING, description: "The main content of the email. If the user gives a short prompt, expand on it to create a full, professional email body." }
-        },
-        required: ['recipient', 'subject', 'body']
-    }
-};
-
-const editEmailDraftFunctionDeclaration: FunctionDeclaration = {
-    name: 'editEmailDraft',
-    description: "Edits the currently drafted email. Specify which part to edit, the action to take (replace, append, or prepend), and the new content.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            partToEdit: {
-                type: Type.STRING,
-                description: "The part of the email to modify.",
-                enum: ['recipient', 'subject', 'body']
-            },
-            action: {
-                type: Type.STRING,
-                description: "The editing action: 'replace' the existing content, 'append' to the end, or 'prepend' to the beginning.",
-                enum: ['replace', 'append', 'prepend']
-            },
-            newContent: {
-                type: Type.STRING,
-                description: "The new text content for the edit."
-            }
-        },
-        required: ['partToEdit', 'action', 'newContent']
-    }
-};
-
-const sendEmailFunctionDeclaration: FunctionDeclaration = {
-    name: 'sendEmail',
-    description: "Confirms and 'sends' the currently drafted email by opening the user's default email client. Only use this after the user has confirmed the draft."
-};
-
-const setBackgroundMusicFunctionDeclaration: FunctionDeclaration = {
-    name: 'setBackgroundMusic',
-    description: 'Sets the ambient background music to match a mood. Use "none" to stop the music.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            mood: {
-                type: Type.STRING,
-                description: 'The mood for the music.',
-                enum: ['happy', 'sad', 'epic', 'calm', 'none']
-            }
-        },
-        required: ['mood']
-    }
-};
-
-const functionDeclarations: FunctionDeclaration[] = [
-    { name: 'searchAndPlayYoutubeVideo', description: "Searches for and plays a video on YouTube. CRUCIAL: For song requests, append terms like 'official audio' or 'lyrics' to the query to find more playable results, as music videos are often blocked.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: "The search query, like a song name and artist, e.g., 'Saiyaara official audio'." } }, required: ['query'] } },
-    { name: 'controlYoutubePlayer', description: 'Controls the YouTube video player.', parameters: { type: Type.OBJECT, properties: { action: { type: Type.STRING, description: 'The control action to perform.', enum: ['play', 'pause', 'forward', 'rewind', 'volumeUp', 'volumeDown', 'stop'] } }, required: ['action'] } },
-    { name: 'playNextYoutubeVideo', description: 'Plays the next video in the current YouTube search results queue.' },
-    { name: 'playPreviousYoutubeVideo', description: 'Plays the previous video in the current YouTube search results queue.' },
-    { name: 'setTimer', description: 'Sets a timer for a specified duration.', parameters: { type: Type.OBJECT, properties: { durationInSeconds: { type: Type.NUMBER, description: 'The total duration of the timer in seconds.' }, timerName: { type: Type.STRING, description: 'An optional name for the timer.' } }, required: ['durationInSeconds'] } },
-    { name: 'setAvatarExpression', description: "Sets the avatar's emotional expression.", parameters: { type: Type.OBJECT, properties: { expression: { type: Type.STRING, description: 'The expression to display.', enum: ['idle', 'thinking', 'speaking', 'error', 'listening', 'surprised', 'sad', 'celebrating'] } }, required: ['expression'] } },
-    { name: 'displayWeather', description: 'Fetches and displays the current weather for a given location.', parameters: { type: Type.OBJECT, properties: { location: { type: Type.STRING, description: 'The city and country, e.g., "London, UK".' } }, required: ['location'] } },
-    { name: 'displayNews', description: 'Displays a list of news headlines based on data provided by the model.', parameters: { type: Type.OBJECT, properties: { articles: { type: Type.ARRAY, description: 'A list of news articles.', items: { type: Type.OBJECT, properties: { title: { type: Type.STRING, description: 'The headline of the article.' }, summary: { type: Type.STRING, description: 'A brief summary of the article.' } }, required: ['title', 'summary'] } } }, required: ['articles'] } },
-    { name: 'getRealtimeNews', description: 'Fetches real-time top news headlines from an external service. The raw data should be returned to the model for processing and display.', parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: 'An optional topic to search for. If omitted, fetches general top headlines.' } } } },
-    { name: 'generateImage', description: 'Generates an image based on a textual description.', parameters: { type: Type.OBJECT, properties: { prompt: { type: Type.STRING, description: 'A detailed description of the image to generate.' } }, required: ['prompt'] } },
-    { name: 'generateIntroVideo', description: "Creates a short, cinematic introductory video showcasing Kaniska's capabilities and sci-fi theme." },
-    { name: 'singSong', description: 'Sings a song by speaking the provided lyrics with emotion. This function MUST be used for all singing requests.', parameters: { type: Type.OBJECT, properties: { songName: { type: Type.STRING, description: 'The name of the song.' }, artist: { type: Type.STRING, description: 'The artist of the song.' }, lyrics: { type: Type.ARRAY, description: 'An array of strings, where each string is a line of the song lyric.', items: { type: Type.STRING } }, mood: { type: Type.STRING, description: "The emotional tone for the song, as requested by the user (e.g., 'happy', 'sad').", enum: ['happy', 'sad', 'epic', 'calm', 'none'] } }, required: ['songName', 'artist', 'lyrics', 'mood'] } },
-    sayFunctionDeclaration,
-    getSystemScriptFunctionDeclaration,
-    setSystemScriptFunctionDeclaration,
-    applyImageEditsFunctionDeclaration,
-    writeCodeFunctionDeclaration,
-    updateCodeFunctionDeclaration,
-    composeEmailFunctionDeclaration,
-    editEmailDraftFunctionDeclaration,
-    sendEmailFunctionDeclaration,
-    setBackgroundMusicFunctionDeclaration,
-];
+  // Refs for Gemini TTS Audio
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const speechSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  
+  // Ref to track the current assistant state inside async callbacks
+  const assistantStateRef = useRef(assistantState);
+  assistantStateRef.current = assistantState;
 
 
-// --- SVG Icons & Helper Components ---
-const HologramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17l-3-2.5 3-2.5"/><path d="M19 17l3-2.5-3-2.5"/><path d="M2 14.5h20"/><path d="m12 2-3 4-1 4 4 4 4-4-1-4-3-4Z"/><path d="M12 2v20"/></svg> );
-const InstagramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg> );
-const SettingsIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.12l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.12l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg> );
-const SunIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> );
-const MoonIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> );
-const FindReplaceIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><path d="m14 8-2 2-2-2" /><path d="m10 14 2-2 2 2" /></svg> );
-const ShareIcon = ({ size = 16 }: { size?: number }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> );
-const CopyIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> );
-const DeleteIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg> );
-const UploadIcon: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = "" }) => ( <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> );
-const UserCircleIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/></svg>);
-const MicVocalIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 8V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4"/><path d="M8 18.5a2.5 2.5 0 1 0 5 0"/><path d="M12 14v4.5"/><path d="m16 12-4 4-4-4"/><path d="M16 8h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"/></svg>);
-const ImageIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>);
-const KeyIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>);
-const SlidersIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="4" x2="4" y1="21" y2="14" /><line x1="4" x2="4" y1="10" y2="3" /><line x1="12" x2="12" y1="21" y2="12" /><line x1="12" x2="12" y1="8" y2="3" /><line x1="20" x2="20" y1="21" y2="16" /><line x1="20" x2="20" y1="12" y2="3" /><line x1="2" x2="6" y1="14" y2="14" /><line x1="10" x2="14" y1="8" y2="8" /><line x1="18" x2="22" y1="16" y2="16" /></svg>);
-const HelpCircleIcon = ({ className = "h-5 w-5" }: { className?: string }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>);
-
-const Clock: React.FC = () => {
-    const [time, setTime] = useState(new Date());
-
-    useEffect(() => {
-        const timerId = setInterval(() => {
-            setTime(new Date());
-        }, 1000);
-
-        return () => {
-            clearInterval(timerId);
-        };
-    }, []);
-
-    const options: Intl.DateTimeFormatOptions = {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-    };
-    // Use en-IN format and remove comma for cleaner look.
-    const formattedTime = new Intl.DateTimeFormat('en-IN', options).format(time).replace(/,/g, '');
-
-    return <div className="header-clock">{formattedTime}</div>;
-};
-
-const TypingIndicator = () => (
-    <div className="typing-indicator">
-        <div className="typing-dot"></div>
-        <div className="typing-dot"></div>
-        <div className="typing-dot"></div>
-    </div>
-);
-
-
-// --- Predefined Avatars & Constants ---
-const PREDEFINED_AVATARS = [
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", // Default blank
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARTSURBVHhe7ZxLUdswFIBzL3M3s9PuwK6A2AGxA6IDsAPCBkQHpAPSAcEO2A5wOiA6oOywQ3YEdmB2eC4lpTSpM9I5SfL/gScl0qS/9/PeFxCCEEP4j4Y+4tBDjLPIY7w/g4t4Xp/hKj7lV/yKD/AHPtQvD/AL/sJ9+AD34T58hPvwEd7yP5fxfJ/gYzyNl/G8nmQG8Dq+wuv4Ql/hVXyBb/CVPuAP/IHP8A1+wTf4A7/hHnyCb/BvfIAP8C+8wzt4V59hB/hLgD/y/f4Gz/ArvsCveE+f4Ad8gS/wFf4GgD/gZ/gU3+BrfIAP8HWe4wY8w0d4ip/xFR7g93yD3/A1nuAdfIZP8Bn+gK/wA/6Bf+AtvIX38A7e4R08w5/wM3yKH/ApPsA/eA+/4338jnfxUaTxo+gD3sbv+B4f40f8jI/xI/6Bf+Jd/A7fxu/4Ht/jR/yMH/Ej/sA/+Bd/g7fxO34n8A3e4x38iI/xI37GD/gD/+J3/A5v43f8jm/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BVv43e8jW/zR/yMH/EjfsAf+Bff4e18h7fxR/yMH/Fj/IH/8D0+x4/4GT/ix/gD/+F9/I638Tvexh/xM37Ej/gD/+F9/I638UeAP/AmfsAfeAOf4AN8gh/x/gL8gX/xL7yH3+F7/I4P8Ue8gT/gHvyE3+Bf+Bv/wL/wLd7Gv/AP/oD78An+wA/4x3/4Cj/g7/gE3+Av/I7P8Qd+wTf4E36Bv/APvIXb+B//wD/wCt7G//Av/sAf+Anv4T/8gH/iO/wFf8Cf+BXf42M8jBfxsv4Y4iK/xRfwCv4ir8A/cKj8G94V/4Gv9LXeA3f43N8jY/yMt7Gx/gef8dP+Avv4k8QQghh/AdkR3/1mP+TCAAAAABJRU5kJggg==",
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAARMA0lEQVR4Xu2bS3LkNhCEOeMxb8ajPBo5hRyBsRvkjZGzMMbvkUeyb/YQJBEaHwlb4EaqGjLzI/KDG11dVRX9lMKy/pGvF/hY4KOIj+A7fAof8Am+w+d8h8/wHT6D9/Fe/hTfwvt4I9/L+3g338X7eD/fz/v5Af/gB/wBf8AP8D7+wR/wXf6AL/Af/sAP+Af+wZ/wE/6AL/AH/oE/4U/4D3/gH/wn/IX/4X/w5L3+f+A83scX8X68n6/jA/yDH/EHvI9v4gP8g+/yP34fX+QHvIc/4y/4EX/B3/FX/A3/xr/wV/wb/8Of8Xf8GX/H3/F3/B//yJ/wd/wd/wH/wd/xd/wH/wd/x3/wf/wH/wP/wH/wH/wP/8Af8Af8Af/AH/AH/AE/4U/4U/4Ef8K/8Bf8FX/FX/A3/A3/wV/wd/wd/8e/8V/8GX/Hn/En/Al/wp/wJ/wJ/8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJf8Kf8Cf8CX/Cn/B3/B1/x5/xJ/wZf8ef8Sf8CX/Cn/An/Al/wp/wd/wdf8ef8Sf8GX/Hn/En/Al/wp/wJ/wJf8Kf8Hf8HX/H3/En/Bl/w5/xJ/wJ/8Kf8Cf8CX/C3/B3/F3/F3/FX/A3/A3/BV/AVf8Wf8Wf8GX/Gn/Bn/A3/E//F//A//Af/Af/Af/AE/4A/4A/6AP+AP+AOf8Cf8CX/An/An/An/gn/hT/hT/gR/wV/wVfwVf8Xf8Xf8Hf/Gn/FX/BX/BX/F3/F3/B3/xp/wV/wV/wV/wV/wd/wdf8af8Vf8Ff8Ff8Xf8Xf8HX/H//Bn/B//h//Af/Af/wH/wB/wBf8Af8Af8AT/gD3jCn/An/Al/wp/wJ/wJ/8Kf8Kf8Cf+Cf+FP+FP+BH/BX/BX/BX/FX/B3/B3/AJ/wV/wVf8Xf8Xf8Hf/An/BX/BX/FX/F3/B3/AJ/wV/wV/wV/wV/xV/wd/8Cf8Ff8FX/F3/F3/B3/B/wB/wB/8Af8Af8AX/An/An/Al/wp/wJ/wVf8Wf8Wf8Gn/Gv/Bf/wf/wP/yP//F/jJj4KP6PL+OLeBffx/fxfXwTH+NL+CZeysd4G5/i13gTf8Tf8TbeAEv4if8T7+L7+KVBCCEIQ4X0vhcc/mdft9/QAAAAASUVORK5CYII=",
-];
-
-
-// --- API Interaction ---
-const searchYoutubeVideo = async (query: string, apiKey: string): Promise<{ videoId: string; title: string }[]> => {
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${apiKey}&type=video&videoEmbeddable=true&maxResults=10`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        const errorData = await response.json();
-        console.error("YouTube API Error:", errorData);
-        throw new Error(errorData.error?.message || "Failed to search YouTube.");
-    }
-
-    const data = await response.json();
-    if (!data.items || data.items.length === 0) {
-        throw new Error(`I couldn't find any videos matching "${query}".`);
-    }
-
-    return data.items.map((item: any) => ({
-        videoId: item.id.videoId,
-        title: item.snippet.title,
-    }));
-};
-
-const fetchWeatherData = async (location: string, apiKey: string): Promise<WeatherData> => {
-    const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(location)}?unitGroup=metric&key=${apiKey}&contentType=json`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        // Visual Crossing returns error text directly, not always JSON
-        const errorText = await response.text();
-        throw new Error(errorText || `Failed to fetch weather for ${location}. Status: ${response.status}`);
-    }
-    const data = await response.json();
-
-    if (!data.currentConditions) {
-        throw new Error(`Could not find current weather conditions for ${location}.`);
-    }
-
-    const current = data.currentConditions;
-
-    return {
-        location: data.resolvedAddress,
-        temperature: Math.round(current.temp),
-        condition: current.conditions,
-        humidity: current.humidity,
-        windSpeed: Math.round(current.windspeed),
-    };
-};
-
-const fetchNewsData = async (apiKey: string, query?: string): Promise<{ title: string; summary: string }[]> => {
-    const baseUrl = 'https://gnews.io/api/v4/';
-    const endpoint = query ? 'search' : 'top-headlines';
-    let gnewsApiUrl = `${baseUrl}${endpoint}?lang=en&country=us&max=5&apikey=${apiKey}`;
-
-    if (query) {
-        gnewsApiUrl += `&q=${encodeURIComponent(query)}`;
-    } else {
-        gnewsApiUrl += `&category=general`;
-    }
-    
-    // GNews's free plan has CORS restrictions, so a proxy is still needed for client-side requests.
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(gnewsApiUrl)}`;
-
-    const response = await fetch(proxyUrl);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch news headlines from GNews via proxy. Status: ${response.status}`);
-    }
-    
-    const newsData = await response.json();
-
-    if (newsData.errors) {
-        throw new Error(`GNews API Error: ${newsData.errors.join(', ')}`);
-    }
-
-    if (!newsData.articles || newsData.articles.length === 0) {
-        return [];
-    }
-
-    return newsData.articles.map((article: any) => ({
-        title: article.title,
-        summary: article.description || 'No summary available.',
-    }));
-};
-
-
-const fetchJoke = async (): Promise<string> => {
-    // Using a public joke API that doesn't require keys, making it reliable and easy to use.
-    const url = 'https://v2.jokeapi.dev/joke/Any?type=single&safe-mode';
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch a joke. Status: ${response.status}`);
-    }
-    const data = await response.json();
-    if (data.error) {
-        throw new Error('Joke API returned an error.');
-    }
-    return data.joke;
-};
-
-
-const BACKGROUND_MUSIC: { [key: string]: string } = {
-    happy: 'https://cdn.pixabay.com/download/audio/2022/02/20/audio_2c56a84a6c.mp3',
-    sad: 'https://cdn.pixabay.com/download/audio/2022/11/17/audio_8779f2229a.mp3',
-    epic: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_a405998a6a.mp3',
-    calm: 'https://cdn.pixabay.com/download/audio/2022/05/13/audio_f523d91754.mp3',
-};
-
-// --- Helper to parse API errors for user-friendly messages ---
-const getApiErrorMessage = (error: unknown): string => {
-    console.error("API Error Encountered:", error);
-
-    let errorMessage = "An unknown error occurred. I've logged the details. Please try again.";
-    let statusCode: number | null = null;
-
-    if (error instanceof Error) {
-        errorMessage = error.message;
-        const match = error.message.match(/\[(\d{3})\]/);
-        if (match) statusCode = parseInt(match[1], 10);
-    } else if (typeof error === 'object' && error !== null) {
-        errorMessage = (error as any).message || JSON.stringify(error);
-        statusCode = (error as any).status || (error as any).statusCode;
-    } else if (typeof error === 'string') {
-        errorMessage = error;
-    }
-
-    const lowerCaseMessage = errorMessage.toLowerCase();
-
-    if (lowerCaseMessage.includes('failed to fetch') || lowerCaseMessage.includes('network error')) {
-        return "Oops! I'm having trouble connecting to my network. Could you please check your internet connection? Sometimes firewalls can also get in the way.";
-    }
-
-    if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('api_key_invalid') || lowerCaseMessage.includes('permission is not found')) {
-        return "My connection is failing. It looks like there's an issue with the API key. Please check your key in the Settings > API Keys section and make sure it's correct and has the right permissions configured in Google AI Studio.";
-    }
-    if (lowerCaseMessage.includes('permission_denied')) {
-        return "I'm sorry, I don't have the required permissions to perform that action. This could be due to an incorrect API key or a billing issue with your Google Cloud project. Please double-check your settings in the Settings > API Keys section.";
-    }
-    if (lowerCaseMessage.includes('requested entity was not found')) {
-        return "It seems the API key I was using is no longer valid. Could you please select a new one for me in Settings > API Keys? This can happen if the key was deleted or its permissions were recently changed.";
-    }
-
-    if (lowerCaseMessage.includes('resource_exhausted') || lowerCaseMessage.includes('429') || statusCode === 429) {
-        return "Oh dear, it looks like we've been a bit too chatty and hit the API limit for now. You might have used up the free quota. Please check your usage on the Google AI Studio dashboard, or we can try again in a little while.";
-    }
-    
-    if (lowerCaseMessage.includes('safety') || lowerCaseMessage.includes('prompt_blocked') || lowerCaseMessage.includes('response was blocked') || (statusCode === 400 && lowerCaseMessage.includes('finish reason: safety'))) {
-        return "I'm sorry, but I can't respond to that. My safety filters have blocked the request. Could we perhaps try rephrasing it or talking about something else?";
-    }
-    
-    if (lowerCaseMessage.includes('user location is not supported')) {
-        return "I'm really sorry, but it seems my services are not yet available in your current region. Please check the Gemini API documentation for a list of supported locations.";
-    }
-
-    if (lowerCaseMessage.includes('internal') || statusCode === 500 || statusCode === 503) {
-        return "It seems my core systems are experiencing a temporary hiccup. This is usually resolved quickly. Please give me a moment and then try your request again. My engineers are likely already on it!";
-    }
-
-    if (lowerCaseMessage.includes('invalid_argument') || (statusCode === 400 && !lowerCaseMessage.includes('finish reason: safety'))) {
-        return "I'm having a little trouble understanding that request. It seems to be invalid, which can sometimes happen with a malformed prompt or unsupported settings. Could we try that again, perhaps in a slightly different way?";
-    }
-    
-    if (lowerCaseMessage.includes('model not found')) {
-        return "I can't seem to find the specific AI model I need for this task. It might be an issue with the model name or availability. Let's try a different command.";
-    }
-
-    if (error instanceof Error) return `An unexpected issue occurred: ${error.message}`;
-
+  // --- Core Hooks ---
+  useEffect(() => {
     try {
-        return `An unexpected technical issue occurred: ${JSON.stringify(error)}`;
-    } catch {
-        return "An unknown and unstringifiable error occurred. Please check the console for details.";
-    }
-};
-
-
-const ApiKeySelectionScreen: React.FC<{
-    onKeysSaved: (keys: ApiKeys) => void;
-    onStudioKeySelected: (optionalKeys: OptionalApiKeys) => void;
-    reselectionReason?: string | null;
-}> = ({ onKeysSaved, onStudioKeySelected, reselectionReason }) => {
-    const [geminiKeyInput, setGeminiKeyInput] = useState('');
-    const [weatherKeyInput, setWeatherKeyInput] = useState('');
-    const [newsKeyInput, setNewsKeyInput] = useState('');
-    const [youtubeKeyInput, setYoutubeKeyInput] = useState('');
-    const [isStudioAvailable, setIsStudioAvailable] = useState(false);
-
-    useEffect(() => {
-        setIsStudioAvailable(!!window.aistudio?.openSelectKey);
-    }, []);
-
-    const handleSelectKeyWithStudio = async () => {
-        if (isStudioAvailable) {
-            try {
-                await window.aistudio.openSelectKey();
-                onStudioKeySelected({
-                    weather: weatherKeyInput.trim() || null,
-                    news: newsKeyInput.trim() || null,
-                    youtube: youtubeKeyInput.trim() || null,
-                });
-            } catch (error) {
-                console.error("AI Studio key selection failed:", error);
+        const loggedInUserId = localStorage.getItem('kaniska-session-userId');
+        if (loggedInUserId) {
+            const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
+            const user = allUsers.find(u => u.id === loggedInUserId);
+            if (user) {
+                setCurrentUser(user);
+                const loadedSettings = user.settings || {};
+                const mergedSettings = {
+                    ...defaultSettings,
+                    ...loadedSettings,
+                    voice: { ...defaultSettings.voice, ...(loadedSettings.voice || {}) },
+                    apiKeys: { ...defaultSettings.apiKeys, ...(loadedSettings.apiKeys || {}) },
+                    avatarMap: { ...defaultSettings.avatarMap, ...(loadedSettings.avatarMap || {}) },
+                    emotionTuning: { ...defaultSettings.emotionTuning, ...(loadedSettings.emotionTuning || {}) }
+                };
+                setSettings(mergedSettings);
+                setChatHistory(user.chatHistory || []);
             }
         }
-    };
-
-    const handleSaveKeys = () => {
-        if (geminiKeyInput.trim()) {
-            onKeysSaved({
-                gemini: geminiKeyInput.trim(),
-                weather: weatherKeyInput.trim() || null,
-                news: newsKeyInput.trim() || null,
-                youtube: youtubeKeyInput.trim() || null,
-            });
-        }
-    };
-
-    return (
-        <div className="h-screen w-screen flex items-center justify-center bg-bg-color text-text-color p-4">
-            <div className="bg-panel-bg p-8 rounded-lg border border-border-color text-center max-w-xl w-full animate-panel-enter">
-                <div className="hologram-svg mx-auto mb-4"><HologramIcon /></div>
-                <h1 className="text-2xl font-bold mb-2 glowing-text">API Keys Required</h1>
-                <p className="text-muted mb-6 text-sm">
-                    This assistant requires a Gemini API key to function. You can also provide optional keys to unlock more features.
-                </p>
-
-                {reselectionReason && (
-                    <div className="my-4 p-3 bg-red-900/50 border border-red-500/60 rounded-md text-red-300 text-sm text-left">
-                        <p className="font-bold">Please update your key</p>
-                        <p className="m-0 text-xs">{reselectionReason}</p>
-                    </div>
-                )}
-                
-                <div className="text-left space-y-4">
-                    <div>
-                        <h2 className="text-lg font-semibold mb-2">Gemini API Key <span className="text-red-400 text-sm font-normal">(Required)</span></h2>
-                        <button onClick={handleSelectKeyWithStudio} disabled={!isStudioAvailable} title={!isStudioAvailable ? "Not available in this environment" : "Select key from AI Studio"} className="w-full mb-2 bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            Select Key via AI Studio & Continue
-                        </button>
-                        <div className="my-3 relative flex items-center"><div className="flex-grow border-t border-border-color"></div><span className="flex-shrink mx-4 text-muted text-xs">OR</span><div className="flex-grow border-t border-border-color"></div></div>
-                        <input type="text" spellCheck="false" autoComplete="off" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder="Paste your Gemini API key here" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
-                    </div>
-                     <div>
-                        <h2 className="text-lg font-semibold mb-2">Optional Keys</h2>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm font-medium text-muted mb-1">Visual Crossing Weather Key</label>
-                                <input type="password" spellCheck="false" autoComplete="off" value={weatherKeyInput} onChange={(e) => setWeatherKeyInput(e.target.value)} placeholder="For weather forecasts" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-muted mb-1">GNews API Key</label>
-                                <input type="password" spellCheck="false" autoComplete="off" value={newsKeyInput} onChange={(e) => setNewsKeyInput(e.target.value)} placeholder="For news headlines (from gnews.io)" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-muted mb-1">Google Cloud API Key</label>
-                                <input type="password" spellCheck="false" autoComplete="off" value={youtubeKeyInput} onChange={(e) => setYoutubeKeyInput(e.target.value)} placeholder="For YouTube search & other Google services" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"/>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <button onClick={handleSaveKeys} disabled={!geminiKeyInput.trim()} className="w-full mt-6 bg-green-600/80 hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50">
-                    Save Manually Pasted Keys & Use
-                </button>
-                <p className="text-xs text-muted mt-4">
-                    Your keys are saved securely in your browser's local storage. For info on billing, visit the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-primary-color hover:underline">official documentation</a>.
-                </p>
-            </div>
-        </div>
-    );
-};
-
-// --- Panel Components ---
-const WeatherPanel: React.FC<{ data: WeatherData }> = ({ data }) => (
-    <div className="p-4">
-        <h3 className="text-xl font-bold mb-2">Weather in {data.location}</h3>
-        <div className="grid grid-cols-2 gap-4">
-            <div><p className="font-semibold text-4xl">{data.temperature}°C</p><p>{data.condition}</p></div>
-            <div><p>Humidity: {data.humidity}%</p><p>Wind: {data.windSpeed} km/h</p></div>
-        </div>
-    </div>
-);
-
-const NewsPanel: React.FC<{ articles: NewsArticle[] }> = ({ articles }) => (
-    <div className="p-4 space-y-4">
-        {articles.map((article, index) => (
-            <div key={index} className="border-b border-border-color pb-2">
-                <h4 className="font-semibold">{article.title}</h4>
-                <p className="text-sm text-muted">{article.summary}</p>
-            </div>
-        ))}
-    </div>
-);
-
-const TimerPanel: React.FC<{ timer: TimerData }> = ({ timer }) => {
-    const formatTime = (seconds: number) => {
-        const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
-        return `${minutes}:${remainingSeconds}`;
-    };
-
-    return (
-        <div className="flex flex-col items-center justify-center h-full">
-            <h3 className="text-2xl font-semibold mb-2">{timer.name}</h3>
-            <p className="text-6xl font-mono tracking-widest">{formatTime(timer.remaining)}</p>
-            <p className={`mt-2 px-3 py-1 text-sm rounded-full ${timer.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                {timer.isActive ? 'Running' : 'Finished'}
-            </p>
-        </div>
-    );
-};
-
-const EmailPanel: React.FC<{
-    recipient: string;
-    subject: string;
-    body: string;
-    onRecipientChange: (value: string) => void;
-    onSubjectChange: (value: string) => void;
-    onBodyChange: (value: string) => void;
-    onSend: () => void;
-}> = ({ recipient, subject, body, onRecipientChange, onSubjectChange, onBodyChange, onSend }) => {
-    return (
-        <div className="flex-grow flex flex-col p-4 gap-4 overflow-y-auto">
-            <div className="flex items-center gap-2">
-                <label htmlFor="email-to" className="font-semibold text-muted">To:</label>
-                <input
-                    id="email-to"
-                    type="email"
-                    value={recipient}
-                    onChange={(e) => onRecipientChange(e.target.value)}
-                    className="flex-grow bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"
-                    placeholder="recipient@example.com"
-                />
-            </div>
-            <div className="flex items-center gap-2">
-                <label htmlFor="email-subject" className="font-semibold text-muted">Subject:</label>
-                <input
-                    id="email-subject"
-                    type="text"
-                    value={subject}
-                    onChange={(e) => onSubjectChange(e.target.value)}
-                    className="flex-grow bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none"
-                    placeholder="Email subject"
-                />
-            </div>
-            <textarea
-                value={body}
-                onChange={(e) => onBodyChange(e.target.value)}
-                className="flex-grow bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none resize-none"
-                placeholder="Compose your email..."
-            />
-            <div className="flex-shrink-0">
-                <button
-                    onClick={onSend}
-                    className="w-full bg-primary-color/80 hover:bg-primary-color text-bg-color font-bold py-2.5 px-4 rounded-md transition disabled:opacity-50"
-                    disabled={!recipient || !subject}
-                >
-                    Send Email
-                </button>
-            </div>
-        </div>
-    );
-};
-
-
-const ImageEditorModal: React.FC<{
-    isOpen: boolean;
-    image: GeneratedImage | null;
-    onClose: () => void;
-    onSave: (newImageUrl: string) => void;
-}> = ({ isOpen, image, onClose, onSave }) => {
-    if (!isOpen || !image || !image.url) return null;
-
-    // A full implementation would have state for edits and a canvas.
-    // This is a placeholder to resolve the component error.
-    const handleSave = () => {
-        // In a real editor, this would be the data URL from a canvas.
-        if (image.url) onSave(image.url);
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content w-full max-w-2xl" onClick={e => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Manual Image Editor</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
-                </header>
-                <div className="p-6">
-                    <img src={image.url} alt={image.prompt} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md" />
-                    <p className="text-center text-muted mt-4">Manual editing controls would appear here.</p>
-                </div>
-                 <footer className="flex justify-end p-4 border-t border-border-color gap-2">
-                    <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Cancel</button>
-                    <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md">Save Changes</button>
-                </footer>
-            </div>
-        </div>
-    );
-};
-
-const LiveImageEditorModal: React.FC<{
-    isOpen: boolean;
-    image: GeneratedImage | null;
-    filters: ImageFilters;
-    transform: ImageTransforms;
-    onClose: () => void;
-    onSave: (newImageUrl: string) => void;
-    onReset: () => void;
-}> = ({ isOpen, image, filters, transform, onClose, onSave, onReset }) => {
-    if (!isOpen || !image || !image.url) return null;
-
-    const imageStyle: React.CSSProperties = {
-        filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) invert(${filters.invert}%)`,
-        transform: `rotate(${transform.rotate}deg) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`,
-    };
-
-    const handleSave = () => {
-         // A real implementation would draw the styled image to a canvas
-         // and get the data URL to save it. For now, we save the original.
-         if (image.url) onSave(image.url);
+    } catch (e: any) {
+        console.error("Failed to load user session from localStorage", e);
     }
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content w-full max-w-4xl" onClick={e => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Live Image Editor</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
-                </header>
-                 <div className="p-6 text-center">
-                    <div className="w-full h-[60vh] bg-black/30 flex items-center justify-center rounded-lg overflow-hidden">
-                        <img src={image.url} alt={image.prompt} style={imageStyle} className="max-w-full max-h-full object-contain transition-all duration-300" />
-                    </div>
-                    <p className="text-sm text-muted mt-2">Use your voice to apply edits in real-time!</p>
-                </div>
-                 <footer className="flex justify-between p-4 border-t border-border-color gap-2">
-                    <button onClick={onReset} className="px-4 py-2 text-sm bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded-md hover:bg-yellow-500/30">Reset Edits</button>
-                    <div>
-                         <button onClick={onClose} className="px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color mr-2">Cancel</button>
-                        <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md">Finish & Save</button>
-                    </div>
-                </footer>
-            </div>
-        </div>
-    );
-};
-
-const WebsitePreviewModal: React.FC<{
-    preview: WebsitePreview | null;
-    onClose: () => void;
-}> = ({ preview, onClose }) => {
-    if (!preview) return null;
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content w-[90vw] h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold truncate">{preview.title}</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
-                </header>
-                <div className="flex-grow">
-                    <iframe
-                        srcDoc={preview.htmlContent}
-                        title={preview.title}
-                        sandbox="allow-scripts allow-same-origin"
-                        className="w-full h-full border-0"
-                    />
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const QuickActions: React.FC<{ 
-    onAction: (action: string) => void; 
-    disabled: boolean;
-    isWeatherEnabled: boolean;
-    isNewsEnabled: boolean;
-    isYoutubeEnabled: boolean;
-}> = ({ onAction, disabled, isWeatherEnabled, isNewsEnabled, isYoutubeEnabled }) => (
-    <div className="flex-shrink-0 p-3 border-t border-border-color flex items-center justify-center gap-2">
-        <p className="text-xs text-muted font-semibold mr-2">Quick Actions:</p>
-        <button onClick={() => onAction('weather')} disabled={disabled || !isWeatherEnabled} title={!isWeatherEnabled ? "Requires Visual Crossing Weather Key in Settings" : ""} className="quick-action-button">Weather</button>
-        <button onClick={() => onAction('news')} disabled={disabled || !isNewsEnabled} title={!isNewsEnabled ? "Requires GNews API Key in Settings" : ""} className="quick-action-button">News</button>
-        <button onClick={() => onAction('music')} disabled={disabled || !isYoutubeEnabled} title={!isYoutubeEnabled ? "Requires YouTube API Key in Settings" : ""} className="quick-action-button">Music</button>
-        <button onClick={() => onAction('joke')} disabled={disabled} className="quick-action-button">Tell a Joke</button>
-    </div>
-);
-
-const CodePanel: React.FC<{
-    snippets: CodeSnippet[];
-    onPreview: (preview: WebsitePreview) => void;
-    onLiveEdit: (snippet: CodeSnippet) => void;
-}> = ({ snippets, onPreview, onLiveEdit }) => {
-    const handlePreview = (snippet: CodeSnippet) => {
-        if (snippet.language.toLowerCase() === 'html') {
-            onPreview({
-                title: snippet.description,
-                htmlContent: snippet.code,
-            });
+  }, []);
+  
+  useEffect(() => {
+    // This effect runs once on mount
+    
+    // Configure ambient audio
+    if (ambientAudioRef.current) {
+        ambientAudioRef.current.volume = 0;
+        // Programmatically set the source for the ambient audio.
+        // This helps prevent a race condition on some browsers where play() might be
+        // called before the browser has processed the `src` attribute from the JSX,
+        // which would lead to a "no supported sources" error.
+        if (!ambientAudioRef.current.src) {
+           ambientAudioRef.current.src = "https://storage.googleapis.com/aai-web-samples/scifi-ambience.mp3";
         }
-    };
-    return (
-        <div className="flex-grow p-4 overflow-y-auto">
-            {snippets.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted">
-                    <p>Ask the assistant to write some code to see it here.</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {snippets.map(snippet => (
-                        <div key={snippet.id} className="bg-assistant-bubble-bg border border-border-color rounded-lg overflow-hidden">
-                            <div className="p-3 border-b border-border-color flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-semibold">{snippet.description}</h4>
-                                    <span className="text-xs text-muted bg-panel-bg px-2 py-0.5 rounded-full border border-border-color">{snippet.language}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    {snippet.language.toLowerCase() === 'html' && (
-                                        <button onClick={() => handlePreview(snippet)} className="text-xs px-2 py-1 bg-panel-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">
-                                            Preview
-                                        </button>
-                                    )}
-                                    <button onClick={() => onLiveEdit(snippet)} className="text-xs px-2 py-1 bg-panel-bg border border-border-color rounded-md hover:border-primary-color hover:text-primary-color transition">
-                                        Live Edit
-                                    </button>
-                                </div>
-                            </div>
-                            <pre className="p-3 text-xs overflow-x-auto bg-black/20"><code className={`language-${snippet.language}`}>{snippet.code}</code></pre>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
-const LiveCodeEditorPanel: React.FC<{
-    snippet: CodeSnippet;
-    code: string;
-    onCodeChange: (code: string) => void;
-    onFinish: () => void;
-}> = ({ snippet, code, onCodeChange, onFinish }) => {
-    const isHtml = snippet.language.toLowerCase() === 'html';
-
-    return (
-        <div className="flex flex-col h-full overflow-hidden">
-            <header className="flex-shrink-0 p-3 border-b border-border-color flex justify-between items-center">
-                <div>
-                    <h3 className="font-semibold">Live Editor: {snippet.description}</h3>
-                    <p className="text-xs text-muted">You can give voice commands to edit the code below.</p>
-                </div>
-                <button onClick={onFinish} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md">
-                    Finish Editing
-                </button>
-            </header>
-            <div className={`flex-grow grid ${isHtml ? 'grid-cols-2' : 'grid-cols-1'} gap-px bg-border-color overflow-hidden`}>
-                <textarea
-                    value={code}
-                    onChange={(e) => onCodeChange(e.target.value)}
-                    className="w-full h-full bg-assistant-bubble-bg p-3 text-sm font-mono focus:outline-none resize-none"
-                    spellCheck="false"
-                />
-                {isHtml && (
-                    <iframe
-                        srcDoc={code}
-                        title="Live Preview"
-                        sandbox="allow-scripts"
-                        className="w-full h-full border-0 bg-white"
-                    />
-                )}
-            </div>
-        </div>
-    );
-};
-
-
-type SettingsModalProps = {
-    isOpen: boolean;
-    onClose: () => void;
-    avatars: string[];
-    currentAvatar: string;
-    onSelectAvatar: (avatar: string) => void;
-    onUploadAvatar: (newAvatar: string) => void;
-    onGenerateAvatar: (prompt: string) => void;
-    generatedAvatarResult: GeneratedAvatar;
-    customGreeting: string;
-    onSaveGreeting: (greeting: string) => void;
-    customSystemPrompt: string;
-    onSaveSystemPrompt: (prompt: string) => void;
-    onClearHistory: () => void;
-    mainVoiceGender: 'female' | 'male';
-    onSetMainVoiceGender: (gender: 'female' | 'male') => void;
-    selectedVoice: string;
-    onSelectVoice: (voice: string) => void;
-    voicePitch: number;
-    onSetVoicePitch: (pitch: number) => void;
-    voiceSpeed: number;
-    onSetVoiceSpeed: (speed: number) => void;
-    greetingVoiceGender: 'female' | 'male';
-    onSetGreetingVoiceGender: (gender: 'female' | 'male') => void;
-    greetingVoice: string;
-    onSetGreetingVoice: (voice: string) => void;
-    greetingPitch: number;
-    onSetGreetingPitch: (pitch: number) => void;
-    greetingSpeed: number;
-    onSetGreetingSpeed: (speed: number) => void;
-    speakText: (text: string, emotion?: string, voiceOverride?: { voice: string; pitch: number; speed: number }) => void;
-    onStartSupportChat: () => void;
-    userId: string | null;
-    apiKeys: ApiKeys;
-    onSaveApiKeys: (keys: ApiKeys) => void;
-    onResetGeminiKey: () => void;
-};
-
-const FaqItem: React.FC<{ q: string; a: React.ReactNode }> = ({ q, a }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    return (
-        <div className="border-b border-border-color">
-            <button onClick={() => setIsOpen(!isOpen)} className="w-full text-left flex justify-between items-center py-3">
-                <span className="font-semibold">{q}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </button>
-            {isOpen && <div className="pb-4 text-sm text-muted prose prose-invert max-w-none prose-p:my-2 prose-ol:my-2 prose-ul:my-2">{a}</div>}
-        </div>
-    );
-};
-
-const SettingsModal: React.FC<SettingsModalProps> = ({
-    isOpen, onClose, avatars, currentAvatar, onSelectAvatar, onUploadAvatar,
-    onGenerateAvatar, generatedAvatarResult,
-    customGreeting, onSaveGreeting, customSystemPrompt, onSaveSystemPrompt, onClearHistory,
-    mainVoiceGender, onSetMainVoiceGender, selectedVoice, onSelectVoice, voicePitch, onSetVoicePitch, voiceSpeed, onSetVoiceSpeed,
-    greetingVoiceGender, onSetGreetingVoiceGender, greetingVoice, onSetGreetingVoice,
-    greetingPitch, onSetGreetingPitch, greetingSpeed, onSetGreetingSpeed,
-    speakText, onStartSupportChat, userId,
-    apiKeys, onSaveApiKeys, onResetGeminiKey
-}) => {
-    const [activeTab, setActiveTab] = React.useState('persona');
-    const [greeting, setGreeting] = React.useState(customGreeting);
-    const [systemPrompt, setSystemPrompt] = React.useState(customSystemPrompt);
-    const [localApiKeys, setLocalApiKeys] = useState(apiKeys);
-    const avatarGenerationInputRef = React.useRef<HTMLInputElement>(null);
-    const avatarUploadInputRef = React.useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        setLocalApiKeys(apiKeys);
-    }, [apiKeys, isOpen]);
-
-    const VOICE_MAP: { [key in 'female' | 'male']: string[] } = {
-        female: ['Zephyr', 'Kore', 'Charon'],
-        male: ['Puck', 'Fenrir'],
-    };
-
-    const handleApiKeySave = () => {
-        onSaveApiKeys(localApiKeys);
-        alert("API Keys saved!");
-    };
+    }
     
-    const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (typeof e.target?.result === 'string') {
-                    onUploadAvatar(e.target.result);
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content settings-modal-content" onClick={e => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Settings</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-text-color transition">&times;</button>
-                </header>
-                <div className="settings-layout">
-                    <nav className="settings-nav">
-                        <button onClick={() => setActiveTab('persona')} className={`settings-nav-button ${activeTab === 'persona' ? 'active' : ''}`}>
-                            <UserCircleIcon /><span>Persona</span>
-                        </button>
-                        <button onClick={() => setActiveTab('voice')} className={`settings-nav-button ${activeTab === 'voice' ? 'active' : ''}`}>
-                            <MicVocalIcon /><span>Voice</span>
-                        </button>
-                        <button onClick={() => setActiveTab('avatar')} className={`settings-nav-button ${activeTab === 'avatar' ? 'active' : ''}`}>
-                            <ImageIcon /><span>Avatar</span>
-                        </button>
-                        <button onClick={() => setActiveTab('apiKeys')} className={`settings-nav-button ${activeTab === 'apiKeys' ? 'active' : ''}`}>
-                            <KeyIcon /><span>API Keys</span>
-                        </button>
-                        <button onClick={() => setActiveTab('account')} className={`settings-nav-button ${activeTab === 'account' ? 'active' : ''}`}>
-                            <SlidersIcon /><span>Account & Data</span>
-                        </button>
-                        <button onClick={() => setActiveTab('help')} className={`settings-nav-button ${activeTab === 'help' ? 'active' : ''}`}>
-                            <HelpCircleIcon /><span>Help & Support</span>
-                        </button>
-                    </nav>
-                    <div className="settings-content">
-                        {activeTab === 'persona' && (
-                            <section className="settings-section">
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Greeting Message</h3>
-                                        <p>This is what the assistant says when you first connect.</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input id="greeting-input" type="text" value={greeting} onChange={(e) => setGreeting(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onSaveGreeting(greeting)} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition">Save</button>
-                                    </div>
-                                </div>
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Custom System Prompt</h3>
-                                        <p>Define the core personality and instructions. A restart is needed for changes to take full effect.</p>
-                                    </div>
-                                    <textarea id="system-prompt-input" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={8} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none w-full resize-y" />
-                                    <button onClick={() => onSaveSystemPrompt(systemPrompt)} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition mt-2">Save Prompt</button>
-                                </div>
-                            </section>
-                        )}
-                        {activeTab === 'voice' && (
-                            <section className="settings-section">
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Main Voice</h3>
-                                        <p>The primary voice used for most responses.</p>
-                                    </div>
-                                     <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label htmlFor="main-voice-gender" className="block text-sm font-medium text-muted mb-1">Gender</label>
-                                            <select id="main-voice-gender" value={mainVoiceGender} onChange={e => onSetMainVoiceGender(e.target.value as 'female' | 'male')} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
-                                                <option value="female">Female</option>
-                                                <option value="male">Male</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label htmlFor="main-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
-                                            <select id="main-voice-select" value={selectedVoice} onChange={e => onSelectVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
-                                                {VOICE_MAP[mainVoiceGender].map(v => <option key={v} value={v}>{v}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 space-y-4">
-                                        <div>
-                                            <label htmlFor="main-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{voicePitch}</span></label>
-                                            <input id="main-voice-pitch" type="range" min="-20" max="20" value={voicePitch} onChange={e => onSetVoicePitch(Number(e.target.value))} />
-                                        </div>
-                                        <div>
-                                            <label htmlFor="main-voice-speed" className="flex justify-between text-sm text-muted mb-1"><span>Speed</span> <span>{voiceSpeed.toFixed(2)}x</span></label>
-                                            <input id="main-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={voiceSpeed} onChange={e => onSetVoiceSpeed(Number(e.target.value))} />
-                                        </div>
-                                    </div>
-                                    <button onClick={() => speakText("Testing the main voice configuration.", "neutral", { voice: selectedVoice, pitch: voicePitch, speed: voiceSpeed })} className="mt-4 px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Voice</button>
-                                </div>
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Greeting Voice</h3>
-                                        <p>A separate voice for the initial greeting message.</p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label htmlFor="greeting-voice-gender" className="block text-sm font-medium text-muted mb-1">Gender</label>
-                                            <select id="greeting-voice-gender" value={greetingVoiceGender} onChange={e => onSetGreetingVoiceGender(e.target.value as 'female' | 'male')} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
-                                                <option value="female">Female</option>
-                                                <option value="male">Male</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label htmlFor="greeting-voice-select" className="block text-sm font-medium text-muted mb-1">Voice Style</label>
-                                            <select id="greeting-voice-select" value={greetingVoice} onChange={e => onSetGreetingVoice(e.target.value)} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none">
-                                                {VOICE_MAP[greetingVoiceGender].map(v => <option key={v} value={v}>{v}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 space-y-4">
-                                        <div>
-                                            <label htmlFor="greeting-voice-pitch" className="flex justify-between text-sm text-muted mb-1"><span>Pitch</span> <span>{greetingPitch}</span></label>
-                                            <input id="greeting-voice-pitch" type="range" min="-20" max="20" value={greetingPitch} onChange={e => onSetGreetingPitch(Number(e.target.value))} />
-                                        </div>
-                                        <div>
-                                            <label htmlFor="greeting-voice-speed" className="flex justify-between text-sm text-muted mb-1"><span>Speed</span> <span>{greetingSpeed.toFixed(2)}x</span></label>
-                                            <input id="greeting-voice-speed" type="range" min="0.25" max="2.0" step="0.05" value={greetingSpeed} onChange={e => onSetGreetingSpeed(Number(e.target.value))} />
-                                        </div>
-                                    </div>
-                                    <button onClick={() => speakText(customGreeting, "neutral", { voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed })} className="mt-4 px-4 py-2 text-sm bg-assistant-bubble-bg border border-border-color rounded-md hover:border-primary-color">Test Greeting</button>
-                                </div>
-                            </section>
-                        )}
-                        {activeTab === 'avatar' && (
-                            <section className="settings-section">
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Select an Avatar</h3>
-                                        <p>Choose from a predefined list or upload your own image.</p>
-                                    </div>
-                                    <div className="avatar-gallery-grid">
-                                        {avatars.map((avatarUrl, index) => (
-                                            <div key={index} onClick={() => onSelectAvatar(avatarUrl)} className={`avatar-item ${currentAvatar === avatarUrl ? 'selected' : ''}`}>
-                                                <img src={avatarUrl} alt={`Avatar ${index + 1}`} />
-                                            </div>
-                                        ))}
-                                        <button onClick={() => avatarUploadInputRef.current?.click()} className="avatar-item upload-avatar-item">
-                                            <UploadIcon size={24} />
-                                            <span className="text-xs mt-2">Upload</span>
-                                            <input type="file" ref={avatarUploadInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Generate with AI</h3>
-                                        <p>Describe the avatar you want to create.</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input ref={avatarGenerationInputRef} type="text" placeholder="e.g., a glowing blue orb of energy" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={() => onGenerateAvatar(avatarGenerationInputRef.current?.value || '')} disabled={generatedAvatarResult.isLoading} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition disabled:opacity-50">
-                                            {generatedAvatarResult.isLoading ? 'Generating...' : 'Generate'}
-                                        </button>
-                                    </div>
-                                    {generatedAvatarResult.error && <p className="text-red-400 text-sm mt-2">{generatedAvatarResult.error}</p>}
-                                    {generatedAvatarResult.url && (
-                                        <div className="mt-4">
-                                            <p className="font-semibold mb-2">Generated Result:</p>
-                                            <div className="flex items-center gap-4">
-                                                <img src={generatedAvatarResult.url} alt="Generated avatar" className="w-24 h-24 rounded-lg object-cover border-2 border-border-color" />
-                                                <button onClick={() => onUploadAvatar(generatedAvatarResult.url!)} className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition">
-                                                    Set as Avatar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </section>
-                        )}
-                        {activeTab === 'apiKeys' && (
-                             <section className="settings-section">
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Gemini API Key (Required)</h3>
-                                        <p>The core key for AI functionality. Get yours from Google AI Studio.</p>
-                                    </div>
-                                    <div className="flex gap-2 items-center">
-                                        <input type="password" value={localApiKeys.gemini || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, gemini: e.target.value }))} placeholder="Starts with 'AIza...'" className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none flex-grow" />
-                                        <button onClick={onResetGeminiKey} className="px-4 py-2 text-sm bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 rounded-md hover:bg-yellow-500/30">Change Key</button>
-                                    </div>
-                                </div>
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Optional API Keys</h3>
-                                        <p>Enable extra features like weather, news, and YouTube search.</p>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-muted mb-1">Visual Crossing Weather Key</label>
-                                            <input type="password" value={localApiKeys.weather || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, weather: e.target.value }))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-muted mb-1">GNews API Key</label>
-                                            <input type="password" value={localApiKeys.news || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, news: e.target.value }))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-muted mb-1">Google Cloud API Key (for YouTube)</label>
-                                            <input type="password" value={localApiKeys.youtube || ''} onChange={(e) => setLocalApiKeys(k => ({ ...k, youtube: e.target.value }))} className="w-full bg-assistant-bubble-bg border border-border-color rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary-color focus:outline-none" />
-                                        </div>
-                                    </div>
-                                </div>
-                                <button onClick={handleApiKeySave} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition self-start">Save All Keys</button>
-                            </section>
-                        )}
-                        {activeTab === 'account' && (
-                             <section className="settings-section">
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Session Information</h3>
-                                        <p>This is your unique identifier for this browser session.</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-assistant-bubble-bg p-2 rounded-md">
-                                        <span className="text-muted text-sm font-mono">User ID:</span>
-                                        <span className="font-mono text-sm">{userId}</span>
-                                        <button onClick={() => navigator.clipboard.writeText(userId || '')} className="ml-auto text-muted hover:text-primary-color"><CopyIcon size={14}/></button>
-                                    </div>
-                                </div>
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Data Management</h3>
-                                        <p>Manage your conversation history and other stored data.</p>
-                                    </div>
-                                    <div>
-                                        <button onClick={() => { if (confirm('Are you sure you want to permanently delete your conversation history? This cannot be undone.')) { onClearHistory(); } }} className="px-4 py-2 text-sm bg-red-600/80 hover:bg-red-600 text-white font-semibold rounded-md transition">
-                                            Clear Conversation History
-                                        </button>
-                                        <p className="text-xs text-muted mt-2">This will remove all conversation transcripts from your browser's local storage.</p>
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-                         {activeTab === 'help' && (
-                             <section className="settings-section">
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Frequently Asked Questions</h3>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <FaqItem q="How do I use Kaniska?" a={<>Simply click the "Connect" button and start speaking when the avatar glows. You can ask questions, give commands for music, weather, and more. Try saying "What can you do?" to get some ideas.</>} />
-                                        <FaqItem q="Where do I get the Gemini API Key?" a={
-                                            <div>
-                                                <p><strong>English:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">Google AI Studio</a>.</li>
-                                                    <li>Click "Create API key in new project".</li>
-                                                    <li>Copy the generated key and paste it here.</li>
-                                                </ol>
-                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">गूगल एआई स्टूडियो</a> पर जाएं।</li>
-                                                    <li>"नए प्रोजेक्ट में एपीआई कुंजी बनाएं" पर क्लिक करें।</li>
-                                                    <li>उत्पन्न कुंजी को कॉपी करें और यहां पेस्ट करें।</li>
-                                                </ol>
-                                            </div>
-                                        } />
-                                        <FaqItem q="Where do I get the Weather API key?" a={
-                                            <div>
-                                                <p><strong>English:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li>Sign up for a free account at <a href="https://www.visualcrossing.com/weather-api" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">Visual Crossing Weather</a>.</li>
-                                                    <li>After logging in, you'll find your API key on your account dashboard.</li>
-                                                    <li>Copy the key and paste it in the API Keys section.</li>
-                                                </ol>
-                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li><a href="https://www.visualcrossing.com/weather-api" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">विज़ुअल क्रॉसिंग वेदर</a> पर एक निःशुल्क खाते के लिए साइन अप करें।</li>
-                                                    <li>लॉग इन करने के बाद, आपको अपने खाता डैशबोर्ड पर अपनी एपीआई कुंजी मिल जाएगी।</li>
-                                                    <li>कुंजी को कॉपी करें और एपीआई कुंजी अनुभाग में पेस्ट करें।</li>
-                                                </ol>
-                                            </div>
-                                        }/>
-                                        <FaqItem q="Where do I get the News API key?" a={
-                                            <div>
-                                                <p><strong>English:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li>Sign up for a free account at <a href="https://gnews.io/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">GNews.io</a>.</li>
-                                                    <li>Your API key will be available on your dashboard after you sign up and log in.</li>
-                                                    <li>The free tier is generous enough for personal use.</li>
-                                                </ol>
-                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li><a href="https://gnews.io/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">GNews.io</a> पर एक निःशुल्क खाते के लिए साइन अप करें।</li>
-                                                    <li>साइन अप करने और लॉग इन करने के बाद आपकी एपीआई कुंजी आपके डैशबोर्ड पर उपलब्ध होगी।</li>
-                                                    <li>निःशुल्क टियर व्यक्तिगत उपयोग के लिए पर्याप्त है।</li>
-                                                </ol>
-                                            </div>
-                                        }/>
-                                        <FaqItem q="Where do I get the Google Cloud API key (for YouTube)?" a={
-                                            <div>
-                                                <p><strong>English:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">Google Cloud Console</a> and create a new project.</li>
-                                                    <li>Go to "APIs & Services" &gt; "Library".</li>
-                                                    <li>Search for and enable the "YouTube Data API v3".</li>
-                                                    <li>Go to "APIs & Services" &gt; "Credentials".</li>
-                                                    <li>Click "Create Credentials" &gt; "API key". Copy the key.</li>
-                                                </ol>
-                                                <p className="mt-4"><strong>हिन्दी:</strong></p>
-                                                <ol className="list-decimal list-inside">
-                                                    <li><a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" className="text-primary-color hover:underline">गूगल क्लाउड कंसोल</a> पर जाएं और एक नया प्रोजेक्ट बनाएं।</li>
-                                                    <li>"एपीआई और सेवाएं" &gt; "लाइब्रेरी" पर जाएं।</li>
-                                                    <li>"यूट्यूब डेटा एपीआई v3" खोजें और सक्षम करें।</li>
-                                                    <li>"एपीआई और सेवाएं" &gt; "क्रेडेंशियल" पर जाएं।</li>
-                                                    <li>"क्रेडेंशियल बनाएं" &gt; "एपीआई कुंजी" पर क्लिक करें। कुंजी को कॉपी करें।</li>
-                                                </ol>
-                                            </div>
-                                        }/>
-                                    </div>
-                                </div>
-                                <div className="settings-card">
-                                    <div className="settings-section-header mb-4">
-                                        <h3>Contact Support</h3>
-                                        <p>If you're facing technical issues, you can start a live chat with our support team.</p>
-                                    </div>
-                                    <button onClick={onStartSupportChat} className="px-4 py-2 text-sm bg-green-600/80 hover:bg-green-600 text-white font-semibold rounded-md transition">Start Support Chat</button>
-                                </div>
-                            </section>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const ShareModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    conversation: TranscriptionEntry[];
-}> = ({ isOpen, onClose, conversation }) => {
-    const [copyStatus, setCopyStatus] = useState('Copy');
-
-    if (!isOpen) return null;
-
-    const formattedText = conversation
-        .map(entry => `[${entry.speaker.toUpperCase()}] ${entry.text}`)
-        .join('\n\n');
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(formattedText);
-        setCopyStatus('Copied!');
-        setTimeout(() => setCopyStatus('Copy'), 2000);
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content w-full max-w-lg" onClick={e => e.stopPropagation()}>
-                <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border-color">
-                    <h2 className="text-lg font-semibold">Share Conversation</h2>
-                    <button onClick={onClose} className="text-2xl font-bold leading-none text-muted hover:text-white">&times;</button>
-                </header>
-                <div className="p-4">
-                    <textarea
-                        readOnly
-                        value={formattedText}
-                        className="w-full h-64 bg-assistant-bubble-bg border border-border-color rounded p-2 text-sm resize-none"
-                    />
-                </div>
-                <footer className="flex justify-end p-4 border-t border-border-color">
-                    <button onClick={handleCopy} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md w-24">
-                        {copyStatus}
-                    </button>
-                </footer>
-            </div>
-        </div>
-    );
-};
-
-
-// --- The Main App Component ---
-export const App: React.FC = () => {
-    // Component State
-    const [theme, setTheme] = useState<Theme>('dark');
-    const [assistantState, setAssistantState] = useState<AssistantState>('idle');
-    const [avatarExpression, setAvatarExpression] = useState<AvatarExpression>('idle');
-    const [isMuted, setIsMuted] = useState(false);
-    const [transcriptionHistory, setTranscriptionHistory] = useState<TranscriptionEntry[]>([]);
-    const [activePanel, setActivePanel] = useState<ActivePanel>('transcript');
-    const [youtubePlayer, setYoutubePlayer] = useState<YT.Player | null>(null);
-    const [youtubeSearchResults, setYoutubeSearchResults] = useState<{ videoId: string; title: string }[]>([]);
-    const [currentYoutubeIndex, setCurrentYoutubeIndex] = useState(0);
-    const [isYoutubePlaying, setIsYoutubePlaying] = useState(false);
-    const [timerData, setTimerData] = useState<TimerData | null>(null);
-    const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-    const [newsData, setNewsData] = useState<NewsArticle[] | null>(null);
-    const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
-    const [showSettingsModal, setShowSettingsModal] = useState(false);
-    const [showShareModal, setShowShareModal] = useState(false);
+    const context = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    audioContextRef.current = context;
+    const gainNode = context.createGain();
+    gainNode.connect(context.destination);
+    gainNodeRef.current = gainNode;
     
-    // User Settings & API Keys
-    const [userId, setUserId] = useState<string | null>(null);
-    const [apiKeys, setApiKeys] = useState<ApiKeys>({ gemini: null, weather: null, news: null, youtube: null });
-    const [apiKeyReselectionReason, setApiKeyReselectionReason] = useState<string | null>(null);
-    const [currentAvatar, setCurrentAvatar] = useState<string>(PREDEFINED_AVATARS[0]);
-    const [customGreeting, setCustomGreeting] = useState("Hello, I'm Kaniska, your personal AI assistant. How can I help you today?");
-    const [customSystemPrompt, setCustomSystemPrompt] = useState("You are Kaniska, a helpful and friendly female AI assistant from the future with a slightly sci-fi personality. Your primary language is English, but you must understand and respond to commands given in Hindi. You are integrated into a smart dashboard and can control various functions like playing music on YouTube, setting timers, and fetching information. Be concise but warm in your responses.");
-    
-    // Voice Settings
-    const [mainVoiceGender, setMainVoiceGender] = useState<'female' | 'male'>('female');
-    const [selectedVoice, setSelectedVoice] = useState('Zephyr');
-    const [voicePitch, setVoicePitch] = useState(0);
-    const [voiceSpeed, setVoiceSpeed] = useState(1.0);
-    const [greetingVoiceGender, setGreetingVoiceGender] = useState<'female' | 'male'>('female');
-    const [greetingVoice, setGreetingVoice] = useState('Kore');
-    const [greetingPitch, setGreetingPitch] = useState(2);
-    const [greetingSpeed, setGreetingSpeed] = useState(1.1);
-    
-    // Refs for persistent objects
-    const aiRef = useRef<GoogleGenAI | null>(null);
-    const sessionPromiseRef = useRef<Promise<Session> | null>(null);
-    const inputAudioContextRef = useRef<AudioContext | null>(null);
-    const outputAudioContextRef = useRef<AudioContext | null>(null);
-    const micStreamRef = useRef<MediaStream | null>(null);
-    const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-    const nextAudioTimeRef = useRef(0);
-    const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-    const transcriptEndRef = useRef<HTMLDivElement | null>(null);
-    const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
-    const scriptProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
-
-    const VOICE_MAP: { [key in 'female' | 'male']: string[] } = {
-        female: ['Zephyr', 'Kore', 'Charon'],
-        male: ['Puck', 'Fenrir'],
-    };
-    
-    // --- Core Lifecycle & Setup ---
-
-    useEffect(() => {
-        // Initialize user ID
-        let uid = localStorage.getItem('kaniska-userId');
-        if (!uid) {
-            uid = `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-            localStorage.setItem('kaniska-userId', uid);
-        }
-        setUserId(uid);
-
-        // Load theme from localStorage
-        const savedTheme = localStorage.getItem('kaniska-theme') as Theme;
-        if (savedTheme) {
-            setTheme(savedTheme);
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        }
-
-        // Initialize audio contexts
-        inputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        outputAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-        
-        // Setup background music player
-        audioPlayerRef.current = new Audio();
-        audioPlayerRef.current.loop = true;
-
-        // Setup YouTube Iframe API
+    if (window.YT && window.YT.Player) {
+        setIsYTReady(true);
+    } else {
+        const originalCallback = window.onYouTubeIframeAPIReady;
         window.onYouTubeIframeAPIReady = () => {
-            const player = new YT.Player('youtube-player', {
-                height: '100%',
-                width: '100%',
-                playerVars: { 'autoplay': 1, 'controls': 1, 'rel': 0 },
-                events: {
-                    'onStateChange': (event: any) => {
-                        setIsYoutubePlaying(event.data === YT.PlayerState.PLAYING);
-                         if (event.data === YT.PlayerState.ENDED) {
-                            // Play next video on end
-                            if (currentYoutubeIndex < youtubeSearchResults.length - 1) {
-                                const nextIndex = currentYoutubeIndex + 1;
-                                setCurrentYoutubeIndex(nextIndex);
-                                player.loadVideoById(youtubeSearchResults[nextIndex].videoId);
-                            }
-                        }
-                    }
-                }
-            });
-            setYoutubePlayer(player);
+            if (originalCallback) {
+                originalCallback();
+            }
+            setIsYTReady(true);
         };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = settings.volume;
+    }
+  }, [settings.volume]);
+
+  const saveCurrentUserChanges = useCallback(() => {
+    if (!currentUser) return;
+    try {
+        const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
+        const userIndex = allUsers.findIndex(u => u.id === currentUser.id);
         
-        return () => { // Cleanup
-            disconnect();
-            if (audioPlayerRef.current) {
-                audioPlayerRef.current.pause();
-                audioPlayerRef.current = null;
-            }
-        };
-    }, []);
-
-    // Load settings from Local Storage
-    useEffect(() => {
-        if (userId) {
-            const storedSettings = localStorage.getItem(`kaniska-settings-${userId}`);
-            if (storedSettings) {
-                const settings = JSON.parse(storedSettings);
-                if (settings.apiKeys) setApiKeys(k => ({ ...k, ...settings.apiKeys }));
-                if (settings.currentAvatar) setCurrentAvatar(settings.currentAvatar);
-                if (settings.customGreeting) setCustomGreeting(settings.customGreeting);
-                if (settings.customSystemPrompt) setCustomSystemPrompt(settings.customSystemPrompt);
-                if (settings.voice && typeof settings.voice === 'object') {
-                    const voiceSettings = settings.voice as any;
-                    if (voiceSettings.main) {
-                        setMainVoiceGender(voiceSettings.main.gender || 'female');
-                        setSelectedVoice(voiceSettings.main.voice || 'Zephyr');
-                        setVoicePitch(voiceSettings.main.pitch ?? 0);
-                        setVoiceSpeed(voiceSettings.main.speed ?? 1.0);
-                    }
-                    if (voiceSettings.greeting) {
-                        setGreetingVoiceGender(voiceSettings.greeting.gender || 'female');
-                        setGreetingVoice(voiceSettings.greeting.voice || 'Kore');
-                        setGreetingPitch(voiceSettings.greeting.pitch ?? 2);
-                        setGreetingSpeed(voiceSettings.greeting.speed ?? 1.1);
-                    }
-                }
-            }
-
-            const storedHistory = localStorage.getItem(`kaniska-history-${userId}`);
-            if (storedHistory) {
-                try {
-                    const history = JSON.parse(storedHistory).map((entry: any) => ({
-                        ...entry,
-                        timestamp: new Date(entry.timestamp),
-                    }));
-                    setTranscriptionHistory(history);
-                } catch (e) {
-                    console.error("Failed to parse history from local storage", e);
-                }
-            }
-        }
-    }, [userId]);
-
-    // Save settings to Local Storage
-    useEffect(() => {
-        if (userId) {
-            const settings = {
-                apiKeys,
-                currentAvatar,
-                customGreeting,
-                customSystemPrompt,
-                voice: {
-                    main: { gender: mainVoiceGender, voice: selectedVoice, pitch: voicePitch, speed: voiceSpeed },
-                    greeting: { gender: greetingVoiceGender, voice: greetingVoice, pitch: greetingPitch, speed: greetingSpeed },
-                },
-            };
-            localStorage.setItem(`kaniska-settings-${userId}`, JSON.stringify(settings));
-        }
-    }, [
-        userId, apiKeys, currentAvatar, customGreeting, customSystemPrompt,
-        mainVoiceGender, selectedVoice, voicePitch, voiceSpeed,
-        greetingVoiceGender, greetingVoice, greetingPitch, greetingSpeed
-    ]);
-    
-    // Save history to Local Storage
-    useEffect(() => {
-        if (userId) {
-            localStorage.setItem(`kaniska-history-${userId}`, JSON.stringify(transcriptionHistory));
-        }
-    }, [userId, transcriptionHistory]);
-    
-     useEffect(() => {
-        transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [transcriptionHistory]);
-
-    // --- Core Assistant Connection ---
-    const getGeminiApiKey = (): string | null => {
-        // If a manual key is provided and it's not the studio placeholder, use it.
-        if (apiKeys.gemini && apiKeys.gemini !== 'key_from_studio') {
-            return apiKeys.gemini;
-        }
-        // Otherwise, use the key from the environment (populated by AI Studio).
-        return process.env.API_KEY || null;
-    };
-    
-    const connect = async () => {
-        // Resume AudioContexts on user gesture
-        if (inputAudioContextRef.current?.state === 'suspended') {
-            await inputAudioContextRef.current.resume();
-        }
-        if (outputAudioContextRef.current?.state === 'suspended') {
-            await outputAudioContextRef.current.resume();
-        }
-        
-        const geminiApiKey = getGeminiApiKey();
-        if (!geminiApiKey) {
-            console.error("Gemini API Key is not set.");
-            addSystemMessage("Connection failed: The API key is missing. Please configure it in Settings.", 'error');
-            setAssistantState('error');
-            return;
-        }
-
-        setAssistantState('connecting');
-        setAvatarExpression('thinking');
-        addSystemMessage("Initializing connection...", 'info');
-
-        try {
-            aiRef.current = new GoogleGenAI({ apiKey: geminiApiKey });
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            micStreamRef.current = stream;
-
-            const sessionPromise = aiRef.current.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-                callbacks: { onopen, onmessage, onerror, onclose },
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {
-                        voiceConfig: {
-                            prebuiltVoiceConfig: {
-                                voiceName: selectedVoice,
-                            }
-                        }
-                    },
-                    systemInstruction: customSystemPrompt,
-                    inputAudioTranscription: {},
-                    outputAudioTranscription: {},
-                    tools: [{ functionDeclarations }],
-                },
-            });
-
-            sessionPromiseRef.current = sessionPromise;
-            
-            await sessionPromise;
-            setAssistantState('active');
-            setAvatarExpression('listening');
-            addSystemMessage("Connection established. I'm listening.", 'success');
-            addTranscription('assistant', customGreeting);
-            speakText(customGreeting, 'cheerful', {
-                voice: greetingVoice,
-                pitch: greetingPitch,
-                speed: greetingSpeed
-            });
-
-        } catch (error) {
-            console.error("Connection failed:", error);
-            const friendlyMessage = getApiErrorMessage(error);
-            addSystemMessage(`Connection failed: ${friendlyMessage}`, 'error');
-            setAssistantState('error');
-            setAvatarExpression('error');
-            if (friendlyMessage.includes('API key')) {
-                setApiKeyReselectionReason(friendlyMessage);
-                setApiKeys(k => ({...k, gemini: null})); // Force re-selection
-            }
-        }
-    };
-    
-    const disconnect = () => {
-        sessionPromiseRef.current?.then(session => session.close());
-        sessionPromiseRef.current = null;
-        
-        // Disconnect and release audio resources
-        scriptProcessorNodeRef.current?.disconnect();
-        micSourceNodeRef.current?.disconnect();
-        scriptProcessorNodeRef.current = null;
-        micSourceNodeRef.current = null;
-
-        micStreamRef.current?.getTracks().forEach(track => track.stop());
-        micStreamRef.current = null;
-        
-        setAssistantState('idle');
-        setAvatarExpression('idle');
-        addSystemMessage("Connection closed.", 'info');
-    };
-
-    // --- Live Session Callbacks ---
-
-    const onopen = () => {
-        const inputCtx = inputAudioContextRef.current;
-        const stream = micStreamRef.current;
-        if (!inputCtx || !stream) return;
-
-        const source = inputCtx.createMediaStreamSource(stream);
-        const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
-        
-        micSourceNodeRef.current = source;
-        scriptProcessorNodeRef.current = scriptProcessor;
-
-        scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-            const pcmBlob = createBlob(inputData);
-            sessionPromiseRef.current?.then(session => {
-                session.sendRealtimeInput({ media: pcmBlob });
-            });
+        const updatedUser = {
+            ...currentUser,
+            settings: settings,
+            chatHistory: chatHistory,
         };
 
-        source.connect(scriptProcessor);
-        scriptProcessor.connect(inputCtx.destination);
-    };
-
-    const onmessage = async (message: LiveServerMessage) => {
-        // Handle audio output
-        const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
-        if (audioData) {
-            playAudio(audioData);
-            setAvatarExpression('speaking');
+        if (userIndex !== -1) {
+            allUsers[userIndex] = updatedUser;
+        } else {
+            allUsers.push(updatedUser);
         }
+        
+        localStorage.setItem('kaniska-users', JSON.stringify(allUsers));
+    } catch (e: any) {
+        console.error("Failed to save user data to localStorage", e);
+    }
+  }, [currentUser, settings, chatHistory]);
 
-        // Handle transcription
-        if (message.serverContent?.outputTranscription || message.serverContent?.inputTranscription) {
-            // Logic to update transcriptionHistory would go here, but it's better to
-            // use turnComplete to avoid partial sentences.
-        }
-        if (message.serverContent?.turnComplete) {
-            const userInput = message.serverContent.inputTranscription?.text?.trim();
-            const assistantOutput = message.serverContent.outputTranscription?.text?.trim();
+  const handleSettingChange = (newSettings: any) => {
+    const tempSettings = { ...newSettings };
+    if (tempSettings.clearHistory) {
+      setChatHistory([]);
+      delete tempSettings.clearHistory;
+    }
+    setSettings(tempSettings);
+  };
 
-            if (userInput) addTranscription('user', userInput);
-            if (assistantOutput) addTranscription('assistant', assistantOutput);
-            setAvatarExpression('listening'); // Back to listening after a turn
-        }
+  useEffect(() => {
+      saveCurrentUserChanges();
+  }, [settings, chatHistory, saveCurrentUserChanges]);
+  
+  const fadeAmbientSound = useCallback((targetVolume: number, duration = 500) => {
+    const audio = ambientAudioRef.current;
+    if (!audio) return;
 
-        // Handle function calls
-        if (message.toolCall) {
-            setAvatarExpression('composing');
-            for (const fc of message.toolCall.functionCalls) {
-                console.log("Function Call Received:", fc);
-                const result = await handleFunctionCall(fc.name, fc.args);
-                sessionPromiseRef.current?.then(session => {
-                    session.sendToolResponse({
-                        functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result) } }
-                    });
-                });
-            }
-        }
-    };
-
-    const onerror = (e: ErrorEvent) => {
-        console.error("Session Error:", e);
-        const friendlyMessage = getApiErrorMessage(e);
-        addSystemMessage(`Session error: ${friendlyMessage}`, 'error');
-        setAssistantState('error');
-        setAvatarExpression('error');
-        if (friendlyMessage.includes('API key')) {
-             setApiKeyReselectionReason(friendlyMessage);
-             setApiKeys(k => ({...k, gemini: null}));
-        }
-    };
-    
-    const onclose = (e: CloseEvent) => {
-        if (assistantState === 'active') { // Only show message if it wasn't a manual disconnect
-            addSystemMessage("Connection was closed unexpectedly.", 'info');
-            setAssistantState('idle');
-            setAvatarExpression('idle');
-        }
-    };
-    
-    // --- Audio Playback ---
-    
-    const playAudio = async (base64Audio: string) => {
-        if (isMuted) return;
-        const outputCtx = outputAudioContextRef.current;
-        if (!outputCtx) return;
-
-        try {
-            const audioBuffer = await decodeAudioData(decode(base64Audio), outputCtx, 24000, 1);
-            const source = outputCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(outputCtx.destination);
-            
-            const currentTime = outputCtx.currentTime;
-            const startTime = Math.max(currentTime, nextAudioTimeRef.current);
-            source.start(startTime);
-            
-            nextAudioTimeRef.current = startTime + audioBuffer.duration;
-            
-            audioSourcesRef.current.add(source);
-            source.onended = () => {
-                audioSourcesRef.current.delete(source);
-                 // If queue is empty, return to listening state
-                if (audioSourcesRef.current.size === 0) {
-                    setAvatarExpression('listening');
-                }
-            };
-        } catch (error) {
-            console.error("Error playing audio:", error);
-        }
-    };
-
-    // --- Tool & Function Call Handling ---
-
-    const playNext = useCallback(() => {
-        if (youtubeSearchResults.length === 0 || !youtubePlayer) return 'No videos in the queue.';
-        if (currentYoutubeIndex < youtubeSearchResults.length - 1) {
-            const nextIndex = currentYoutubeIndex + 1;
-            setCurrentYoutubeIndex(nextIndex);
-            youtubePlayer.loadVideoById(youtubeSearchResults[nextIndex].videoId);
-            return `Playing next video: ${youtubeSearchResults[nextIndex].title}`;
-        }
-        return 'This is the last video in the queue.';
-    }, [currentYoutubeIndex, youtubeSearchResults, youtubePlayer]);
-
-    const playPrevious = useCallback(() => {
-        if (youtubeSearchResults.length === 0 || !youtubePlayer) return 'No videos in the queue.';
-        if (currentYoutubeIndex > 0) {
-            const prevIndex = currentYoutubeIndex - 1;
-            setCurrentYoutubeIndex(prevIndex);
-            youtubePlayer.loadVideoById(youtubeSearchResults[prevIndex].videoId);
-            return `Playing previous video: ${youtubeSearchResults[prevIndex].title}`;
-        }
-        return 'This is the first video in the queue.';
-    }, [currentYoutubeIndex, youtubeSearchResults, youtubePlayer]);
-
-    const handleFunctionCall = async (name: string, args: any): Promise<any> => {
-        addSystemMessage(`Executing command: ${name}(${JSON.stringify(args)})`, 'info');
-        try {
-             switch (name) {
-                case 'searchAndPlayYoutubeVideo':
-                    if(!apiKeys.youtube) return "YouTube API key not set.";
-                    const results = await searchYoutubeVideo(args.query, apiKeys.youtube);
-                    if (results.length > 0) {
-                        setYoutubeSearchResults(results);
-                        setCurrentYoutubeIndex(0);
-                        youtubePlayer?.loadVideoById(results[0].videoId);
-                        setActivePanel('youtube');
-                        return `Now playing ${results[0].title}.`;
-                    }
-                    return `Could not find any videos for "${args.query}".`;
-                case 'playNextYoutubeVideo':
-                    return playNext();
-                case 'playPreviousYoutubeVideo':
-                    return playPrevious();
-                // Add cases for all other functions...
-                default:
-                    return `Function ${name} is not implemented.`;
-            }
-        } catch (error) {
-             const message = getApiErrorMessage(error);
-             addSystemMessage(`Error in ${name}: ${message}`, 'error');
-             return `Error: ${message}`;
-        }
-    };
-
-    // --- UI & State Helpers ---
-    const addSystemMessage = (text: string, type: 'info' | 'success' | 'error') => {
-        const message: TranscriptionEntry = {
-            speaker: 'system',
-            text: `[${type.toUpperCase()}] ${text}`,
-            timestamp: new Date()
-        };
-        setTranscriptionHistory(prev => [...prev, message]);
-    };
-    
-    const addTranscription = (speaker: 'user' | 'assistant', text: string) => {
-        if (!text) return;
-        const entry: TranscriptionEntry = { speaker, text, timestamp: new Date() };
-        setTranscriptionHistory(prev => [...prev, entry]);
-    };
-    
-    const speakText = async (
-        text: string,
-        emotion: string = "neutral",
-        voiceOverride?: { voice: string; pitch: number; speed: number }
-    ) => {
-        const geminiApiKey = getGeminiApiKey();
-        if (!geminiApiKey || !text) {
-            addSystemMessage("Cannot speak: API key is missing or text is empty.", "error");
-            return;
-        }
-    
-        const ai = aiRef.current ?? new GoogleGenAI({ apiKey: geminiApiKey });
-    
-        const voiceToUse = voiceOverride?.voice || selectedVoice;
-        const pitchToUse = voiceOverride?.pitch ?? voicePitch;
-        const speedToUse = voiceOverride?.speed ?? voiceSpeed;
-        const prompt = emotion === 'neutral' ? text : `Say the following in a ${emotion} tone: "${text}"`;
-    
-        try {
-            setAvatarExpression('speaking');
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash-preview-tts",
-                contents: [{ parts: [{ text: prompt }] }],
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {
-                        voiceConfig: {
-                            prebuiltVoiceConfig: {
-                                voiceName: voiceToUse,
-                            },
-                        },
-                        pitch: pitchToUse,
-                        speakingRate: speedToUse,
-                    }
-                }
-            });
-    
-            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            if (base64Audio) {
-                await playAudio(base64Audio);
-            } else {
-                addSystemMessage("Speech generation returned no audio data.", "error");
-                setAvatarExpression('listening');
-            }
-        } catch (error) {
-            console.error("TTS Error:", error);
-            const friendlyMessage = getApiErrorMessage(error);
-            addSystemMessage(`Could not generate speech: ${friendlyMessage}`, 'error');
-            setAvatarExpression('error');
-        }
-    };
-
-    const handleSaveApiKeys = (keys: ApiKeys) => {
-        setApiKeys(keys);
-        if (keys.gemini) {
-           setApiKeyReselectionReason(null);
-        }
-    };
-
-    const handleStudioKeySelected = (optionalKeys: OptionalApiKeys) => {
-        const newKeys = { ...apiKeys, ...optionalKeys, gemini: 'key_from_studio' }; // Placeholder
-        setApiKeys(newKeys);
-        setApiKeyReselectionReason(null);
-    };
-
-    const handleSetMainVoiceGender = (gender: 'female' | 'male') => {
-        const newVoice = VOICE_MAP[gender][0];
-        setMainVoiceGender(gender);
-        setSelectedVoice(newVoice);
-    };
-
-    const handleSetSelectedVoice = (voice: string) => {
-        setSelectedVoice(voice);
-    };
-
-    const handleSetVoicePitch = (pitch: number) => {
-        setVoicePitch(pitch);
-    };
-
-    const handleSetVoiceSpeed = (speed: number) => {
-        setVoiceSpeed(speed);
-    };
-
-    const handleSetGreetingVoiceGender = (gender: 'female' | 'male') => {
-        const newVoice = VOICE_MAP[gender][0];
-        setGreetingVoiceGender(gender);
-        setGreetingVoice(newVoice);
-    };
-
-    const handleSetGreetingVoice = (voice: string) => {
-        setGreetingVoice(voice);
-    };
-
-    const handleSetGreetingPitch = (pitch: number) => {
-        setGreetingPitch(pitch);
-    };
-
-    const handleSetGreetingSpeed = (speed: number) => {
-        setGreetingSpeed(speed);
-    };
-    
-    if (!getGeminiApiKey()) {
-        return <ApiKeySelectionScreen onKeysSaved={handleSaveApiKeys} onStudioKeySelected={handleStudioKeySelected} reselectionReason={apiKeyReselectionReason}/>;
+    if (fadeIntervalRef.current) {
+        window.clearInterval(fadeIntervalRef.current);
     }
 
-    return (
-        <div className="min-h-screen w-screen flex flex-col bg-bg-color text-text-color">
-            {/* --- Modals --- */}
-            <SettingsModal
-                isOpen={showSettingsModal}
-                onClose={() => setShowSettingsModal(false)}
-                avatars={PREDEFINED_AVATARS}
-                currentAvatar={currentAvatar}
-                onSelectAvatar={setCurrentAvatar}
-                onUploadAvatar={setCurrentAvatar}
-                onGenerateAvatar={() => {}}
-                generatedAvatarResult={{url: null, isLoading: false, error: null}}
-                customGreeting={customGreeting}
-                onSaveGreeting={setCustomGreeting}
-                customSystemPrompt={customSystemPrompt}
-                onSaveSystemPrompt={setCustomSystemPrompt}
-                onClearHistory={() => setTranscriptionHistory([])}
-                mainVoiceGender={mainVoiceGender} onSetMainVoiceGender={handleSetMainVoiceGender}
-                selectedVoice={selectedVoice} onSelectVoice={handleSetSelectedVoice}
-                voicePitch={voicePitch} onSetVoicePitch={handleSetVoicePitch}
-                voiceSpeed={voiceSpeed} onSetVoiceSpeed={handleSetVoiceSpeed}
-                greetingVoiceGender={greetingVoiceGender} onSetGreetingVoiceGender={handleSetGreetingVoiceGender}
-                greetingVoice={greetingVoice} onSetGreetingVoice={handleSetGreetingVoice}
-                greetingPitch={greetingPitch} onSetGreetingPitch={handleSetGreetingPitch}
-                greetingSpeed={greetingSpeed} onSetGreetingSpeed={handleSetGreetingSpeed}
-                speakText={speakText} onStartSupportChat={()=>{}} userId={userId} apiKeys={apiKeys} onSaveApiKeys={handleSaveApiKeys}
-                onResetGeminiKey={() => setApiKeys(k=>({...k, gemini: null}))}
-            />
-            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} conversation={transcriptionHistory} />
+    if (targetVolume > 0 && audio.paused) {
+        audio.volume = 0; // Start muted to avoid a sudden burst of sound
+        audio.play().catch(e => {
+            // AbortError is expected if the user quickly changes state, interrupting the play promise.
+            // We can safely ignore it.
+            if (e.name !== 'AbortError') {
+                console.error("Ambient sound play error:", e);
+            }
+        });
+    }
 
-            {/* --- Main UI --- */}
-            <header className="flex-shrink-0 flex items-center justify-between p-3 border-b border-border-color">
-                <div className="flex items-center gap-3">
-                    <HologramIcon />
-                    <h1 className="text-xl font-bold glowing-text">Kaniska</h1>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Clock />
-                    <button onClick={() => setShowSettingsModal(true)} title="Settings" className="text-muted hover:text-primary-color transition"><SettingsIcon /></button>
-                </div>
-            </header>
+    const startVolume = audio.volume;
+    const stepTime = 50;
+    const steps = duration / stepTime;
 
-            <main className="flex-grow flex flex-col lg:flex-row min-h-0">
-                <div className="w-full lg:w-2/5 flex flex-col items-center justify-center p-4 relative border-b lg:border-b-0 lg:border-r border-border-color">
-                    <div className="hologram-container">
-                        <img src={currentAvatar} alt="Kaniska Avatar" className={`avatar expression-${avatarExpression}`} />
-                        {(avatarExpression === 'composing' || avatarExpression === 'thinking') && <TypingIndicator />}
-                    </div>
-                    <div className="absolute bottom-4 text-center">
-                        <p className="font-semibold capitalize">{assistantState}</p>
-                        <p className="text-xs text-muted">Say "Hey Kaniska" or click Connect</p>
-                    </div>
-                </div>
+    if (steps <= 0) {
+        audio.volume = targetVolume;
+        if (targetVolume === 0 && !audio.paused) audio.pause();
+        return;
+    }
 
-                <div className="w-full lg:w-3/5 flex flex-col bg-panel-bg flex-grow min-h-0">
-                    <div className={`flex-grow p-4 overflow-y-auto space-y-4 ${activePanel === 'transcript' ? '' : 'hidden'}`}>
-                        {transcriptionHistory.map((entry, index) => (
-                            <div key={index} className={`chat-bubble-animation ${entry.speaker === 'user' ? 'text-right' : 'text-left'}`}>
-                                <div className={`inline-block max-w-lg p-3 rounded-xl ${entry.speaker === 'user' ? 'bg-primary-color/20' : entry.speaker === 'assistant' ? 'bg-assistant-bubble-bg' : 'bg-yellow-500/10'}`}>
-                                    <p className="text-sm m-0">{entry.text ?? '[empty message]'}</p>
-                                    <p className="text-xs text-muted mt-1 opacity-70">
-                                        {entry.timestamp instanceof Date && !isNaN(entry.timestamp.getTime())
-                                            ? entry.timestamp.toLocaleTimeString()
-                                            : ''}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                        <div ref={transcriptEndRef} />
-                    </div>
-                    
-                    <div className={`flex-grow flex-col p-4 gap-4 ${activePanel === 'youtube' ? 'flex' : 'hidden'}`}>
-                        <div id="youtube-player" className="youtube-container"></div>
-                        <div className="flex flex-col items-center justify-center gap-2">
-                            <p className="text-sm text-center text-muted w-full px-4 truncate">{youtubeSearchResults[currentYoutubeIndex]?.title || 'No video loaded.'}</p>
-                            <div className="youtube-controls-container">
-                                <button onClick={playPrevious} disabled={currentYoutubeIndex <= 0} className="youtube-control-button" aria-label="Previous video">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
-                                </button>
-                                <button onClick={() => isYoutubePlaying ? youtubePlayer?.pauseVideo() : youtubePlayer?.playVideo()} className="youtube-control-button play-pause-btn" aria-label={isYoutubePlaying ? 'Pause video' : 'Play video'}>
-                                    {isYoutubePlaying ?
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                        :
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                    }
-                                </button>
-                                <button onClick={playNext} disabled={currentYoutubeIndex >= youtubeSearchResults.length - 1} className="youtube-control-button" aria-label="Next video">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+    const volumeStep = (targetVolume - startVolume) / steps;
+    let currentStep = 0;
 
-                    {/* Other panels would be conditionally rendered here */}
-                    <QuickActions 
-                        onAction={() => {}} 
-                        disabled={assistantState !== 'active'}
-                        isWeatherEnabled={!!apiKeys.weather}
-                        isNewsEnabled={!!apiKeys.news}
-                        isYoutubeEnabled={!!apiKeys.youtube}
-                    />
-                </div>
-            </main>
+    fadeIntervalRef.current = window.setInterval(() => {
+        currentStep++;
+        if (currentStep >= steps) {
+            if (fadeIntervalRef.current) window.clearInterval(fadeIntervalRef.current);
+            audio.volume = targetVolume;
+            if (targetVolume === 0 && !audio.paused) audio.pause();
+            return;
+        }
+        
+        const newVolume = startVolume + currentStep * volumeStep;
+        audio.volume = Math.max(0, Math.min(1, newVolume));
+    }, stepTime);
+  }, []);
 
-            <footer className="fixed bottom-0 left-0 right-0 z-20 bg-bg-color p-3 border-t border-border-color flex items-center justify-around">
-                 <button onClick={() => assistantState === 'active' ? disconnect() : connect()} className={`footer-button ${assistantState === 'active' ? 'active' : ''}`}>
-                    {assistantState === 'active' ? 
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                        :
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+  useEffect(() => {
+    if (!hasInteracted) return;
+    
+    const targetVolume = settings.ambientVolume;
+    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused'];
+
+    if (playStates.includes(assistantState) && isConnected) {
+        fadeAmbientSound(targetVolume);
+    } else {
+        fadeAmbientSound(0);
+    }
+  }, [assistantState, isConnected, hasInteracted, settings.ambientVolume, fadeAmbientSound]);
+  
+  useEffect(() => {
+    if (chatLogRef.current) {
+        chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  const startRecognition = useCallback(() => {
+    if (!isSpeakingRef.current) {
+        setAssistantState('listening');
+    }
+    if (recognitionRef.current) {
+        try {
+            recognitionRef.current.start();
+        } catch (e) {
+            if (e.name !== 'InvalidStateError') {
+                console.warn("Recognition already started.", e);
+            }
+        }
+    }
+  }, []);
+
+  const speak = useCallback(async (text: string, config: VoiceConfig, onEndCallback?: () => void) => {
+    if (speechSourceRef.current) {
+        speechSourceRef.current.onended = null;
+        speechSourceRef.current.stop();
+        speechSourceRef.current.disconnect();
+    }
+
+    isSpeakingRef.current = true;
+    setAssistantState('speaking');
+    
+    try {
+        const base64Audio = await generateSpeech(text, config.name);
+        if (!audioContextRef.current || !gainNodeRef.current) {
+            throw new Error("AudioContext not initialized");
+        }
+        
+        const audioBuffer = await decodeAudioData(
+            decode(base64Audio),
+            audioContextRef.current,
+            24000,
+            1,
+        );
+        
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(gainNodeRef.current);
+        source.onended = () => {
+            isSpeakingRef.current = false;
+            speechSourceRef.current = null;
+            if (onEndCallback) {
+                onEndCallback();
+            } else {
+                setAssistantState('idle');
+            }
+        };
+        source.start();
+        speechSourceRef.current = source;
+    } catch (error: any) {
+        console.error("Error generating or playing speech:", error);
+        isSpeakingRef.current = false;
+        setAssistantState('error');
+        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: `[Voice Error] ${error.message}` }]);
+    }
+  }, []);
+
+  const handleTestVoice = (text: string, config: VoiceConfig) => {
+    speak(text, config);
+  };
+  
+  const handleLogin = (identifier: string, password: string): boolean => {
+      try {
+          const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
+          const normalizedIdentifier = identifier.toLowerCase().trim();
+          const user = allUsers.find(u =>
+              (u.email.toLowerCase() === normalizedIdentifier || u.name === identifier || u.phone === identifier) && u.password === password
+          );
+          if (user) {
+              localStorage.setItem('kaniska-session-userId', user.id);
+              setCurrentUser(user);
+              const loadedSettings = user.settings || {};
+              const mergedSettings = {
+                  ...defaultSettings,
+                  ...loadedSettings,
+                  voice: { ...defaultSettings.voice, ...(loadedSettings.voice || {}) },
+                  apiKeys: { ...defaultSettings.apiKeys, ...(loadedSettings.apiKeys || {}) },
+                  avatarMap: { ...defaultSettings.avatarMap, ...(loadedSettings.avatarMap || {}) },
+                  emotionTuning: { ...defaultSettings.emotionTuning, ...(loadedSettings.emotionTuning || {}) }
+              };
+              setSettings(mergedSettings);
+              setChatHistory(user.chatHistory || []);
+              return true;
+          }
+          return false;
+      } catch (e) {
+          console.error("Login failed:", e);
+          return false;
+      }
+  };
+
+  const handleSignUp = (name: string, email: string, phone: string, password: string): { success: boolean, message: string } => {
+    try {
+        const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
+        const normalizedEmail = email.toLowerCase().trim();
+        const trimmedName = name.trim();
+        const trimmedPhone = phone.trim();
+
+        if (allUsers.some(u => u.email.toLowerCase() === normalizedEmail)) {
+            return { success: false, message: 'auth.error.emailExists' };
+        }
+        if (allUsers.some(u => u.name === trimmedName)) {
+            return { success: false, message: 'auth.error.usernameExists' };
+        }
+        
+        const newUserId = `user-${Date.now()}`;
+        const newSettings = {
+            ...defaultSettings,
+            userId: newUserId,
+        };
+
+        const newUser = {
+            id: newUserId,
+            name: trimmedName,
+            email: normalizedEmail,
+            phone: trimmedPhone,
+            password: password,
+            settings: newSettings,
+            chatHistory: [],
+        };
+
+        allUsers.push(newUser);
+        localStorage.setItem('kaniska-users', JSON.stringify(allUsers));
+        handleLogin(email, password);
+        return { success: true, message: '' };
+    } catch (e) {
+        console.error("Signup failed:", e);
+        return { success: false, message: 'auth.error.unexpected' };
+    }
+  };
+
+  const handleLogout = () => {
+    saveCurrentUserChanges();
+    localStorage.removeItem('kaniska-session-userId');
+    setCurrentUser(null);
+    setIsConnected(false);
+    setChatHistory([]);
+  };
+
+  const onPlayerReady = (event: any) => {
+    playerRef.current = event.target;
+    playerRef.current.setVolume(50);
+  };
+  
+  const onPlayerStateChange = (event: any) => {
+    setPlayerState(event.data);
+    if (event.data === window.YT.PlayerState.PLAYING) {
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = window.setInterval(() => {
+            setPlayerProgress({
+                currentTime: playerRef.current?.getCurrentTime() || 0,
+                duration: playerRef.current?.getDuration() || 0,
+            });
+        }, 1000);
+    } else {
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    }
+  };
+
+  useEffect(() => {
+    if (youtubeVideoId && isYTReady) {
+        if (!playerRef.current) {
+            playerRef.current = new window.YT.Player('youtube-player', {
+                videoId: youtubeVideoId,
+                playerVars: { 'autoplay': 1, 'controls': 0, 'modestbranding': 1, 'rel': 0 },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        } else {
+            playerRef.current.loadVideoById(youtubeVideoId);
+        }
+    }
+  }, [youtubeVideoId, isYTReady]);
+  
+  const handleYoutubeControl = (action: string) => {
+    if (!playerRef.current) return;
+    switch(action) {
+        case 'toggle':
+            if (playerState === window.YT.PlayerState.PLAYING) playerRef.current.pauseVideo();
+            else playerRef.current.playVideo();
+            break;
+        case 'close':
+            if (playerRef.current) {
+                playerRef.current.destroy();
+                playerRef.current = null;
+            }
+            setYoutubeVideoId(null);
+            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+            break;
+    }
+  };
+  
+  const formatTime = (seconds: number) => {
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60);
+    return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+  };
+
+  const stopRecognition = useCallback(() => {
+    if (recognitionRef.current) {
+        recognitionRef.current.stop();
+    }
+  }, []);
+
+  const handleCommand = useCallback(async (transcript: string) => {
+      stopRecognition();
+      setAssistantState('thinking');
+      const userMessage: ChatMessage = { id: Date.now(), sender: 'user', text: transcript };
+      const updatedHistory = [...chatHistory, userMessage];
+      setChatHistory(updatedHistory);
+
+      const systemInstruction = getSystemPrompt(settings.gender);
+      const response = await processUserCommand(updatedHistory, systemInstruction, BIAS_TEMPERATURE_MAP[settings.bias], settings.emotionTuning);
+      
+      const assistantMessage: ChatMessage = { id: Date.now() + 1, sender: 'assistant', text: response.reply, sources: response.sources };
+      setChatHistory(prev => [...prev, assistantMessage]);
+
+      speak(response.reply, settings.voice.main, () => {
+          if (isConnected) {
+              startRecognition();
+          } else {
+              setAssistantState('idle');
+          }
+      });
+      
+      const handleError = (e: any) => {
+          speak(e.message, settings.voice.main);
+          setChatHistory(prev => [...prev, { id: Date.now() + 2, sender: 'assistant', text: `[Error] ${e.message}` }]);
+      };
+      
+      switch (response.command) {
+          case 'YOUTUBE_SEARCH':
+              if (response.youtubeQuery) {
+                  try {
+                    const videoId = await searchYouTube(settings.apiKeys.youtube, response.youtubeQuery);
+                    if (videoId) {
+                        setYoutubeVideoId(videoId);
+                    } else {
+                        throw new Error(`I couldn't find a suitable video for "${response.youtubeQuery}".`);
                     }
-                    <span className="text-xs font-semibold">{assistantState === 'active' ? 'Disconnect' : 'Connect'}</span>
-                </button>
-                <button onClick={() => setShowShareModal(true)} disabled={transcriptionHistory.length === 0} className="footer-button">
-                    <ShareIcon size={24} />
-                    <span className="text-xs font-semibold">Share</span>
-                </button>
-                <button onClick={() => setIsMuted(!isMuted)} className={`footer-button ${isMuted ? 'text-red-400' : ''}`}>
-                     {isMuted ? 
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
-                        :
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
-                    }
-                    <span className="text-xs font-semibold">{isMuted ? 'Unmute' : 'Mute'}</span>
-                </button>
-            </footer>
+                  } catch (e: any) {
+                    handleError(e);
+                  }
+              }
+              break;
+          case 'GET_WEATHER':
+              if (response.location) {
+                  try {
+                      const weatherSummary = await fetchWeatherSummary(response.location, settings.apiKeys.weather);
+                      speak(weatherSummary, settings.voice.main);
+                      setChatHistory(prev => [...prev, { id: Date.now() + 2, sender: 'assistant', text: weatherSummary }]);
+                  } catch (e: any) {
+                      handleError(e);
+                  }
+              }
+              break;
+          case 'GET_NEWS':
+              if(response.newsQuery) {
+                  try {
+                      const newsSummary = await fetchNews(settings.apiKeys.news, response.newsQuery);
+                      speak(newsSummary, settings.voice.main);
+                      setChatHistory(prev => [...prev, { id: Date.now() + 2, sender: 'assistant', text: newsSummary }]);
+                  } catch (e: any) {
+                      handleError(e);
+                  }
+              }
+              break;
+      }
+  }, [chatHistory, settings, isConnected, speak, stopRecognition, startRecognition]);
+
+  const handleConnect = useCallback(() => {
+    if (!hasInteracted) setHasInteracted(true);
+
+    if (isConnected) {
+      stopRecognition();
+      if (speechSourceRef.current) {
+        speechSourceRef.current.stop();
+      }
+      isSpeakingRef.current = false;
+      setIsConnected(false);
+      setAssistantState('idle');
+      hasGreetedRef.current = false;
+    } else {
+      if (connectionAudioRef.current && settings.connectionSoundUrl) {
+          connectionAudioRef.current.src = settings.connectionSoundUrl;
+          connectionAudioRef.current.play().catch(e => console.error("Error playing connection sound:", e));
+      }
+      setIsConnected(true);
+      
+      if (!hasGreetedRef.current) {
+        speak(settings.greeting, settings.voice.greeting, () => {
+          startRecognition();
+          hasGreetedRef.current = true;
+        });
+      } else {
+        startRecognition();
+      }
+    }
+  }, [hasInteracted, isConnected, settings.connectionSoundUrl, settings.greeting, settings.voice.greeting, speak, startRecognition, stopRecognition]);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setListeningHint("Speech Recognition not supported.");
+      return;
+    }
+    
+    recognitionRef.current = new SpeechRecognition();
+    const recognition = recognitionRef.current;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
+
+    recognition.onstart = () => {
+      if (!isSpeakingRef.current) {
+        setAssistantState('listening');
+      }
+    };
+
+    recognition.onresult = (event: any) => {
+      noSpeechErrorCountRef.current = 0; // Reset on successful speech input
+      let finalTranscript = '';
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      setCurrentTranscript(interimTranscript);
+      if (finalTranscript.trim()) {
+        if (isSpeakingRef.current && speechSourceRef.current) {
+            // Force-stop current speech to allow interruption.
+            speechSourceRef.current.onended = null; // Prevent old callback from restarting recognition
+            speechSourceRef.current.stop();
+            speechSourceRef.current = null;
+            isSpeakingRef.current = false;
+        }
+        handleCommand(finalTranscript.trim());
+      }
+    };
+    
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      if (event.error === 'no-speech') {
+        noSpeechErrorCountRef.current += 1;
+        setListeningHint(t('main.noSpeechHint'));
+        if(hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+        hintTimeoutRef.current = window.setTimeout(() => setListeningHint(null), 2500);
+      } else {
+        noSpeechErrorCountRef.current = 0;
+        setAssistantState('error');
+      }
+    };
+
+    recognition.onend = () => {
+      if (noSpeechErrorCountRef.current >= 3) {
+        handleConnect(); // Toggle connection off
+        setListeningHint(t('main.status.disconnectedInactivity'));
+        if(hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+        hintTimeoutRef.current = window.setTimeout(() => setListeningHint(null), 4000);
+        noSpeechErrorCountRef.current = 0;
+        return;
+      }
+      // Only restart recognition if we are connected AND the assistant is in a state
+      // where it should be listening (i.e., not thinking or speaking). This prevents feedback loops.
+      if (isConnected && (assistantStateRef.current === 'idle' || assistantStateRef.current === 'listening')) {
+        startRecognition();
+      } else if (!isConnected) {
+        setAssistantState('idle');
+      }
+    };
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [isConnected, handleCommand, startRecognition, t, lang, handleConnect]);
+
+  const getAssistantStatusText = () => {
+    if (listeningHint) return <span className="state-text-animation text-yellow-400">{listeningHint}</span>;
+    switch(assistantState) {
+        case 'listening': return <span className="listening-text-pulse">{currentTranscript || t('main.status.listening')}</span>;
+        case 'thinking': return t('main.status.thinking');
+        case 'speaking': return t('main.status.speaking');
+        case 'error': return <span className="text-red-400">{t('main.status.error')}</span>;
+        default: return t('main.status.idle');
+    }
+  };
+  
+  if (!currentUser) {
+      return <Auth onLogin={handleLogin} onSignUp={handleSignUp} />;
+  }
+
+  return (
+    <div className="bg-bg-color text-text-color w-screen h-screen flex flex-col overflow-hidden">
+      <header className="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
+        <h1 className="text-xl font-bold tracking-wider glowing-text">{t('appName')}</h1>
+        <div className="flex items-center gap-4">
+          <Clock />
+           <div className="relative">
+              <button onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)} className="footer-button flex items-center gap-2" aria-haspopup="true" aria-expanded={isLangDropdownOpen}>
+                  <GlobeIcon />
+                  <span>{lang.toUpperCase()}</span>
+              </button>
+              {isLangDropdownOpen && (
+                  <div className="absolute right-0 mt-2 py-1 w-28 bg-panel-bg border border-border-color rounded-md shadow-lg z-20">
+                      {availableLanguages.map((l) => (
+                          <a
+                              href="#"
+                              key={l.code}
+                              onClick={(e) => {
+                                  e.preventDefault();
+                                  setLang(l.code);
+                                  setIsLangDropdownOpen(false);
+                              }}
+                              className="block px-4 py-2 text-sm text-text-color-muted hover:bg-assistant-bubble-bg hover:text-text-color"
+                          >
+                              {l.name}
+                          </a>
+                      ))}
+                  </div>
+              )}
+          </div>
+          <button onClick={() => setIsSettingsOpen(true)} className="footer-button" aria-label={t('header.settings')}>
+            <SettingsIcon />
+          </button>
         </div>
-    );
+      </header>
+
+      <main className="flex-grow flex min-h-0">
+        <div className="flex-grow flex flex-col items-center justify-center p-4 relative">
+            <div className={`hologram-container ${isConnected && assistantState === 'listening' ? 'listening-hologram' : ''}`}>
+                {assistantState === 'thinking' && (
+                    <div className="typing-indicator">
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                        <div className="typing-dot"></div>
+                    </div>
+                )}
+                <img 
+                    src={settings.avatarMap[assistantState] || PLACEHOLDER_AVATAR_URL} 
+                    alt="Kaniska Avatar" 
+                    className={`avatar expression-${assistantState}`}
+                />
+            </div>
+          <p className="mt-6 text-lg text-text-color-muted h-8 text-center state-text-animation">
+            {isConnected ? getAssistantStatusText() : t('main.status.offline')}
+          </p>
+        </div>
+
+        <aside className="w-[380px] flex-shrink-0 bg-panel-bg border-l border-border-color flex flex-col animate-panel-enter">
+          {youtubeVideoId ? (
+             <div className="p-2 flex flex-col h-full">
+                <div id="youtube-player" className="youtube-container flex-grow"></div>
+                <div className="flex-shrink-0 p-2 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-mono text-text-color-muted">
+                        <span>{formatTime(playerProgress.currentTime)}</span>
+                        <div className="w-full bg-border-color h-1 rounded">
+                            <div className="bg-primary-color h-1 rounded" style={{ width: `${playerProgress.duration > 0 ? (playerProgress.currentTime / playerProgress.duration) * 100 : 0}%` }}></div>
+                        </div>
+                        <span>{formatTime(playerProgress.duration)}</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-4">
+                        <button onClick={() => handleYoutubeControl('toggle')} className="youtube-control-button play-pause-btn p-3" disabled={playerState === null}>
+                            {playerState === window.YT?.PlayerState?.PLAYING ? <PauseIcon className="w-8 h-8"/> : <PlayIcon className="w-8 h-8"/>}
+                        </button>
+                        <button onClick={() => handleYoutubeControl('close')} className="youtube-control-button bg-red-500/20 text-red-400 hover:bg-red-500/30">
+                            <StopIcon/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+          ) : (
+            <div ref={chatLogRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
+              <ChatLog history={chatHistory} />
+            </div>
+          )}
+        </aside>
+      </main>
+      
+      <footer className="flex items-center justify-center p-3 border-t border-border-color flex-shrink-0">
+        <button onClick={handleConnect} className="flex items-center gap-3 px-6 py-3 rounded-full bg-primary-color text-bg-color font-bold text-lg hover:opacity-90 transition transform hover:scale-105 active:scale-100 disabled:opacity-50 disabled:scale-100">
+            {isConnected ? <StopIcon /> : <ConnectIcon />}
+            <span>{isConnected ? t('footer.disconnect') : t('footer.connect')}</span>
+        </button>
+      </footer>
+
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        settings={settings}
+        onSettingChange={handleSettingChange}
+        onTestVoice={handleTestVoice}
+        onLogout={handleLogout}
+      />
+      <audio ref={ambientAudioRef} loop />
+      <audio ref={connectionAudioRef} />
+    </div>
+  );
 };

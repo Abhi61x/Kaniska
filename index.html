@@ -1,10 +1,10 @@
 <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0"
+    "react/": "https://aistudiocdn.com/react@^18.2.0/",
+    "react": "https://aistudiocdn.com/react@^18.2.0"
   }
 }
 </script>
@@ -17,7 +17,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
     <style>
       :root {
         --bg-color: #0d1117;
@@ -40,7 +40,7 @@
       }
 
       body {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', 'Noto Color Emoji', sans-serif;
         background-color: var(--bg-color);
         color: var(--text-color);
         transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
@@ -256,6 +256,21 @@
       .avatar.expression-celebrating {
          animation: glow 1s infinite alternate ease-in-out, celebrate-glow 1.5s linear infinite;
       }
+      
+      @keyframes confused-glow {
+        0%, 100% { filter: drop-shadow(0 0 15px #facc15); opacity: 0.8; } /* yellow-400 */
+        50% { filter: drop-shadow(0 0 25px #fde047); opacity: 1; } /* yellow-300 */
+      }
+      @keyframes confused-wobble {
+        0%, 100% { transform: rotate(0deg) scale(1); }
+        25% { transform: rotate(-2deg) scale(1.01); }
+        75% { transform: rotate(2deg) scale(1.01); }
+      }
+      .avatar.expression-confused {
+          animation: confused-glow 2s infinite ease-in-out, confused-wobble 2.5s infinite ease-in-out;
+          border-color: rgba(250, 204, 21, 0.6);
+      }
+
 
       /* --- Typing Indicator --- */
       .typing-indicator {
@@ -328,16 +343,6 @@
         background-color: #000;
         border-radius: 8px;
         overflow: hidden;
-      }
-
-      .youtube-controls-container {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 0.5rem 1rem;
-        background-color: var(--assistant-bubble-bg);
-        border-radius: 9999px; /* Pill shape */
-        border: 1px solid var(--border-color);
       }
 
       .youtube-control-button {
@@ -482,45 +487,6 @@
         color: var(--text-color-muted);
         margin-top: 4px;
       }
-
-      .avatar-gallery-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-        gap: 12px;
-      }
-      .avatar-item {
-        aspect-ratio: 1/1;
-        border-radius: 8px;
-        border: 2px solid var(--border-color);
-        cursor: pointer;
-        transition: all 0.2s ease;
-        overflow: hidden;
-      }
-      .avatar-item:hover {
-        border-color: var(--primary-color);
-        transform: scale(1.05);
-      }
-      .avatar-item.selected {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 10px var(--primary-color);
-      }
-       .avatar-item img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-      .upload-avatar-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: var(--text-color-muted);
-        background-color: var(--assistant-bubble-bg);
-      }
-       .upload-avatar-item:hover {
-        color: var(--primary-color);
-        border-color: var(--primary-color);
-      }
       
       /* Custom range slider styles */
       input[type=range] {
@@ -563,6 +529,38 @@
         animation: panel-enter 0.5s ease-out forwards;
       }
 
+      /* Save Button Style */
+      .save-button {
+        background-color: #2563eb; /* blue-600 */
+        color: #ffffff;
+        border-color: #1d4ed8; /* blue-700 */
+      }
+      .save-button:hover:not(:disabled) {
+        background-color: #1d4ed8;
+        color: #ffffff; /* ensure text stays white on hover */
+      }
+
+      /* --- State Feedback Animations --- */
+      @keyframes text-fade-in {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .state-text-animation {
+        animation: text-fade-in 0.4s ease-out;
+      }
+
+      @keyframes listening-pulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+      .listening-text-pulse {
+        animation: listening-pulse 2.5s infinite ease-in-out;
+      }
+      
+      .listening-hologram::before, .listening-hologram::after {
+        animation-duration: 2s; /* Faster pulse when listening */
+        border-color: rgba(34, 211, 238, 0.7); /* Brighter border */
+      }
     </style>
   </head>
   <body>

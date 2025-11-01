@@ -1,0 +1,190 @@
+
+{
+  "appName": "Kaniska",
+  "auth": {
+    "loginMessage": "Please log in to continue",
+    "signupMessage": "Create an account to begin",
+    "login": "Login",
+    "signup": "Sign Up",
+    "identifierLabel": "Username, Email, or Phone",
+    "identifierPlaceholder": "Enter your identifier",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signupNameLabel": "Name / Username",
+    "signupNamePlaceholder": "Choose a username",
+    "signupEmailLabel": "Email",
+    "signupEmailPlaceholder": "your@email.com",
+    "signupPhoneLabel": "Phone Number",
+    "signupPhonePlaceholder": "10-digit phone number",
+    "signupPasswordPlaceholder": "Create a strong password",
+    "toggleToSignup": "Don't have an account? Sign Up",
+    "toggleToLogin": "Already have an account? Login",
+    "error": {
+      "fillFields": "Please fill in all fields.",
+      "invalidCredentials": "Invalid credentials or user not found.",
+      "emailExists": "An account with this email already exists.",
+      "usernameExists": "This username is already taken.",
+      "unexpected": "An unexpected error occurred."
+    }
+  },
+  "header": {
+    "settings": "Settings"
+  },
+  "main": {
+    "status": {
+      "offline": "Offline",
+      "listening": "Listening...",
+      "thinking": "Thinking...",
+      "speaking": "Speaking...",
+      "error": "An error occurred.",
+      "idle": "Idle"
+    },
+    "noSpeechHint": "I didn't hear anything."
+  },
+  "footer": {
+    "connect": "Connect",
+    "disconnect": "Disconnect"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "Your conversation will appear here.",
+      "info": "[INFO] Connection closed."
+    },
+    "sources": "Sources:"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "persona": "Persona",
+      "bias": "Bias",
+      "voice": "Voice",
+      "avatar": "Avatar",
+      "apiKeys": "API Keys",
+      "account": "Account & Data",
+      "help": "Help & Support"
+    },
+    "personaTab": {
+      "greeting": {
+        "title": "Greeting Message",
+        "description": "This is what the assistant says when you first connect."
+      },
+      "tuning": {
+        "title": "Emotional Tuning",
+        "description": "Fine-tune the assistant's personality traits. Changes will be reflected in responses.",
+        "happiness": "Happiness",
+        "empathy": "Empathy",
+        "formality": "Formality"
+      },
+      "ambient": {
+        "title": "Ambient Sound",
+        "description": "Control the volume of the background sci-fi ambience.",
+        "volume": "Volume"
+      },
+      "connectionSound": {
+        "title": "Connection Sound",
+        "description": "Play a custom sound when you connect to the assistant.",
+        "upload": "Upload Sound",
+        "test": "Test sound",
+        "remove": "Remove"
+      },
+      "systemPrompt": {
+        "title": "Custom System Prompt",
+        "description": "Define the core personality and instructions. A restart is needed for changes to take full effect.",
+        "save": "Save Prompt"
+      }
+    },
+    "biasTab": {
+      "title": "Response Bias",
+      "description": "Control the AI's personality from deterministic to creative.",
+      "options": {
+        "precise": {
+          "label": "Precise",
+          "description": "For factual, deterministic answers. (Low bias)"
+        },
+        "balanced": {
+          "label": "Balanced",
+          "description": "A mix of creativity and factuality. (Default)"
+        },
+        "creative": {
+          "label": "Creative",
+          "description": "For imaginative and diverse responses. (High bias)"
+        }
+      }
+    },
+    "voiceTab": {
+      "main": {
+        "title": "Main Voice",
+        "description": "The primary voice used for most responses."
+      },
+      "greeting": {
+        "title": "Greeting Voice",
+        "description": "A separate voice for the initial greeting message."
+      },
+      "styleLabel": "Voice Style (Gemini TTS)",
+      "styleDescription": "These are high-quality, natural-sounding voices provided by Google's Gemini API.",
+      "test": "Test Voice",
+      "save": "Save Voice Settings"
+    },
+    "avatarTab": {
+      "title": "Custom Avatars",
+      "description": "Upload a custom image for each assistant state. A default is used if none is set.",
+      "change": "Change",
+      "save": "Save Avatars"
+    },
+    "apiKeysTab": {
+      "gemini": {
+        "title": "Gemini API Key (Required)",
+        "description": "The core key for AI functionality. Managed by the environment.",
+        "envSet": "Environment Set"
+      },
+      "optional": {
+        "title": "Optional API Keys",
+        "description": "Provide API keys for additional features like weather and YouTube search. Your keys are saved locally to your account."
+      },
+      "weatherKey": "Visual Crossing Weather Key",
+      "newsKey": "GNews API Key",
+      "youtubeKey": "Google Cloud API Key (for YouTube)",
+      "save": "Save All Keys"
+    },
+    "accountTab": {
+      "session": {
+        "title": "Session Information",
+        "description": "This is your unique identifier for this browser session."
+      },
+      "data": {
+        "title": "Data Management",
+        "description": "Manage your conversation history and other stored data."
+      },
+      "clearHistory": {
+        "button": "Clear Conversation History",
+        "description": "This will permanently remove all conversation transcripts from your account."
+      },
+      "logout": {
+        "button": "Log Out",
+        "description": "This will end your current session. Your data will be saved to your account."
+      }
+    },
+    "helpTab": {
+      "faqTitle": "Frequently Asked Questions",
+      "contactTitle": "Contact Support",
+      "contactDescription": "If you're facing technical issues, you can get help via Instagram DM.",
+      "contactButton": "DM on Instagram",
+      "q1": "How do I use Kaniska?",
+      "a1": "Click the \"Connect\" button to start a session. When the avatar indicates it's listening, speak your command. You can now interrupt the assistant at any time by simply speaking again.",
+      "q2": "How do I get and set up API Keys?",
+      "a2": {
+        "weatherTitle": "Visual Crossing Weather API Key",
+        "weatherSteps": "1. Go to the <1>Visual Crossing Weather Data</1> website.\n2. Click \"Sign Up\" to create a free account.\n3. After signing in, navigate to your Account page from the top-right menu.\n4. Your API Key will be visible on this page. Copy it.",
+        "youtubeTitle": "Google Cloud API Key (for YouTube)",
+        "youtubeSteps": "1. Go to the <1>Google Cloud Console</1>.\n2. Create a new project (or select an existing one).\n3. In the search bar, find and enable the \"YouTube Data API v3\".\n4. Go to \"APIs & Services\" > \"Credentials\".\n5. Click \"+ CREATE CREDENTIALS\" and select \"API key\".\n6. Your new API key will be displayed. Copy it.",
+        "inputTitle": "Where do I input the keys?",
+        "inputSteps": "1. In this app, go to Settings ⚙️ > API Keys.\n2. Paste your copied key into the corresponding input field.\n3. Click the \"Save All Keys\" button."
+      }
+    },
+    "common": {
+      "save": "Save",
+      "copy": "Copy",
+      "copied": "Copied!"
+    }
+  }
+}

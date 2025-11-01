@@ -1,10 +1,8 @@
 
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// --- FIX START: Update import path for App component ---
 import { App } from './App.tsx';
-// --- FIX END: Update import path for App component ---
+import { TranslationProvider } from './i18n/index.ts';
 
 window.addEventListener('DOMContentLoaded', () => {
   const rootElement = document.getElementById('root');
@@ -15,7 +13,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <React.StrictMode>
-      <App />
+      <TranslationProvider>
+        <App />
+      </TranslationProvider>
     </React.StrictMode>
   );
 });
