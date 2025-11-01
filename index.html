@@ -228,6 +228,27 @@
       .avatar.expression-error {
           animation: glow 2s infinite alternate ease-in-out, glitch-glow 0.4s steps(2, end) infinite;
       }
+      
+      @keyframes awake-glow {
+        0% {
+          filter: drop-shadow(0 0 20px var(--primary-color));
+          border-color: rgba(34, 211, 238, 0.7);
+          transform: scale(1.02);
+        }
+        50% {
+          filter: drop-shadow(0 0 35px #ffffff);
+          border-color: rgba(255, 255, 255, 0.9);
+          transform: scale(1.04);
+        }
+        100% {
+          filter: drop-shadow(0 0 20px var(--primary-color));
+          border-color: rgba(34, 211, 238, 0.7);
+          transform: scale(1.02);
+        }
+      }
+      .avatar.expression-awake {
+        animation: awake-glow 2s infinite ease-in-out;
+      }
 
       @keyframes surprise-glow {
         0% { transform: scale(1); filter: drop-shadow(0 0 25px #00e5ff); }
@@ -269,6 +290,22 @@
       .avatar.expression-confused {
           animation: confused-glow 2s infinite ease-in-out, confused-wobble 2.5s infinite ease-in-out;
           border-color: rgba(250, 204, 21, 0.6);
+      }
+      
+      @keyframes sleep-glow {
+        0%, 100% {
+          filter: drop-shadow(0 0 8px #22577a) brightness(0.7); /* Dark blue */
+          opacity: 0.6;
+          border-color: rgba(34, 87, 122, 0.2);
+        }
+        50% {
+          filter: drop-shadow(0 0 12px #22577a) brightness(0.8);
+          opacity: 0.7;
+          border-color: rgba(34, 87, 122, 0.3);
+        }
+      }
+      .avatar.expression-sleep {
+        animation: sleep-glow 8s infinite ease-in-out;
       }
 
 

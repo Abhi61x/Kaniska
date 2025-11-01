@@ -1,5 +1,8 @@
 
 
+
+
+
 import React, { createContext, useContext, useState, useCallback, FC } from 'react';
 
 const en = {
@@ -24,14 +27,16 @@ const en = {
     "toggleToLogin": "Already have an account? Login",
     "error": {
       "fillFields": "Please fill in all fields.",
-      "invalidCredentials": "Invalid credentials or user not found.",
+      "userNotFound": "No account found with that username, email, or phone number.",
+      "invalidPassword": "The password you entered is incorrect. Please try again.",
       "emailExists": "An account with this email already exists.",
       "usernameExists": "This username is already taken.",
       "unexpected": "An unexpected error occurred."
     }
   },
   "header": {
-    "settings": "Settings"
+    "settings": "Settings",
+    "toggleTheme": "Toggle Theme"
   },
   "main": {
     "status": {
@@ -41,13 +46,19 @@ const en = {
       "speaking": "Speaking...",
       "error": "An error occurred.",
       "idle": "Idle",
-      "disconnectedInactivity": "Disconnected due to inactivity."
+      "disconnectedInactivity": "Disconnected due to inactivity.",
+      "listeningForWakeWord": "Listening for '{{wakeWord}}'",
+      "awake": "Awake. Listening for command...",
+      "sleep": "Sleeping. Click the mic to wake me up.",
+      "goingToSleep": "Going to sleep due to inactivity. Click the microphone to wake me up."
     },
     "noSpeechHint": "I didn't hear anything."
   },
   "footer": {
     "connect": "Connect",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "record": "Record",
+    "stop": "Stop"
   },
   "chat": {
     "placeholder": {
@@ -68,16 +79,37 @@ const en = {
       "help": "Help & Support"
     },
     "personaTab": {
+      "appearance": {
+        "title": "Appearance",
+        "description": "Choose how the application looks.",
+        "light": "Light",
+        "dark": "Dark"
+      },
       "greeting": {
         "title": "Greeting Message",
         "description": "This is what the assistant says when you first connect."
+      },
+      "continuousListening": {
+        "title": "Continuous Listening",
+        "description": "Allow the assistant to listen continuously without needing to press the record button each time.",
+        "enable": "Enable Continuous Listening"
+      },
+       "wakeWord": {
+        "title": "Wake Word",
+        "description": "Set a custom phrase to activate the assistant in continuous listening mode.",
+        "default": "Default",
+        "custom": "Custom",
+        "placeholder": "Enter custom wake word"
       },
       "tuning": {
         "title": "Emotional Tuning",
         "description": "Fine-tune the assistant's personality traits. Changes will be reflected in responses.",
         "happiness": "Happiness",
         "empathy": "Empathy",
-        "formality": "Formality"
+        "formality": "Formality",
+        "excitement": "Excitement",
+        "sadness": "Sadness",
+        "curiosity": "Curiosity"
       },
       "ambient": {
         "title": "Ambient Sound",
@@ -122,16 +154,16 @@ const en = {
       }
     },
     "voiceTab": {
-      "main": {
-        "title": "Main Voice",
-        "description": "The primary voice used for most responses."
+      "title": "Voice Configuration",
+      "description": "Set different voices for each persona. These are high-quality, natural-sounding voices provided by Google's Gemini API.",
+      "female": {
+        "title": "Female Persona (Kaniska)"
       },
-      "greeting": {
-        "title": "Greeting Voice",
-        "description": "A separate voice for the initial greeting message."
+      "male": {
+        "title": "Male Persona (Kanishk)"
       },
-      "styleLabel": "Voice Style (Gemini TTS)",
-      "styleDescription": "These are high-quality, natural-sounding voices provided by Google's Gemini API.",
+      "mainVoiceLabel": "Main Voice",
+      "greetingVoiceLabel": "Greeting Voice",
       "test": "Test Voice",
       "save": "Save Voice Settings"
     },
@@ -222,14 +254,16 @@ const hi = {
     "toggleToLogin": "पहले से ही एक खाता है? लॉग इन करें",
     "error": {
       "fillFields": "कृपया सभी फ़ील्ड भरें।",
-      "invalidCredentials": "अमान्य क्रेडेंशियल या उपयोगकर्ता नहीं मिला।",
+      "userNotFound": "उस उपयोगकर्ता नाम, ईमेल या फ़ोन नंबर से कोई खाता नहीं मिला।",
+      "invalidPassword": "आपके द्वारा दर्ज किया गया पासवर्ड गलत है। कृपया पुनः प्रयास करें।",
       "emailExists": "इस ईमेल से एक खाता पहले से मौजूद है।",
       "usernameExists": "यह उपयोगकर्ता नाम पहले ही लिया जा चुका है।",
       "unexpected": "एक अप्रत्याशित त्रुटि हुई।"
     }
   },
   "header": {
-    "settings": "सेटिंग्स"
+    "settings": "सेटिंग्स",
+    "toggleTheme": "थीम टॉगल करें"
   },
   "main": {
     "status": {
@@ -239,13 +273,19 @@ const hi = {
       "speaking": "बोल रही हूँ...",
       "error": "एक त्रुटि हुई।",
       "idle": "निष्क्रिय",
-      "disconnectedInactivity": "निष्क्रियता के कारण डिस्कनेक्ट हो गया।"
+      "disconnectedInactivity": "निष्क्रियता के कारण डिस्कनेक्ट हो गया।",
+      "listeningForWakeWord": "'{{wakeWord}}' के लिए सुन रही हूँ",
+      "awake": "जागृत। कमांड के लिए सुन रही हूँ...",
+      "sleep": "सो रही हूँ। मुझे जगाने के लिए माइक पर क्लिक करें।",
+      "goingToSleep": "निष्क्रियता के कारण सोने जा रही हूँ। मुझे जगाने के लिए माइक्रोफ़ोन पर क्लिक करें।"
     },
     "noSpeechHint": "मैंने कुछ नहीं सुना।"
   },
   "footer": {
     "connect": "कनेक्ट",
-    "disconnect": "डिस्कनेक्ट"
+    "disconnect": "डिस्कनेक्ट",
+    "record": "रिकॉर्ड",
+    "stop": "रोकें"
   },
   "chat": {
     "placeholder": {
@@ -266,16 +306,37 @@ const hi = {
       "help": "सहायता"
     },
     "personaTab": {
+       "appearance": {
+        "title": "दिखावट",
+        "description": "चुनें कि एप्लिकेशन कैसा दिखता है।",
+        "light": "रोशनी",
+        "dark": "अंधेरा"
+      },
       "greeting": {
         "title": "अभिवादन संदेश",
         "description": "जब आप पहली बार कनेक्ट होते हैं तो सहायक यह कहता है।"
+      },
+       "continuousListening": {
+        "title": "सतत सुनना",
+        "description": "सहायक को हर बार रिकॉर्ड बटन दबाए बिना लगातार सुनने की अनुमति दें।",
+        "enable": "सतत सुनना सक्षम करें"
+      },
+      "wakeWord": {
+        "title": "वेक वर्ड",
+        "description": "सतत सुनने की मोड में सहायक को सक्रिय करने के लिए एक कस्टम वाक्यांश सेट करें।",
+        "default": "डिफ़ॉल्ट",
+        "custom": "कस्टम",
+        "placeholder": "कस्टम वेक वर्ड दर्ज करें"
       },
       "tuning": {
         "title": "भावनात्मक ट्यूनिंग",
         "description": "सहायक के व्यक्तित्व लक्षणों को ठीक करें। परिवर्तन प्रतिक्रियाओं में दिखाई देंगे।",
         "happiness": "ख़ुशी",
         "empathy": "सहानुभूति",
-        "formality": "औपचारिकता"
+        "formality": "औपचारिकता",
+        "excitement": "उत्साह",
+        "sadness": "उदासी",
+        "curiosity": "जिज्ञासा"
       },
       "ambient": {
         "title": "परिवेश ध्वनि",
@@ -320,16 +381,16 @@ const hi = {
       }
     },
     "voiceTab": {
-      "main": {
-        "title": "मुख्य आवाज़",
-        "description": "अधिकांश प्रतिक्रियाओं के लिए उपयोग की जाने वाली प्राथमिक आवाज़।"
+      "title": "आवाज़ विन्यास",
+      "description": "प्रत्येक व्यक्तित्व के लिए अलग-अलग आवाजें सेट करें। ये गूगल की जेमिनी एपीआई द्वारा प्रदान की गई उच्च-गुणवत्ता, प्राकृतिक-लगने वाली आवाजें हैं।",
+      "female": {
+        "title": "महिला व्यक्तित्व (कनिष्का)"
       },
-      "greeting": {
-        "title": "अभिवादन की आवाज़",
-        "description": "प्रारंभिक अभिवादन संदेश के लिए एक अलग आवाज़।"
+      "male": {
+        "title": "पुरुष व्यक्तित्व (कनिष्क)"
       },
-      "styleLabel": "आवाज़ शैली (जेमिनी टीटीएस)",
-      "styleDescription": "ये गूगल की जेमिनी एपीआई द्वारा प्रदान की गई उच्च-गुणवत्ता, प्राकृतिक-लगने वाली आवाजें हैं।",
+      "mainVoiceLabel": "मुख्य आवाज़",
+      "greetingVoiceLabel": "अभिवादन की आवाज़",
       "test": "आवाज़ का परीक्षण करें",
       "save": "आवाज़ सेटिंग्स सहेजें"
     },
@@ -405,7 +466,7 @@ type Language = keyof typeof translationsData;
 interface TranslationContextType {
   lang: Language;
   setLang: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: { [key: string]: string }) => string;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -425,9 +486,14 @@ export const TranslationProvider: FC<{children: React.ReactNode}> = ({ children 
     }
   }, []);
 
-  const t = useCallback((key: string): string => {
-    // Fallback logic: Try current language -> English -> return key
-    return getNested(translationsData[lang], key) || getNested(translationsData['en'], key) || key;
+  const t = useCallback((key: string, params?: { [key: string]: string }): string => {
+    let translation = getNested(translationsData[lang], key) || getNested(translationsData['en'], key) || key;
+    if (params) {
+        Object.keys(params).forEach(paramKey => {
+            translation = translation.replace(`{{${paramKey}}}`, params[paramKey]);
+        });
+    }
+    return translation;
   }, [lang]);
 
   // FIX: Replaced JSX with React.createElement to be valid in a .ts file.

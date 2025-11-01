@@ -8,7 +8,7 @@ export async function processUserCommand(
     history: ChatMessage[], 
     systemInstruction: string, 
     temperature: number,
-    emotionTuning: { happiness: number; empathy: number; formality: number; }
+    emotionTuning: { happiness: number; empathy: number; formality: number; excitement: number; sadness: number; curiosity: number; }
 ): Promise<GeminiResponse> {
   const lastMessage = history[history.length - 1];
   if (!lastMessage || lastMessage.sender !== 'user' || !lastMessage.text.trim()) {
@@ -27,6 +27,9 @@ Adhere to the following personality traits on a scale of 0 to 100.
 - Happiness: ${emotionTuning.happiness}. (0 is melancholic, 100 is extremely joyful).
 - Empathy: ${emotionTuning.empathy}. (0 is clinical and detached, 100 is deeply compassionate).
 - Formality: ${emotionTuning.formality}. (0 is very casual and uses slang, 100 is extremely formal and professional).
+- Excitement: ${emotionTuning.excitement}. (0 is calm and monotonous, 100 is highly energetic and expressive).
+- Sadness: ${emotionTuning.sadness}. (0 is optimistic, 100 is sorrowful and somber).
+- Curiosity: ${emotionTuning.curiosity}. (0 is passive, 100 is inquisitive and might ask clarifying questions).
 Your 'emotion' value in the JSON output should reflect these settings.
 `;
 
@@ -39,6 +42,10 @@ Your 'emotion' value in the JSON output should reflect these settings.
             temperature: temperature,
         }
     });
+
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error("I'm sorry, but I can't provide a response to that due to my safety guidelines.");
+    }
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const sources: Source[] = groundingChunks
@@ -76,13 +83,21 @@ Your 'emotion' value in the JSON output should reflect these settings.
     }
   } catch (apiError: any) {
     console.error("Error calling the Gemini API:", apiError);
-    if (apiError.message?.includes('API key not valid')) {
+    const errorMessage = (apiError.message || apiError.toString() || '').toLowerCase();
+
+    if (errorMessage.includes('api key not valid')) {
         throw new Error("I can't connect because the main Gemini API key is invalid. Please ask the administrator to check it.");
     }
-    if (apiError instanceof TypeError && apiError.message.includes('fetch')) {
+    if (errorMessage.includes('rate limit')) {
+        throw new Error("I'm receiving a lot of requests right now. Please wait a moment before trying again.");
+    }
+    if (errorMessage.includes('blocked') || errorMessage.includes('safety')) {
+        throw new Error("I'm sorry, but I can't respond to that request due to my safety guidelines.");
+    }
+    if (apiError instanceof TypeError && errorMessage.includes('fetch')) {
          throw new Error("I'm having trouble connecting to my core services. Please check your internet connection and try again.");
     }
-    // Generic error for other cases (500 errors, rate limiting, etc.)
+    // Generic error for other cases (500 errors, etc.)
     throw new Error("I'm having a little trouble thinking right now. My core service might be temporarily unavailable. Please try again shortly.");
   }
 }
@@ -265,9 +280,10 @@ export async function searchYouTube(apiKey: string, query: string): Promise<stri
 
 export async function generateSpeech(text: string, voiceName: string): Promise<string> {
     try {
+        const instructionalText = `Speak at a slightly faster pace, but clearly: ${text}`;
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text }] }],
+            contents: [{ parts: [{ text: instructionalText }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {

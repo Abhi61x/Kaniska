@@ -8,7 +8,8 @@ export type AssistantState =
   | 'speaking'
   | 'error'
   | 'composing'
-  | 'confused';
+  | 'confused'
+  | 'sleep';
 
 export interface Source {
   uri: string;

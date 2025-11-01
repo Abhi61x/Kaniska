@@ -1,5 +1,8 @@
 
 
+
+
+
 {
   "appName": "Kaniska",
   "auth": {
@@ -22,14 +25,16 @@
     "toggleToLogin": "Already have an account? Login",
     "error": {
       "fillFields": "Please fill in all fields.",
-      "invalidCredentials": "Invalid credentials or user not found.",
+      "userNotFound": "No account found with that username, email, or phone number.",
+      "invalidPassword": "The password you entered is incorrect. Please try again.",
       "emailExists": "An account with this email already exists.",
       "usernameExists": "This username is already taken.",
       "unexpected": "An unexpected error occurred."
     }
   },
   "header": {
-    "settings": "Settings"
+    "settings": "Settings",
+    "toggleTheme": "Toggle Theme"
   },
   "main": {
     "status": {
@@ -38,13 +43,19 @@
       "thinking": "Thinking...",
       "speaking": "Speaking...",
       "error": "An error occurred.",
-      "idle": "Idle"
+      "idle": "Idle",
+      "listeningForWakeWord": "Listening for '{{wakeWord}}'",
+      "awake": "Awake. Listening for command...",
+      "sleep": "Sleeping. Click the mic to wake me up.",
+      "goingToSleep": "Going to sleep due to inactivity. Click the microphone to wake me up."
     },
     "noSpeechHint": "I didn't hear anything."
   },
   "footer": {
     "connect": "Connect",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "record": "Record",
+    "stop": "Stop"
   },
   "chat": {
     "placeholder": {
@@ -65,16 +76,37 @@
       "help": "Help & Support"
     },
     "personaTab": {
+      "appearance": {
+        "title": "Appearance",
+        "description": "Choose how the application looks.",
+        "light": "Light",
+        "dark": "Dark"
+      },
       "greeting": {
         "title": "Greeting Message",
         "description": "This is what the assistant says when you first connect."
+      },
+      "continuousListening": {
+        "title": "Continuous Listening",
+        "description": "Allow the assistant to listen continuously without needing to press the record button each time.",
+        "enable": "Enable Continuous Listening"
+      },
+      "wakeWord": {
+        "title": "Wake Word",
+        "description": "Set a custom phrase to activate the assistant in continuous listening mode.",
+        "default": "Default",
+        "custom": "Custom",
+        "placeholder": "Enter custom wake word"
       },
       "tuning": {
         "title": "Emotional Tuning",
         "description": "Fine-tune the assistant's personality traits. Changes will be reflected in responses.",
         "happiness": "Happiness",
         "empathy": "Empathy",
-        "formality": "Formality"
+        "formality": "Formality",
+        "excitement": "Excitement",
+        "sadness": "Sadness",
+        "curiosity": "Curiosity"
       },
       "ambient": {
         "title": "Ambient Sound",
@@ -119,16 +151,16 @@
       }
     },
     "voiceTab": {
-      "main": {
-        "title": "Main Voice",
-        "description": "The primary voice used for most responses."
+      "title": "Voice Configuration",
+      "description": "Set different voices for each persona. These are high-quality, natural-sounding voices provided by Google's Gemini API.",
+      "female": {
+        "title": "Female Persona (Kaniska)"
       },
-      "greeting": {
-        "title": "Greeting Voice",
-        "description": "A separate voice for the initial greeting message."
+      "male": {
+        "title": "Male Persona (Kanishk)"
       },
-      "styleLabel": "Voice Style (Gemini TTS)",
-      "styleDescription": "These are high-quality, natural-sounding voices provided by Google's Gemini API.",
+      "mainVoiceLabel": "Main Voice",
+      "greetingVoiceLabel": "Greeting Voice",
       "test": "Test Voice",
       "save": "Save Voice Settings"
     },
