@@ -1324,6 +1324,15 @@ export const App = () => {
     }
   }, [settings.volume]);
 
+  // Bug Fix: Automatically disable active continuous listening if the setting is turned off.
+  useEffect(() => {
+    if (!settings.enableContinuousListening && isContinuousListeningActive) {
+      setIsContinuousListeningActive(false);
+      // The recognition loop will terminate on its own in the onend handler
+      // because isContinuousListeningActiveRef.current will be false.
+    }
+  }, [settings.enableContinuousListening, isContinuousListeningActive]);
+
   const saveCurrentUserChanges = useCallback(() => {
     if (!currentUser) return;
     try {
@@ -1961,7 +1970,7 @@ const goToSleep = useCallback(() => {
         if (isContinuousListeningActiveRef.current) {
             setTimeout(() => {
                 if (isContinuousListeningActiveRef.current) {
-                   try { recognition.start(); } catch (e) { /* ignore */ }
+                   startRecognition();
                 }
             }, 250);
         } else if (assistantStateRef.current === 'listening') {
@@ -1975,7 +1984,7 @@ const goToSleep = useCallback(() => {
         recognitionRef.current.stop();
       }
     };
-  }, [lang, handleCommand, t, isAwake, resetInactivityTimer, addErrorMessageToChat]);
+  }, [lang, handleCommand, t, isAwake, resetInactivityTimer, addErrorMessageToChat, startRecognition]);
 
   const handleRecordButtonClick = () => {
     if (settings.enableContinuousListening) {
@@ -2087,7 +2096,7 @@ const goToSleep = useCallback(() => {
                     </div>
                 )}
                 <img 
-                    src={settings.avatarMap[assistantState] || PLACEHOLDER_AVATAR_URL} 
+                    src={settings.avatarMap[isAwake ? 'listening' : assistantState] || PLACEHOLDER_AVATAR_URL} 
                     alt="Kaniska Avatar" 
                     className={`avatar expression-${assistantState} ${isAwake ? 'expression-awake' : ''}`}
                 />

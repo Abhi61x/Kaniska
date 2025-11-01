@@ -1,1 +1,1 @@
-// This file is intentionally left empty to remove Firebase from the project.
+// This file is intentionally left blank as Firebase integration has been removed.
