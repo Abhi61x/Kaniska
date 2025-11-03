@@ -1,4 +1,6 @@
 
+
+
 export type AssistantState =
   | 'idle'
   | 'listening'
@@ -7,8 +9,10 @@ export type AssistantState =
   | 'error'
   | 'composing'
   | 'confused'
-  | 'sleep'
-  | 'singing';
+  | 'singing'
+  | 'sad'
+  | 'celebrating'
+  | 'surprised';
 
 export interface Source {
   uri: string;
@@ -28,7 +32,7 @@ export interface ChatMessage {
 export type Emotion = 'neutral' | 'happy' | 'sad' | 'excited' | 'empathetic' | 'singing' | 'formal' | 'chirpy' | 'surprised' | 'curious' | 'thoughtful' | 'joking';
 
 export interface GeminiResponse {
-  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG' | 'DEACTIVATE_LISTENING';
+  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG' | 'GET_LYRICS' | 'DEACTIVATE_LISTENING' | 'SET_TIMER' | 'RANDOM_FACT';
   reply: string;
   // FIX: youtubeQuery is always present as per the system prompt (can be an empty string).
   youtubeQuery: string;
@@ -38,6 +42,15 @@ export interface GeminiResponse {
   sources: Source[];
   songTitle?: string;
   songArtist?: string;
+  timerDurationSeconds?: number;
 }
 
 export type Gender = 'female' | 'male';
+
+export interface WeatherData {
+    summary: string;
+    location: string;
+    temp: number;
+    conditions: string;
+    icon: string; // e.g., 'partly-cloudy-day', 'clear-day', 'rain'
+}

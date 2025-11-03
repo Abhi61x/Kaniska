@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { AssistantState, ChatMessage, Emotion, Source, Gender } from './types.ts';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, ApiKeyError } from './services/api.ts';
+import type { AssistantState, ChatMessage, Emotion, Source, Gender, WeatherData } from './types.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.ts';
 
 declare global {
@@ -24,7 +24,6 @@ const PersonaIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" hei
 const VoiceIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
 const AvatarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>;
 const ApiKeysIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16.5 7.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="m18.5 9.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="m14.5 11.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="M2 18v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><circle cx="8" cy="7" r="2"/></svg>;
-const AccountDataIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M20.66 13.5A5.5 5.5 0 0 0 17.5 13a5.5 5.5 0 0 0-3.16 9.5"/></svg>;
 const HelpSupportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>;
 const SlidersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>;
 const ConnectIcon = ({ className = "w-6 h-6" }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M12 14q1.25 0 2.125-.875T15 11V5q0-1.25-.875-2.125T12 2q-1.25 0-2.125.875T9 5v6q0 1.25.875 2.125T12 14Zm-1 7v-3.05q-2.825-.2-4.913-2.288T4 11H6q0 2.5 1.75 4.25T12 17q2.5 0 4.25-1.75T18 11h2q0 2.825-2.088 4.913T13 18.05V21h-2Z"/></svg>;
@@ -35,12 +34,25 @@ const VolumeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heig
 const ChatIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c-1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>;
 const ChevronDownIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 const CopyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>;
+const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
 const StopIcon = ({ className = "w-6 h-6" }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>;
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>;
 const PlayIcon = ({ className = "w-6 h-6" } : { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M8 5v14l11-7z"/></svg>;
 const PauseIcon = ({ className = "w-6 h-6" } : { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>;
 const SunIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
 const MoonIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
+const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+const LoadingSpinnerIcon = ({ className }: { className?: string }) => <svg className={`spinner ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity="0.25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
+
+// Weather Icons
+const WeatherSunIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
+const WeatherCloudIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>;
+const WeatherCloudyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 9 20h8.5a4.5 4.5 0 0 0 2.5-8.2z"/><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m17.66 17.66 1.41 1.41"/><path d="M4 12H2"/><path d="m6.34 17.66-1.41 1.41"/></svg>;
+const WeatherRainIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><path d="M8 14v6"/><path d="M12 16v6"/><path d="M16 14v6"/></svg>;
+const WeatherSnowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><path d="M10 15l-2 2m0-2l2 2"/><path d="M14 15l-2 2m0-2l2 2"/></svg>;
+const WeatherFogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 9 20h9.5a4.5 4.5 0 0 0 1-8.8"/><path d="M3 20h18"/><path d="M3 16h18"/></svg>;
+const TimerIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 14"/><line x1="7" y1="4" x2="10" y2="4"/><line x1="14" y1="4" x2="17" y2="4"/></svg>;
+
 
 const DEFAULT_SYSTEM_PROMPT = `
 You are a futuristic AI voice assistant. Your name is {{name}}, and you have a {{gender}} persona. Your primary goal is to process user commands and respond with a single, valid JSON object. Your entire output must be ONLY this JSON object, with no extra text, explanations, or markdown.
@@ -54,22 +66,27 @@ ABOUT YOU:
 JSON OUTPUT STRUCTURE:
 Your entire response must be a single JSON object with this exact structure:
 {
-  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG" | "DEACTIVATE_LISTENING",
+  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG" | "GET_LYRICS" | "DEACTIVATE_LISTENING" | "SET_TIMER" | "RANDOM_FACT",
   "reply": "Your verbal response to the user. This is what will be spoken out loud. IMPORTANT: This text will be fed directly into a text-to-speech (TTS) engine. It MUST contain only plain, speakable words. Do not include markdown, emojis, or parenthetical non-speech descriptions like '(laughs)' or '♪'. Keep it concise and conversational.",
-  "youtubeQuery": "A simplified keyword for the YouTube search. Examples: 'music', 'news', 'cats'. Otherwise, an empty string.",
+  "youtubeQuery": "A simplified keyword for the YouTube search. Examples: 'latest pop music', 'news highlights', 'funny cat videos'. Otherwise, an empty string.",
   "newsQuery": "The topic for the news search. Examples: 'technology', 'world headlines'. Otherwise, an empty string.",
   "location": "The city or place for the weather query. Examples: 'London', 'Tokyo'. Otherwise, an empty string.",
   "emotion": "neutral" | "happy" | "sad" | "excited" | "empathetic" | "singing" | "formal" | "chirpy" | "surprised" | "curious" | "thoughtful" | "joking",
   "songTitle": "The title of the song to sing. Example: 'Kesariya'. Otherwise, an empty string.",
-  "songArtist": "The artist of the song. Example: 'Arijit Singh'. Otherwise, an empty string."
+  "songArtist": "The artist of the song. Example: 'Arijit Singh'. Otherwise, an empty string.",
+  "timerDurationSeconds": "The total duration of the timer in seconds. Example: for '5 minutes', this would be 300. Otherwise, 0."
 }
 
 HOW TO DECIDE THE JSON VALUES:
 
 1. COMMAND:
-- If the user explicitly asks you to stop listening, go to sleep, or deactivate (e.g., "stop listening", "deactivate", "that's all for now", "go to sleep"), set command to "DEACTIVATE_LISTENING". Your reply should be a simple confirmation like "Okay, shutting down." or "Goodbye."
-- If the user asks you to sing a specific song (e.g., "sing Kesariya by Arijit Singh"), set command to "SING_SONG".
-- If the user asks you to search for or play a video on YouTube (e.g., "play some music", "find a video about cats"), set command to "YOUTUBE_SEARCH".
+- If the user wants to end the conversation (e.g., "goodbye", "disconnect", "that's all for now"), set command to "DEACTIVATE_LISTENING". Your reply should be a simple confirmation like "Goodbye."
+- If the user asks for the lyrics of a specific song (e.g., "what are the lyrics for 'Bohemian Rhapsody'?", "show me the lyrics to..."), set command to "GET_LYRICS". Extract the songTitle and songArtist.
+- If the user asks you to sing a specific song (e.g., "sing Kesariya"), set command to "SING_SONG". You must extract the songTitle and songArtist. If the user does not provide an artist, you MUST use your knowledge to identify the most common or original artist for that song and populate the 'songArtist' field. For example, for the song "Kesariya", the artist is "Arijit Singh".
+- If the user asks to set a timer (e.g., "set a timer for 5 minutes", "timer for 30 seconds"), set command to "SET_TIMER". You MUST convert all time units (minutes, hours) into seconds and put the total in the 'timerDurationSeconds' field.
+- If the user asks for a 'random fact', 'fun fact', or 'interesting fact', set command to "RANDOM_FACT". Your 'reply' should be the fact itself.
+- If the user asks you to search for or play a video on YouTube, set command to "YOUTUBE_SEARCH".
+- IMPORTANT (YouTube clarification): If the user's request is very general (like just "play music" or "find a video"), your 'reply' MUST be a clarifying question (e.g., "Certainly, what genre of music would you like?"). In this specific case, you MUST set 'youtubeQuery' to an empty string. Otherwise, fill 'youtubeQuery' with the specific search term.
 - If the user asks about the weather (e.g., "what's the weather like?", "is it going to rain in Paris?"), set command to "GET_WEATHER".
 - If the user asks for news (e.g., "latest headlines", "news about space exploration"), set command to "GET_NEWS".
 - If the user asks to send an email (e.g., "send an email to John"), set command to "SEND_EMAIL". Your 'reply' should confirm the request, like "Certainly, who should the email be addressed to and what is the message?".
@@ -114,8 +131,10 @@ const DEFAULT_AVATAR_MAP: Record<AssistantState, string> = {
   error: PLACEHOLDER_AVATAR_URL,
   composing: PLACEHOLDER_AVATAR_URL,
   confused: PLACEHOLDER_AVATAR_URL,
-  sleep: PLACEHOLDER_AVATAR_URL,
   singing: PLACEHOLDER_AVATAR_URL,
+  sad: PLACEHOLDER_AVATAR_URL,
+  celebrating: PLACEHOLDER_AVATAR_URL,
+  surprised: PLACEHOLDER_AVATAR_URL,
 };
 
 const GEMINI_TTS_VOICES = [
@@ -169,7 +188,8 @@ const defaultSettings = {
         male: {
             main: { name: 'Zephyr' },
             greeting: { name: 'Charon' },
-        }
+        },
+        speakingRate: 1.15,
     },
     emotionTuning: {
         happiness: 50,
@@ -179,164 +199,86 @@ const defaultSettings = {
         sadness: 50,
         curiosity: 50,
     },
+    singingEmotionTuning: {
+        happiness: 50,
+        sadness: 50,
+        excitement: 50,
+    },
     volume: 1,
     ambientVolume: 0.3,
     connectionSoundUrl: null,
     apiKeys: { weather: '', news: '', youtube: '' },
-    userId: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    enableContinuousListening: false,
-    wakeWordMode: 'default', // 'default' or 'custom'
-    customWakeWord: '',
+    browserId: `browser-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
 };
 
 
 // --- Child Components ---
 
-const Auth = ({ onLogin, onSignUp }) => {
-    const { t } = useTranslation();
-    const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
-    const [error, setError] = useState('');
-
-    // Login state
-    const [identifier, setIdentifier] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-
-    // Signup state
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [signUpPassword, setSignUpPassword] = useState('');
-
-    const handleLoginSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        const trimmedIdentifier = identifier.trim();
-        if (!trimmedIdentifier || !loginPassword) {
-            setError(t('auth.error.fillFields'));
-            return;
-        }
-        const result = onLogin(trimmedIdentifier, loginPassword);
-        if (!result.success) {
-            setError(t(result.message!));
-        }
-    };
-
-    const handleSignUpSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        const trimmedName = name.trim();
-        const trimmedEmail = email.trim();
-        const trimmedPhone = phone.trim();
-
-        if (!trimmedName || !trimmedEmail || !trimmedPhone || !signUpPassword) {
-            setError(t('auth.error.fillFields'));
-            return;
-        }
-        const result = onSignUp(trimmedName, trimmedEmail, trimmedPhone, signUpPassword);
-        if (!result.success) {
-            setError(t(result.message));
-        }
-    };
-    
-    const toggleMode = () => {
-        setError('');
-        setAuthMode(prev => prev === 'login' ? 'signup' : 'login');
-    }
-
-    return (
-        <div className="modal-overlay">
-            <div className="modal-content w-full max-w-md p-8" onClick={e => e.stopPropagation()}>
-                <h1 className="text-3xl font-bold tracking-wider glowing-text text-center mb-2">{t('appName')}</h1>
-                <p className="text-center text-text-color-muted mb-6">
-                    {authMode === 'login' ? t('auth.loginMessage') : t('auth.signupMessage')}
-                </p>
-                {error && <p className="bg-red-500/20 text-red-400 text-sm p-3 rounded-lg mb-4 text-center">{error}</p>}
-                
-                {authMode === 'login' ? (
-                     <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
-                        <div>
-                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.identifierLabel')}</label>
-                            <input
-                                type="text"
-                                value={identifier}
-                                onChange={e => setIdentifier(e.target.value)}
-                                className="w-full p-3 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color text-text-color"
-                                placeholder={t('auth.identifierPlaceholder')}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.passwordLabel')}</label>
-                            <input
-                                type="password"
-                                value={loginPassword}
-                                onChange={e => setLoginPassword(e.target.value)}
-                                className="w-full p-3 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color text-text-color"
-                                placeholder={t('auth.passwordPlaceholder')}
-                            />
-                        </div>
-                        <button type="submit" className="w-full p-3 mt-4 rounded-lg bg-primary-color/80 hover:bg-primary-color text-white font-semibold transition text-lg">
-                            {t('auth.login')}
-                        </button>
-                    </form>
-                ) : (
-                    <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
-                        <div>
-                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.signupNameLabel')}</label>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2.5 rounded bg-assistant-bubble-bg border border-border-color text-text-color" placeholder={t('auth.signupNamePlaceholder')}/>
-                        </div>
-                         <div>
-                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.signupEmailLabel')}</label>
-                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 rounded bg-assistant-bubble-bg border border-border-color text-text-color" placeholder={t('auth.signupEmailPlaceholder')}/>
-                        </div>
-                         <div>
-                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.signupPhoneLabel')}</label>
-                            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-2.5 rounded bg-assistant-bubble-bg border border-border-color text-text-color" placeholder={t('auth.signupPhonePlaceholder')}/>
-                        </div>
-                         <div>
-                            <label className="text-sm text-text-color-muted block mb-2">{t('auth.passwordLabel')}</label>
-                            <input type="password" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} className="w-full p-2.5 rounded bg-assistant-bubble-bg border border-border-color text-text-color" placeholder={t('auth.signupPasswordPlaceholder')}/>
-                        </div>
-                        <button type="submit" className="w-full p-3 mt-4 rounded-lg bg-primary-color/80 hover:bg-primary-color text-white font-semibold transition text-lg">
-                            {t('auth.signup')}
-                        </button>
-                    </form>
-                )}
-                <div className="text-center mt-6">
-                    <button onClick={toggleMode} className="text-sm text-primary-color/80 hover:text-primary-color hover:underline">
-                        {authMode === 'login' ? t('auth.toggleToSignup') : t('auth.toggleToLogin')}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
+const KaniskaLogo = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="header-logo">
+    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="var(--primary-color)" strokeOpacity="0.5" strokeWidth="1.5"/>
+    <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="var(--primary-color)" strokeWidth="1.5" className="logo-part-top"/>
+    <path d="M20.5901 19.5C20.5901 16.48 18.0101 14 15.0001 14H9.00009C5.99009 14 3.41009 16.48 3.41009 19.5" stroke="var(--primary-color)" strokeWidth="1.5" className="logo-part-bottom"/>
+  </svg>
+);
 
 const Clock = () => {
   const [time, setTime] = useState(new Date());
+  const [seconds, setSeconds] = useState(time.getSeconds());
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
-    const timerId = setInterval(() => setTime(new Date()), 1000);
+    const timerId = setInterval(() => {
+      const newTime = new Date();
+      setTime(newTime);
+      if (newTime.getSeconds() !== seconds) {
+        setIsAnimating(true);
+        setTimeout(() => {
+            setSeconds(newTime.getSeconds());
+            setIsAnimating(false);
+        }, 250); // half of animation duration
+      }
+    }, 1000);
     return () => clearInterval(timerId);
-  }, []);
+  }, [seconds]);
 
   const formatDate = (date: Date) => {
     const options: Intl.DateTimeFormatOptions = {
       day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+      hour: '2-digit', minute: '2-digit', hour12: true
     };
     let formatted = new Intl.DateTimeFormat('en-US', options).format(date);
-    return formatted.replace(',', '').replace(' AM', ' am').replace(' PM', ' pm');
+    return formatted.replace(',', '').replace(/ (AM|PM)$/, '');
   };
 
+  const formattedSeconds = String(seconds).padStart(2, '0');
+  const ampm = time.getHours() >= 12 ? 'pm' : 'am';
+
   return (
-    <div className="text-sm text-text-color-muted font-mono hidden sm:block">
-      {formatDate(time)}
+    <div className="text-sm text-text-color-muted font-mono hidden sm:flex items-baseline">
+      <span>{formatDate(time)}:</span>
+      <div className="relative w-5 h-5 overflow-hidden">
+        <span 
+          key={seconds}
+          className={`absolute inset-0 transition-all duration-500 ease-in-out ${isAnimating ? 'opacity-0 -translate-y-full' : 'opacity-100 translate-y-0'}`}
+        >
+          {formattedSeconds}
+        </span>
+      </div>
+      <span className="ml-1">{ampm}</span>
     </div>
   );
 };
 
 const SettingsModal = ({
-    isOpen, onClose, settings, onSettingChange, onTestVoice, onLogout, initialTab
+    isOpen, onClose, settings, onSettingChange, onTestVoice, initialTab
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    settings: typeof defaultSettings;
+    onSettingChange: (newSettings: Partial<typeof defaultSettings & { clearHistory?: boolean }>) => void;
+    onTestVoice: (text: string, config: VoiceConfig, emotion: Emotion) => void;
+    initialTab: string;
 }) => {
     const { t } = useTranslation();
     if (!isOpen) return null;
@@ -354,22 +296,20 @@ const SettingsModal = ({
         { id: 'voice', label: t('settings.tabs.voice'), icon: <VoiceIcon /> },
         { id: 'avatar', label: t('settings.tabs.avatar'), icon: <AvatarIcon /> },
         { id: 'apiKeys', label: t('settings.tabs.apiKeys'), icon: <ApiKeysIcon /> },
-        { id: 'account', label: t('settings.tabs.account'), icon: <AccountDataIcon /> },
         { id: 'help', label: t('settings.tabs.help'), icon: <HelpSupportIcon /> },
     ];
 
-    const handleUpdate = (key, value) => {
-        onSettingChange({ ...settings, [key]: value });
+    const handleUpdate = (key: keyof typeof defaultSettings, value: any) => {
+        onSettingChange({ [key]: value });
     };
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'persona': return <PersonaContent settings={settings} onUpdate={handleUpdate} />;
+            case 'persona': return <PersonaContent settings={settings} onUpdate={onSettingChange} />;
             case 'bias': return <BiasContent settings={settings} onUpdate={handleUpdate} />;
-            case 'voice': return <VoiceContent settings={settings} onUpdate={handleUpdate} onTestVoice={onTestVoice} />;
+            case 'voice': return <VoiceContent settings={settings} onUpdate={onSettingChange} onTestVoice={onTestVoice} />;
             case 'avatar': return <AvatarContent settings={settings} onUpdate={handleUpdate} />;
             case 'apiKeys': return <ApiKeysContent settings={settings} onUpdate={handleUpdate} />;
-            case 'account': return <AccountDataContent settings={settings} onUpdate={handleUpdate} onLogout={onLogout} />;
             case 'help': return <HelpSupportContent />;
             default: return null;
         }
@@ -400,30 +340,13 @@ const SettingsModal = ({
     );
 };
 
-const Switch = ({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void; }) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    onClick={() => onChange(!checked)}
-    className={`${
-      checked ? 'bg-primary-color' : 'bg-assistant-bubble-bg'
-    } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-color focus:ring-offset-2 focus:ring-offset-panel-bg`}
-  >
-    <span
-      aria-hidden="true"
-      className={`${
-        checked ? 'translate-x-5' : 'translate-x-0'
-      } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-    />
-  </button>
-);
-
-const PersonaContent = ({ settings, onUpdate }) => {
+const PersonaContent = ({ settings, onUpdate }: { 
+    settings: typeof defaultSettings;
+    onUpdate: (updates: Partial<typeof defaultSettings & { clearHistory?: boolean }>) => void;
+}) => {
     const { t } = useTranslation();
     const [greetingInput, setGreetingInput] = useState(settings.greeting);
     const [systemPromptInput, setSystemPromptInput] = useState(settings.systemPrompt);
-    const [customWakeWordInput, setCustomWakeWordInput] = useState(settings.customWakeWord);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const testAudioRef = useRef<HTMLAudioElement>(null);
 
@@ -435,19 +358,14 @@ const PersonaContent = ({ settings, onUpdate }) => {
         setSystemPromptInput(settings.systemPrompt);
     }, [settings.systemPrompt]);
 
-    useEffect(() => {
-        setCustomWakeWordInput(settings.customWakeWord);
-    }, [settings.customWakeWord]);
-    
     const emotionTuning = settings.emotionTuning || defaultSettings.emotionTuning;
-    const defaultWakeWord = settings.gender === 'female' ? 'Hey Kaniska' : 'Hey Kanishk';
 
     const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                onUpdate('connectionSoundUrl', e.target?.result as string);
+                onUpdate({ connectionSoundUrl: e.target?.result as string });
             };
             reader.readAsDataURL(file);
         }
@@ -463,12 +381,16 @@ const PersonaContent = ({ settings, onUpdate }) => {
         const newGreeting = gender === 'female' 
             ? "Hello, I am Kaniska. How can I assist you today?"
             : "Hello, I am Kanishk. How may I help you?";
-        onUpdate('gender', gender);
-        onUpdate('greeting', newGreeting);
+        onUpdate({ gender, greeting: newGreeting });
     };
     
-    const handleWakeWordModeChange = (mode: 'default' | 'custom') => {
-        onUpdate('wakeWordMode', mode);
+    const handleSliderUpdate = (key: keyof typeof emotionTuning, value: string) => {
+        onUpdate({ 
+            emotionTuning: { 
+                ...emotionTuning, 
+                [key]: parseInt(value, 10) 
+            }
+        });
     };
 
     return (
@@ -485,7 +407,7 @@ const PersonaContent = ({ settings, onUpdate }) => {
                             name="theme"
                             value="light"
                             checked={settings.theme === 'light'}
-                            onChange={() => onUpdate('theme', 'light')}
+                            onChange={() => onUpdate({ theme: 'light' })}
                             className="h-4 w-4 shrink-0 accent-primary-color"
                         />
                         <span>{t('settings.personaTab.appearance.light')}</span>
@@ -496,7 +418,7 @@ const PersonaContent = ({ settings, onUpdate }) => {
                             name="theme"
                             value="dark"
                             checked={settings.theme === 'dark'}
-                            onChange={() => onUpdate('theme', 'dark')}
+                            onChange={() => onUpdate({ theme: 'dark' })}
                             className="h-4 w-4 shrink-0 accent-primary-color"
                         />
                         <span>{t('settings.personaTab.appearance.dark')}</span>
@@ -545,55 +467,8 @@ const PersonaContent = ({ settings, onUpdate }) => {
                         onChange={e => setGreetingInput(e.target.value)}
                         className="flex-grow p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition text-text-color"
                     />
-                    <button onClick={() => onUpdate('greeting', greetingInput)} className="quick-action-button save-button px-4">{t('settings.common.save')}</button>
+                    <button onClick={() => onUpdate({ greeting: greetingInput })} className="quick-action-button save-button px-4">{t('settings.common.save')}</button>
                 </div>
-            </div>
-             <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.continuousListening.title')}</h3>
-                    <p>{t('settings.personaTab.continuousListening.description')}</p>
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                    <label htmlFor="continuous-listening-toggle" className="font-medium text-text-color">
-                        {t('settings.personaTab.continuousListening.enable')}
-                    </label>
-                    <Switch
-                        checked={settings.enableContinuousListening}
-                        onChange={(checked) => onUpdate('enableContinuousListening', checked)}
-                    />
-                </div>
-                {settings.enableContinuousListening && (
-                    <div className="mt-4 p-3 bg-assistant-bubble-bg rounded-lg text-sm">
-                        <div className="settings-card !bg-bg-color mt-0">
-                            <div className="settings-section-header">
-                                <h3>{t('settings.personaTab.wakeWord.title')}</h3>
-                                <p>{t('settings.personaTab.wakeWord.description')}</p>
-                            </div>
-                            <div className="mt-4 flex flex-col gap-3">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="wakeWordMode" value="default" checked={settings.wakeWordMode === 'default'} onChange={() => handleWakeWordModeChange('default')} className="h-4 w-4 shrink-0 accent-primary-color"/>
-                                    <span>{t('settings.personaTab.wakeWord.default')} ({defaultWakeWord})</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="wakeWordMode" value="custom" checked={settings.wakeWordMode === 'custom'} onChange={() => handleWakeWordModeChange('custom')} className="h-4 w-4 shrink-0 accent-primary-color"/>
-                                    <span>{t('settings.personaTab.wakeWord.custom')}</span>
-                                </label>
-                                {settings.wakeWordMode === 'custom' && (
-                                    <div className="mt-2 pl-6 flex items-center gap-3">
-                                        <input
-                                            type="text"
-                                            value={customWakeWordInput}
-                                            onChange={e => setCustomWakeWordInput(e.target.value)}
-                                            placeholder={t('settings.personaTab.wakeWord.placeholder')}
-                                            className="flex-grow p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color transition text-text-color"
-                                        />
-                                        <button onClick={() => onUpdate('customWakeWord', customWakeWordInput)} className="quick-action-button save-button px-4">{t('settings.common.save')}</button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
             <div className="settings-card">
                 <div className="settings-section-header">
@@ -601,84 +476,21 @@ const PersonaContent = ({ settings, onUpdate }) => {
                     <p>{t('settings.personaTab.tuning.description')}</p>
                 </div>
                 <div className="mt-4 space-y-4">
-                    <div>
-                        <label htmlFor="happiness-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                            <span>{t('settings.personaTab.tuning.happiness')}</span>
-                            <span>{emotionTuning.happiness}%</span>
-                        </label>
-                        <input
-                            id="happiness-slider"
-                            type="range" min="0" max="100" step="1"
-                            value={emotionTuning.happiness}
-                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, happiness: parseInt(e.target.value, 10) })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-                     <div>
-                        <label htmlFor="empathy-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                            <span>{t('settings.personaTab.tuning.empathy')}</span>
-                            <span>{emotionTuning.empathy}%</span>
-                        </label>
-                        <input
-                            id="empathy-slider"
-                            type="range" min="0" max="100" step="1"
-                            value={emotionTuning.empathy}
-                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, empathy: parseInt(e.target.value, 10) })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-                     <div>
-                        <label htmlFor="formality-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                            <span>{t('settings.personaTab.tuning.formality')}</span>
-                            <span>{emotionTuning.formality}%</span>
-                        </label>
-                        <input
-                            id="formality-slider"
-                            type="range" min="0" max="100" step="1"
-                            value={emotionTuning.formality}
-                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, formality: parseInt(e.target.value, 10) })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="excitement-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                            <span>{t('settings.personaTab.tuning.excitement')}</span>
-                            <span>{emotionTuning.excitement}%</span>
-                        </label>
-                        <input
-                            id="excitement-slider"
-                            type="range" min="0" max="100" step="1"
-                            value={emotionTuning.excitement}
-                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, excitement: parseInt(e.target.value, 10) })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="sadness-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                            <span>{t('settings.personaTab.tuning.sadness')}</span>
-                            <span>{emotionTuning.sadness}%</span>
-                        </label>
-                        <input
-                            id="sadness-slider"
-                            type="range" min="0" max="100" step="1"
-                            value={emotionTuning.sadness}
-                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, sadness: parseInt(e.target.value, 10) })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="curiosity-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                            <span>{t('settings.personaTab.tuning.curiosity')}</span>
-                            <span>{emotionTuning.curiosity}%</span>
-                        </label>
-                        <input
-                            id="curiosity-slider"
-                            type="range" min="0" max="100" step="1"
-                            value={emotionTuning.curiosity}
-                            onChange={e => onUpdate('emotionTuning', { ...emotionTuning, curiosity: parseInt(e.target.value, 10) })}
-                            className="w-full mt-1"
-                        />
-                    </div>
+                    {Object.keys(emotionTuning).map(key => (
+                        <div key={key}>
+                            <label htmlFor={`${key}-slider`} className="text-sm text-text-color-muted block mb-1 flex justify-between capitalize">
+                                <span>{t(`settings.personaTab.tuning.${key}`)}</span>
+                                <span>{emotionTuning[key as keyof typeof emotionTuning]}%</span>
+                            </label>
+                            <input
+                                id={`${key}-slider`}
+                                type="range" min="0" max="100" step="1"
+                                value={emotionTuning[key as keyof typeof emotionTuning]}
+                                onChange={e => handleSliderUpdate(key as keyof typeof emotionTuning, e.target.value)}
+                                className="w-full mt-1"
+                            />
+                        </div>
+                    ))}
                 </div>
             </div>
             <div className="settings-card">
@@ -698,7 +510,7 @@ const PersonaContent = ({ settings, onUpdate }) => {
                         max="1"
                         step="0.01"
                         value={settings.ambientVolume}
-                        onChange={e => onUpdate('ambientVolume', parseFloat(e.target.value))}
+                        onChange={e => onUpdate({ ambientVolume: parseFloat(e.target.value) })}
                         className="w-full mt-1"
                     />
                 </div>
@@ -725,7 +537,7 @@ const PersonaContent = ({ settings, onUpdate }) => {
                             <button onClick={playTestSound} className="quick-action-button !p-2" title={t('settings.personaTab.connectionSound.test')}>
                                 <PlayIcon className="w-5 h-5" />
                             </button>
-                            <button onClick={() => onUpdate('connectionSoundUrl', null)} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30">
+                            <button onClick={() => onUpdate({ connectionSoundUrl: null })} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30">
                                 {t('settings.personaTab.connectionSound.remove')}
                             </button>
                         </>
@@ -744,14 +556,28 @@ const PersonaContent = ({ settings, onUpdate }) => {
                     className="w-full mt-4 p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition font-mono text-xs text-text-color"
                 />
                 <div className="mt-3 flex justify-end">
-                    <button onClick={() => onUpdate('systemPrompt', systemPromptInput)} className="quick-action-button save-button px-4">{t('settings.personaTab.systemPrompt.save')}</button>
+                    <button onClick={() => onUpdate({ systemPrompt: systemPromptInput })} className="quick-action-button save-button px-4">{t('settings.personaTab.systemPrompt.save')}</button>
+                </div>
+            </div>
+            <div className="settings-card border-yellow-500/50">
+                <div className="settings-section-header">
+                    <h3 className="text-yellow-400">{t('settings.personaTab.dataManagement.title')}</h3>
+                </div>
+                <div className="mt-4">
+                    <button onClick={() => onUpdate({ clearHistory: true })} className="quick-action-button bg-yellow-500/20 border-yellow-500/80 text-yellow-400 hover:bg-yellow-500/30 px-4">
+                        {t('settings.personaTab.dataManagement.clearHistory.button')}
+                    </button>
+                    <p className="text-xs text-text-color-muted mt-2">{t('settings.personaTab.dataManagement.clearHistory.description')}</p>
                 </div>
             </div>
         </div>
     );
 };
 
-const BiasContent = ({ settings, onUpdate }) => {
+const BiasContent = ({ settings, onUpdate }: { 
+    settings: typeof defaultSettings;
+    onUpdate: (key: keyof typeof defaultSettings, value: any) => void;
+}) => {
     const { t } = useTranslation();
     const biasOptions = [
         { id: 'precise', label: t('settings.biasTab.options.precise.label'), description: t('settings.biasTab.options.precise.description') },
@@ -789,27 +615,60 @@ const BiasContent = ({ settings, onUpdate }) => {
     );
 };
 
-const VoiceContent = ({ settings, onUpdate, onTestVoice }) => {
+const VoiceContent = ({ settings, onUpdate, onTestVoice }: {
+    settings: typeof defaultSettings;
+    onUpdate: (newSettings: Partial<typeof defaultSettings>) => void;
+    onTestVoice: (text: string, config: VoiceConfig, emotion: Emotion) => void;
+}) => {
     const { t } = useTranslation();
-    const [localVoiceSettings, setLocalVoiceSettings] = useState(settings.voice);
+    const [localSettings, setLocalSettings] = useState({
+        voice: settings.voice,
+        singingEmotionTuning: settings.singingEmotionTuning || defaultSettings.singingEmotionTuning
+    });
 
     const handleChange = (gender: 'female' | 'male', type: 'main' | 'greeting', prop: string, value: any) => {
-        setLocalVoiceSettings(prev => ({
+        setLocalSettings(prev => ({
             ...prev,
-            [gender]: {
-                ...prev[gender],
-                [type]: { ...prev[gender][type], [prop]: value }
+            voice: {
+                ...prev.voice,
+                [gender]: {
+                    ...prev.voice[gender],
+                    [type]: { ...prev.voice[gender][type], [prop]: value }
+                }
+            }
+        }));
+    };
+    
+    const handleVoiceChange = (prop: string, value: any) => {
+        setLocalSettings(prev => ({
+            ...prev,
+            voice: {
+                ...prev.voice,
+                [prop]: value
+            }
+        }));
+    };
+
+    const handleSingingTuningChange = (emotion: string, value: number) => {
+        setLocalSettings(prev => ({
+            ...prev,
+            singingEmotionTuning: {
+                ...prev.singingEmotionTuning,
+                [emotion]: value,
             }
         }));
     };
 
     const handleTestVoice = (gender: 'female' | 'male', type: 'main' | 'greeting') => {
-        const voiceConfig = localVoiceSettings[gender][type];
-        onTestVoice("This is a test of the selected voice.", voiceConfig);
+        const voiceConfig = localSettings.voice[gender][type];
+        onTestVoice("This is a test of the selected voice.", voiceConfig, 'neutral');
     };
 
     const handleSave = () => {
-        onUpdate('voice', localVoiceSettings);
+        onUpdate({
+            voice: localSettings.voice,
+            singingEmotionTuning: localSettings.singingEmotionTuning,
+        });
     };
 
     const renderVoicePanel = (gender: 'female' | 'male') => {
@@ -824,7 +683,7 @@ const VoiceContent = ({ settings, onUpdate, onTestVoice }) => {
                     {['main', 'greeting'].map(type => {
                         const voiceType = type as 'main' | 'greeting';
                         const label = voiceType === 'main' ? t('settings.voiceTab.mainVoiceLabel') : t('settings.voiceTab.greetingVoiceLabel');
-                        const config = localVoiceSettings[gender][voiceType];
+                        const config = localSettings.voice[gender][voiceType];
                         
                         return (
                             <div key={`${gender}-${type}`}>
@@ -857,8 +716,75 @@ const VoiceContent = ({ settings, onUpdate, onTestVoice }) => {
                 <h3>{t('settings.voiceTab.title')}</h3>
                 <p>{t('settings.voiceTab.description')}</p>
             </div>
+
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.voiceTab.speed.title')}</h3>
+                    <p>{t('settings.voiceTab.speed.description')}</p>
+                </div>
+                <div className="mt-4">
+                    <label htmlFor="speaking-rate-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                        <span>{t('settings.voiceTab.speed.label')}</span>
+                        <span>{(localSettings.voice.speakingRate || 1.0).toFixed(2)}x</span>
+                    </label>
+                    <input
+                        id="speaking-rate-slider"
+                        type="range" min="0.5" max="2.0" step="0.05"
+                        value={localSettings.voice.speakingRate || 1.0}
+                        onChange={e => handleVoiceChange('speakingRate', parseFloat(e.target.value))}
+                        className="w-full mt-1"
+                    />
+                </div>
+            </div>
+
             {renderVoicePanel('female')}
             {renderVoicePanel('male')}
+
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.voiceTab.singingTuning.title')}</h3>
+                    <p>{t('settings.voiceTab.singingTuning.description')}</p>
+                </div>
+                <div className="mt-4 space-y-4">
+                    <div>
+                        <label htmlFor="sing-happiness-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                            <span>{t('settings.personaTab.tuning.happiness')}</span>
+                            <span>{localSettings.singingEmotionTuning.happiness}%</span>
+                        </label>
+                        <input
+                            id="sing-happiness-slider" type="range" min="0" max="100" step="1"
+                            value={localSettings.singingEmotionTuning.happiness}
+                            onChange={e => handleSingingTuningChange('happiness', parseInt(e.target.value, 10))}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                     <div>
+                        <label htmlFor="sing-sadness-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                           <span>{t('settings.personaTab.tuning.sadness')}</span>
+                           <span>{localSettings.singingEmotionTuning.sadness}%</span>
+                        </label>
+                        <input
+                            id="sing-sadness-slider" type="range" min="0" max="100" step="1"
+                            value={localSettings.singingEmotionTuning.sadness}
+                            onChange={e => handleSingingTuningChange('sadness', parseInt(e.target.value, 10))}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                     <div>
+                        <label htmlFor="sing-excitement-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                            <span>{t('settings.personaTab.tuning.excitement')}</span>
+                            <span>{localSettings.singingEmotionTuning.excitement}%</span>
+                        </label>
+                        <input
+                            id="sing-excitement-slider" type="range" min="0" max="100" step="1"
+                            value={localSettings.singingEmotionTuning.excitement}
+                            onChange={e => handleSingingTuningChange('excitement', parseInt(e.target.value, 10))}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                </div>
+            </div>
+
             <div className="mt-4 flex justify-end">
                 <button onClick={handleSave} className="quick-action-button save-button px-4">{t('settings.voiceTab.save')}</button>
             </div>
@@ -867,7 +793,10 @@ const VoiceContent = ({ settings, onUpdate, onTestVoice }) => {
 };
 
 
-const AvatarContent = ({ settings, onUpdate }) => {
+const AvatarContent = ({ settings, onUpdate }: { 
+    settings: typeof defaultSettings;
+    onUpdate: (key: keyof typeof defaultSettings, value: any) => void;
+}) => {
     const { t } = useTranslation();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadingState, setUploadingState] = useState<AssistantState | null>(null);
@@ -938,18 +867,58 @@ const AvatarContent = ({ settings, onUpdate }) => {
     );
 };
 
-const ApiKeysContent = ({ settings, onUpdate }) => {
+const ApiKeysContent = ({ settings, onUpdate }: {
+    settings: typeof defaultSettings;
+    onUpdate: (key: keyof typeof defaultSettings, value: any) => void;
+}) => {
     const { t } = useTranslation();
     const [keys, setKeys] = useState(settings.apiKeys);
-
+    type Status = 'idle' | 'loading' | 'success' | 'error';
+    const [validation, setValidation] = useState<Record<keyof typeof keys, { status: Status, message: string }>>({
+        weather: { status: 'idle', message: '' },
+        news: { status: 'idle', message: '' },
+        youtube: { status: 'idle', message: '' },
+    });
+    
     useEffect(() => {
         setKeys(settings.apiKeys);
     }, [settings.apiKeys]);
 
-    const handleChange = (key, value) => {
-        setKeys(prev => ({...prev, [key]: value}));
-    }
+    const handleChange = (key: keyof typeof settings.apiKeys, value: string) => {
+        setKeys(prev => ({ ...prev, [key]: value }));
+        // Reset validation status on change
+        setValidation(prev => ({ ...prev, [key]: { status: 'idle', message: '' } }));
+    };
 
+    const handleSave = async () => {
+        setValidation({
+            weather: { status: 'loading', message: '' },
+            news: { status: 'loading', message: '' },
+            youtube: { status: 'loading', message: '' },
+        });
+
+        const weatherResult = await validateWeatherKey(keys.weather);
+        const newsResult = await validateNewsKey(keys.news);
+        const youtubeResult = await validateYouTubeKey(keys.youtube);
+
+        setValidation({
+            weather: { status: weatherResult.success ? 'success' : 'error', message: weatherResult.message },
+            news: { status: newsResult.success ? 'success' : 'error', message: newsResult.message },
+            youtube: { status: youtubeResult.success ? 'success' : 'error', message: youtubeResult.message },
+        });
+
+        onUpdate('apiKeys', keys);
+    };
+    
+    const renderStatusIcon = (status: Status) => {
+        switch (status) {
+            case 'loading': return <LoadingSpinnerIcon className="w-4 h-4 text-primary-color" />;
+            case 'success': return <CheckIcon />;
+            case 'error': return <XIcon />;
+            default: return null;
+        }
+    };
+    
     return (
         <div className="settings-section">
             <div className="settings-card">
@@ -967,64 +936,29 @@ const ApiKeysContent = ({ settings, onUpdate }) => {
                     <h3>{t('settings.apiKeysTab.optional.title')}</h3>
                     <p>{t('settings.apiKeysTab.optional.description')}</p>
                 </div>
-                <div className="mt-4 space-y-4">
-                     <div>
-                        <label className="text-sm text-text-color-muted">{t('settings.apiKeysTab.weatherKey')}</label>
-                        <input type="password" value={keys.weather} onChange={e => handleChange('weather', e.target.value)} className="w-full mt-1 p-2 rounded bg-assistant-bubble-bg border border-border-color text-text-color"/>
-                    </div>
-                     <div>
-                        <label className="text-sm text-text-color-muted">{t('settings.apiKeysTab.newsKey')}</label>
-                        <input type="password" value={keys.news} onChange={e => handleChange('news', e.target.value)} className="w-full mt-1 p-2 rounded bg-assistant-bubble-bg border border-border-color text-text-color"/>
-                    </div>
-                     <div>
-                        <label className="text-sm text-text-color-muted">{t('settings.apiKeysTab.youtubeKey')}</label>
-                        <input type="password" value={keys.youtube} onChange={e => handleChange('youtube', e.target.value)} className="w-full mt-1 p-2 rounded bg-assistant-bubble-bg border border-border-color text-text-color"/>
-                    </div>
+                <div className="mt-4 space-y-6">
+                    {(['weather', 'news', 'youtube'] as const).map(key => (
+                        <div key={key}>
+                            <label className="text-sm text-text-color-muted">{t(`settings.apiKeysTab.${key}Key`)}</label>
+                            <div className="relative">
+                                <input 
+                                  type="password" 
+                                  value={keys[key]} 
+                                  onChange={e => handleChange(key, e.target.value)} 
+                                  className="w-full mt-1 p-2 rounded bg-assistant-bubble-bg border border-border-color text-text-color pr-8"
+                                />
+                                <div className={`absolute top-1/2 right-2 -translate-y-1/2 text-sm ${validation[key].status === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                                    {renderStatusIcon(validation[key].status)}
+                                </div>
+                            </div>
+                            {validation[key].message && (
+                                <p className={`text-xs mt-1 ${validation[key].status === 'success' ? 'text-green-400' : 'text-red-400'}`}>{validation[key].message}</p>
+                            )}
+                        </div>
+                    ))}
                 </div>
-                 <div className="mt-4 flex justify-end">
-                    <button onClick={() => onUpdate('apiKeys', keys)} className="quick-action-button save-button px-4">{t('settings.apiKeysTab.save')}</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const AccountDataContent = ({ settings, onUpdate, onLogout }) => {
-    const { t } = useTranslation();
-    const [copyText, setCopyText] = useState(t('settings.common.copy'));
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(settings.userId);
-        setCopyText(t('settings.common.copied'));
-        setTimeout(() => setCopyText(t('settings.common.copy')), 2000);
-    };
-
-    return (
-        <div className="settings-section">
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.accountTab.session.title')}</h3>
-                    <p>{t('settings.accountTab.session.description')}</p>
-                </div>
-                <div className="mt-4 flex items-center gap-3">
-                    <input type="text" readOnly value={settings.userId} className="flex-grow p-2 rounded bg-assistant-bubble-bg border border-border-color font-mono text-sm text-text-color"/>
-                    <button onClick={handleCopy} className="quick-action-button flex items-center gap-2"><CopyIcon /> {copyText}</button>
-                </div>
-            </div>
-             <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.accountTab.data.title')}</h3>
-                    <p>{t('settings.accountTab.data.description')}</p>
-                </div>
-                <div className="mt-4 flex flex-col gap-4">
-                    <div>
-                        <button onClick={() => onUpdate('clearHistory', true)} className="quick-action-button bg-yellow-500/20 border-yellow-500/80 text-yellow-400 hover:bg-yellow-500/30 px-4">{t('settings.accountTab.clearHistory.button')}</button>
-                        <p className="text-xs text-text-color-muted mt-2">{t('settings.accountTab.clearHistory.description')}</p>
-                    </div>
-                    <div>
-                        <button onClick={onLogout} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30 px-4">{t('settings.accountTab.logout.button')}</button>
-                        <p className="text-xs text-text-color-muted mt-2">{t('settings.accountTab.logout.description')}</p>
-                    </div>
+                <div className="mt-6 flex justify-end">
+                    <button onClick={handleSave} className="quick-action-button save-button px-4">{t('settings.apiKeysTab.save')}</button>
                 </div>
             </div>
         </div>
@@ -1105,7 +1039,19 @@ const HelpSupportContent = () => {
 
 const ChatLog = ({ history, onOpenSettings }: { history: ChatMessage[]; onOpenSettings: () => void; }) => {
     const { t } = useTranslation();
+    const [copiedId, setCopiedId] = useState<number | null>(null);
     const getCurrentTime = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+    const handleCopy = (text: string, id: number) => {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                setCopiedId(id);
+                setTimeout(() => setCopiedId(null), 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+    };
 
     if (history.length === 0) {
         return (
@@ -1123,14 +1069,23 @@ const ChatLog = ({ history, onOpenSettings }: { history: ChatMessage[]; onOpenSe
       <>
         {history.map((msg) => (
             <div key={msg.id} className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation`}>
-                <div className={`max-w-xl p-3 rounded-xl ${
+                <div className={`group relative max-w-xl p-3 rounded-xl ${
                     msg.sender === 'user' 
                         ? 'bg-primary-color/20 text-text-color rounded-br-none' 
                         : msg.isError
                             ? 'bg-red-500/20 text-red-400 border border-red-500/40 rounded-bl-none'
                             : 'bg-assistant-bubble-bg text-text-color rounded-bl-none'
                 }`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    <p className="whitespace-pre-wrap pr-8">{msg.text}</p>
+                     {msg.text && (
+                        <button
+                            onClick={() => handleCopy(msg.text, msg.id)}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-panel-bg/60 text-text-color-muted backdrop-blur-sm hover:bg-assistant-bubble-bg hover:text-primary-color opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                            aria-label={copiedId === msg.id ? t('settings.common.copied') : t('settings.common.copy')}
+                        >
+                            {copiedId === msg.id ? <CheckIcon /> : <CopyIcon />}
+                        </button>
+                    )}
                     {(msg.onRetry || msg.isApiKeyError) && (
                         <div className="mt-3 pt-2 border-t border-red-500/30 flex items-center gap-2">
                             {msg.isApiKeyError && (
@@ -1166,6 +1121,86 @@ const ChatLog = ({ history, onOpenSettings }: { history: ChatMessage[]; onOpenSe
     );
 };
 
+const WeatherPanel = ({ data, onClose }: { data: WeatherData; onClose: () => void; }) => {
+    const { t } = useTranslation();
+    const getWeatherIcon = (icon: string) => {
+        // Mapping from Visual Crossing icon names to our components
+        if (icon.includes('rain')) return <WeatherRainIcon />;
+        if (icon.includes('snow')) return <WeatherSnowIcon />;
+        if (icon.includes('fog')) return <WeatherFogIcon />;
+        if (icon.includes('cloudy')) return icon.includes('partly') ? <WeatherCloudyIcon /> : <WeatherCloudIcon />;
+        if (icon.includes('clear')) return <WeatherSunIcon />;
+        return <WeatherCloudyIcon />; // Default icon
+    };
+
+    return (
+        <div className="info-panel p-4 flex flex-col h-full items-center justify-center text-center">
+            <button onClick={onClose} className="absolute top-2 right-2 p-2 rounded-full hover:bg-assistant-bubble-bg">
+                <XIcon />
+            </button>
+            <div className="text-primary-color weather-icon-glow">{getWeatherIcon(data.icon)}</div>
+            <p className="text-7xl font-bold mt-2">{data.temp}°<span className="text-3xl align-top">C</span></p>
+            <p className="text-xl text-text-color-muted capitalize">{data.conditions}</p>
+            <p className="mt-1 font-semibold">{data.location}</p>
+            <p className="mt-4 text-sm max-w-xs">{data.summary}</p>
+        </div>
+    );
+};
+
+const TimerPanel = ({ duration, remaining, onClose, onFinish }: { 
+    duration: number; 
+    remaining: number; 
+    onClose: () => void; 
+    onFinish: () => void;
+}) => {
+    const { t } = useTranslation();
+    const radius = 80;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (remaining / duration) * circumference;
+
+    useEffect(() => {
+        if (remaining <= 0) {
+            onFinish();
+        }
+    }, [remaining, onFinish]);
+
+    const formatTime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    };
+
+    return (
+        <div className="info-panel p-4 flex flex-col h-full items-center justify-center text-center">
+            <button onClick={onClose} className="absolute top-2 right-2 p-2 rounded-full hover:bg-assistant-bubble-bg">
+                <XIcon />
+            </button>
+            <TimerIcon />
+            <h3 className="text-lg font-semibold mt-2">{t('timer.title')}</h3>
+            <div className="relative my-4 w-48 h-48">
+                <svg className="w-full h-full" viewBox="0 0 200 200">
+                    <circle className="timer-circle-bg" strokeWidth="10" fill="transparent" r={radius} cx="100" cy="100"/>
+                    <circle 
+                        className="timer-circle-progress"
+                        strokeWidth="10"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        fill="transparent"
+                        r={radius}
+                        cx="100"
+                        cy="100"
+                    />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-4xl font-mono">{formatTime(remaining)}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 type VoiceConfig = {
     name: string;
 };
@@ -1174,6 +1209,29 @@ const BIAS_TEMPERATURE_MAP: Record<string, number> = {
     precise: 0.2,
     balanced: 0.7,
     creative: 1.0,
+};
+
+const getSpeakingStateFromEmotion = (emotion: Emotion): AssistantState => {
+    switch (emotion) {
+        case 'happy':
+        case 'excited':
+        case 'chirpy':
+        case 'joking':
+            return 'celebrating';
+        case 'sad':
+        case 'empathetic':
+            return 'sad';
+        case 'surprised':
+            return 'surprised';
+        case 'singing':
+            return 'singing';
+        case 'neutral':
+        case 'formal':
+        case 'curious':
+        case 'thoughtful':
+        default:
+            return 'speaking';
+    }
 };
 
 // --- Audio Decoding Helpers for Gemini TTS ---
@@ -1210,20 +1268,28 @@ async function decodeAudioData(
 // --- Main App Component ---
 export const App = () => {
   const { t, lang, setLang } = useTranslation();
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [assistantState, setAssistantState] = useState<AssistantState>('idle');
   const [isConnected, setIsConnected] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [listeningHint, setListeningHint] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  type TimerState = { key: number; duration: number; remaining: number; isActive: boolean };
+  const [timer, setTimer] = useState<TimerState | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('persona');
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isYTReady, setIsYTReady] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
-  const [isContinuousListeningActive, setIsContinuousListeningActive] = useState(false);
-  const [isAwake, setIsAwake] = useState(false);
+
+  // Email Composer State
+  const [emailComposer, setEmailComposer] = useState<{
+    stage: 'idle' | 'getEmail' | 'getSubject' | 'getBody' | 'confirmSend';
+    recipient: string;
+    subject: string;
+    body: string;
+  }>({ stage: 'idle', recipient: '', subject: '', body: '' });
 
 
   // YouTube Player State
@@ -1239,57 +1305,56 @@ export const App = () => {
   const progressIntervalRef = useRef<number | null>(null);
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
   const connectionAudioRef = useRef<HTMLAudioElement | null>(null);
-  const wakeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const timerAudioRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<number | null>(null);
   const hintTimeoutRef = useRef<number | null>(null);
-  const noSpeechErrorCountRef = useRef(0);
-  const awakeTimeoutRef = useRef<number | null>(null);
-  const inactivityTimeoutRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
 
 
   // Refs for Gemini TTS Audio
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
-  const speechSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const speechSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   
   // Refs to track state inside async callbacks to avoid stale closures
   const assistantStateRef = useRef(assistantState);
   assistantStateRef.current = assistantState;
-  const isContinuousListeningActiveRef = useRef(isContinuousListeningActive);
-  isContinuousListeningActiveRef.current = isContinuousListeningActive;
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  const isConnectedRef = useRef(isConnected);
+  isConnectedRef.current = isConnected;
+  const emailComposerRef = useRef(emailComposer);
+  emailComposerRef.current = emailComposer;
 
 
   // --- Core Hooks ---
   useEffect(() => {
     try {
-        const loggedInUserId = localStorage.getItem('kaniska-session-userId');
-        if (loggedInUserId) {
-            const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
-            const user = allUsers.find(u => u.id === loggedInUserId);
-            if (user) {
-                setCurrentUser(user);
-                const loadedSettings = user.settings || {};
-                const loadedVoice = loadedSettings.voice || {};
-                const mergedSettings = {
-                    ...defaultSettings,
-                    ...loadedSettings,
-                    theme: loadedSettings.theme || getInitialTheme(),
-                    voice: {
-                        female: { ...defaultSettings.voice.female, ...(loadedVoice.female || {}) },
-                        male: { ...defaultSettings.voice.male, ...(loadedVoice.male || {}) },
-                    },
-                    apiKeys: { ...defaultSettings.apiKeys, ...(loadedSettings.apiKeys || {}) },
-                    avatarMap: { ...defaultSettings.avatarMap, ...(loadedSettings.avatarMap || {}) },
-                    emotionTuning: { ...defaultSettings.emotionTuning, ...(loadedSettings.emotionTuning || {}) }
-                };
-                setSettings(mergedSettings);
-                setChatHistory(user.chatHistory || []);
-            }
+        const savedSettings = localStorage.getItem('kaniska-settings');
+        if (savedSettings) {
+            const loadedSettings = JSON.parse(savedSettings);
+            // Deep merge with defaults to handle new settings being added in updates
+            const mergedSettings = {
+                ...defaultSettings,
+                ...loadedSettings,
+                theme: loadedSettings.theme || getInitialTheme(),
+                voice: {
+                    ...defaultSettings.voice,
+                    ...(loadedSettings.voice || {}),
+                    female: { ...defaultSettings.voice.female, ...(loadedSettings.voice?.female || {}) },
+                    male: { ...defaultSettings.voice.male, ...(loadedSettings.voice?.male || {}) },
+                },
+                apiKeys: { ...defaultSettings.apiKeys, ...(loadedSettings.apiKeys || {}) },
+                avatarMap: { ...defaultSettings.avatarMap, ...(loadedSettings.avatarMap || {}) },
+                emotionTuning: { ...defaultSettings.emotionTuning, ...(loadedSettings.emotionTuning || {}) },
+                singingEmotionTuning: { ...defaultSettings.singingEmotionTuning, ...(loadedSettings.singingEmotionTuning || {}) },
+            };
+            setSettings(mergedSettings);
+        }
+        const savedHistory = localStorage.getItem('kaniska-chatHistory');
+        if (savedHistory) {
+            setChatHistory(JSON.parse(savedHistory));
         }
     } catch (e: any) {
-        console.error("Failed to load user session from localStorage", e);
+        console.error("Failed to load persisted state from localStorage", e);
     }
   }, []);
   
@@ -1304,26 +1369,25 @@ export const App = () => {
 
   useEffect(() => {
     // This effect runs once on mount
-    
-    // Configure ambient audio
-    if (ambientAudioRef.current) {
-        ambientAudioRef.current.volume = 0;
-        if (!ambientAudioRef.current.src) {
-           ambientAudioRef.current.src = "https://storage.googleapis.com/aai-web-samples/scifi-ambience.mp3";
-        }
-    }
-    
-    // Configure wake sound
-    if (wakeAudioRef.current && !wakeAudioRef.current.src) {
-        wakeAudioRef.current.src = "https://storage.googleapis.com/aai-web-samples/sfx-on.mp3";
-        wakeAudioRef.current.volume = 0.5;
-    }
-    
     const context = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
     audioContextRef.current = context;
     const gainNode = context.createGain();
     gainNode.connect(context.destination);
     gainNodeRef.current = gainNode;
+    
+    // Create persistent audio elements to avoid issues with re-renders
+    const ambient = new Audio("https://storage.googleapis.com/aai-web-samples/scifi-ambience.mp3");
+    ambient.loop = true;
+    ambient.preload = 'auto';
+    ambientAudioRef.current = ambient;
+
+    const connection = new Audio();
+    connection.preload = 'auto';
+    connectionAudioRef.current = connection;
+    
+    const timer = new Audio("https://storage.googleapis.com/aai-web-samples/timer-alarm.mp3");
+    timer.preload = 'auto';
+    timerAudioRef.current = timer;
     
     if (window.YT && window.YT.Player) {
         setIsYTReady(true);
@@ -1344,40 +1408,23 @@ export const App = () => {
     }
   }, [settings.volume]);
 
-  // Bug Fix: Automatically disable active continuous listening if the setting is turned off.
   useEffect(() => {
-    if (!settings.enableContinuousListening && isContinuousListeningActive) {
-      setIsContinuousListeningActive(false);
-      // The recognition loop will terminate on its own in the onend handler
-      // because isContinuousListeningActiveRef.current will be false.
-    }
-  }, [settings.enableContinuousListening, isContinuousListeningActive]);
-
-  const saveCurrentUserChanges = useCallback(() => {
-    if (!currentUser) return;
     try {
-        const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
-        const userIndex = allUsers.findIndex(u => u.id === currentUser.id);
-        
-        const updatedUser = {
-            ...currentUser,
-            settings: settings,
-            chatHistory: chatHistory,
-        };
-
-        if (userIndex !== -1) {
-            allUsers[userIndex] = updatedUser;
-        } else {
-            allUsers.push(updatedUser);
-        }
-        
-        localStorage.setItem('kaniska-users', JSON.stringify(allUsers));
-    } catch (e: any) {
-        console.error("Failed to save user data to localStorage", e);
+        localStorage.setItem('kaniska-settings', JSON.stringify(settings));
+    } catch (e) {
+        console.error("Failed to save settings to localStorage", e);
     }
-  }, [currentUser, settings, chatHistory]);
+  }, [settings]);
 
-  const handleSettingChange = (newSettings: any) => {
+  useEffect(() => {
+      try {
+          localStorage.setItem('kaniska-chatHistory', JSON.stringify(chatHistory));
+      } catch (e) {
+          console.error("Failed to save chat history to localStorage", e);
+      }
+  }, [chatHistory]);
+  
+  const handleSettingChange = (newSettings: Partial<typeof defaultSettings & { clearHistory?: boolean }>) => {
     const tempSettings = { ...settings, ...newSettings };
     if (tempSettings.clearHistory) {
       setChatHistory([]);
@@ -1385,10 +1432,6 @@ export const App = () => {
     }
     setSettings(tempSettings);
   };
-
-  useEffect(() => {
-      saveCurrentUserChanges();
-  }, [settings, chatHistory, saveCurrentUserChanges]);
   
   const fadeAmbientSound = useCallback((targetVolume: number, duration = 500) => {
     const audio = ambientAudioRef.current;
@@ -1438,7 +1481,7 @@ export const App = () => {
     if (!hasInteracted) return;
     
     const targetVolume = settings.ambientVolume;
-    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused', 'sleep'];
+    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused'];
 
     if (playStates.includes(assistantState) && isConnected) {
         fadeAmbientSound(targetVolume);
@@ -1454,15 +1497,11 @@ export const App = () => {
   }, [chatHistory]);
 
   const startRecognition = useCallback(() => {
-    if (!isSpeakingRef.current) {
-        setAssistantState('listening');
-    }
+    setAssistantState('listening');
     if (recognitionRef.current) {
-        recognitionRef.current.continuous = settingsRef.current.enableContinuousListening;
         try {
             recognitionRef.current.start();
-        } catch (e) {
-            // Errors are expected if recognition is already running, especially with continuous mode.
+        } catch (e: any) {
             if (e.name !== 'InvalidStateError') {
                 console.warn("Could not start recognition:", e);
             }
@@ -1470,84 +1509,134 @@ export const App = () => {
     }
   }, []);
   
-  const playAudio = useCallback(async (base64Audio: string, onEndCallback?: () => void) => {
-    if (speechSourceRef.current) {
-        speechSourceRef.current.onended = null;
-        speechSourceRef.current.stop();
-        speechSourceRef.current.disconnect();
-    }
-    isSpeakingRef.current = true;
-    try {
-        if (!audioContextRef.current || !gainNodeRef.current) {
-            throw new Error("AudioContext not initialized");
+    const playRawAudio = useCallback(async (base64Audio: string, onEndCallback?: () => void) => {
+        speechSourcesRef.current.forEach(source => {
+            source.onended = null;
+            source.stop();
+        });
+        speechSourcesRef.current.clear();
+        isSpeakingRef.current = true;
+        
+        try {
+            if (!audioContextRef.current || !gainNodeRef.current) throw new Error("AudioContext not initialized");
+            if (audioContextRef.current.state === 'suspended') await audioContextRef.current.resume();
+
+            const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
+            const source = audioContextRef.current.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(gainNodeRef.current);
+            source.playbackRate.value = settings.voice.speakingRate || 1.0;
+            
+            source.onended = () => {
+                isSpeakingRef.current = false;
+                speechSourcesRef.current.delete(source);
+                if (onEndCallback) onEndCallback();
+            };
+            
+            source.start();
+            speechSourcesRef.current.add(source);
+        } catch (error) {
+             console.error("Error playing raw audio:", error);
+             isSpeakingRef.current = false;
+             if (onEndCallback) onEndCallback();
         }
-        const audioBuffer = await decodeAudioData(
-            decode(base64Audio),
-            audioContextRef.current,
-            24000,
-            1,
-        );
-        const source = audioContextRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(gainNodeRef.current);
-        source.onended = () => {
-            isSpeakingRef.current = false;
-            speechSourceRef.current = null;
-            if (onEndCallback) {
-                onEndCallback();
-            } else {
-                // Default behavior if no callback is provided
-                if (isContinuousListeningActiveRef.current) {
-                    setIsAwake(false); // Return to listening for the wake word
-                    setAssistantState('listening');
-                } else {
-                    setAssistantState('idle');
-                }
+    }, [settings.voice.speakingRate]);
+
+    const speak = useCallback(async (text: string, config: VoiceConfig, emotion: Emotion = 'neutral', onEndCallback?: () => void) => {
+        setAssistantState(getSpeakingStateFromEmotion(emotion));
+
+        // Immediately stop any currently playing audio from the previous turn.
+        speechSourcesRef.current.forEach(source => {
+            source.onended = null;
+            source.stop();
+        });
+        speechSourcesRef.current.clear();
+        
+        const sentences = text.match(/[^.!?\n]+([.!?\n]|\s*$)/g)?.map(s => s.trim()).filter(Boolean) || [text.trim()].filter(Boolean);
+        if (sentences.length === 0) {
+            setAssistantState('idle');
+            if (onEndCallback) onEndCallback();
+            return;
+        }
+
+        const audioContext = audioContextRef.current;
+        if (!audioContext || !gainNodeRef.current) {
+            console.error("AudioContext not initialized");
+            setAssistantState('error');
+            return;
+        }
+
+        isSpeakingRef.current = true;
+        let nextStartTime = audioContext.currentTime;
+
+        try {
+            const audioGenerationPromises = sentences.map(sentence => generateSpeech(sentence, config.name));
+            const newSources = new Set<AudioBufferSourceNode>();
+            speechSourcesRef.current = newSources;
+
+            for (const audioPromise of audioGenerationPromises) {
+                const base64Audio = await audioPromise;
+                const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
+                
+                if (audioContext.state === 'suspended') await audioContext.resume();
+
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(gainNodeRef.current);
+                source.playbackRate.value = settings.voice.speakingRate || 1.0;
+                
+                source.start(nextStartTime);
+                nextStartTime += audioBuffer.duration;
+                newSources.add(source);
+
+                source.onended = () => {
+                    newSources.delete(source);
+                    if (newSources.size === 0 && isSpeakingRef.current) {
+                        isSpeakingRef.current = false;
+                        if (onEndCallback) onEndCallback();
+                        else setAssistantState('idle');
+                    }
+                };
             }
-        };
-        source.start();
-        speechSourceRef.current = source;
-    } catch (error: any) {
-        console.error("Error playing audio:", error);
-        isSpeakingRef.current = false;
-        throw error;
-    }
-  }, []);
+        } catch (error: any) {
+            console.error("Error in streaming speech pipeline:", error);
+            isSpeakingRef.current = false;
+            speechSourcesRef.current.forEach(source => { source.onended = null; source.stop(); });
+            speechSourcesRef.current.clear();
+            
+            const retrySpeak = () => {
+                setChatHistory(prev => prev.filter(m => !m.onRetry));
+                speak(text, config, emotion, onEndCallback);
+            };
 
-  const speak = useCallback(async (text: string, config: VoiceConfig, onEndCallback?: () => void) => {
-      setAssistantState('speaking');
-      try {
-          const base64Audio = await generateSpeech(text, config.name);
-          await playAudio(base64Audio, onEndCallback);
-      } catch (error: any) {
-          console.error("Error generating or playing speech:", error);
-          isSpeakingRef.current = false;
-          setAssistantState('error');
-
-          const retrySpeak = () => {
-              setChatHistory(prev => prev.filter(m => !m.onRetry));
-              speak(text, config, onEndCallback);
-          };
-
-          setChatHistory(prev => [...prev, { 
-              id: Date.now(), 
-              sender: 'assistant', 
-              text: error.message,
-              isError: true,
-              onRetry: retrySpeak 
-          }]);
-      }
-  }, [playAudio]);
+            setChatHistory(prev => [...prev.filter(m => !m.onRetry), { 
+                id: Date.now(), 
+                sender: 'assistant', 
+                text: error.message || "I'm having trouble with my voice right now.",
+                isError: true,
+                onRetry: retrySpeak,
+                isApiKeyError: error instanceof ApiKeyError,
+            }]);
+            setAssistantState('error');
+        }
+    }, [settings.gender, settings.voice]);
 
   const addErrorMessageToChat = useCallback((error: any, onRetry?: () => void) => {
-    if (speechSourceRef.current) {
-        speechSourceRef.current.onended = null;
-        speechSourceRef.current.stop();
-    }
+    speechSourcesRef.current.forEach(source => {
+        source.onended = null;
+        source.stop();
+    });
+    speechSourcesRef.current.clear();
     isSpeakingRef.current = false;
 
     const message = error.message || String(error);
     const isApiKeyError = error instanceof ApiKeyError;
+
+    let retryFunc = onRetry;
+    const lowerCaseMessage = message.toLowerCase();
+    if (error instanceof MainApiKeyError || lowerCaseMessage.includes('safety')) {
+      retryFunc = undefined;
+    }
 
     setChatHistory(prev => [
         ...prev.filter(m => !m.onRetry), 
@@ -1556,105 +1645,34 @@ export const App = () => {
             sender: 'assistant',
             text: message,
             isError: true,
-            onRetry: onRetry,
+            onRetry: retryFunc,
             isApiKeyError: isApiKeyError,
         },
     ]);
-    speak(message, settings.voice[settings.gender].main, () => setAssistantState('error'));
+    speak(message, settings.voice[settings.gender].main, 'sad', () => setAssistantState('error'));
     setAssistantState('error');
   }, [speak, settings.voice, settings.gender]);
 
-  const handleTestVoice = (text: string, config: VoiceConfig) => {
-    speak(text, config);
+  const handleTestVoice = (text: string, config: VoiceConfig, emotion: Emotion) => {
+    speak(text, config, emotion);
   };
   
-  const handleLogin = (identifier: string, password: string): { success: boolean, message?: string } => {
-      try {
-          const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
-          const normalizedIdentifier = identifier.toLowerCase().trim();
-          const user = allUsers.find(u =>
-              u.email.toLowerCase() === normalizedIdentifier || u.name.toLowerCase() === normalizedIdentifier || u.phone === identifier
-          );
-
-          if (!user) {
-              return { success: false, message: 'auth.error.userNotFound' };
-          }
-
-          if (user.password !== password) {
-              return { success: false, message: 'auth.error.invalidPassword' };
-          }
-
-          localStorage.setItem('kaniska-session-userId', user.id);
-          setCurrentUser(user);
-          const loadedSettings = user.settings || {};
-          const loadedVoice = loadedSettings.voice || {};
-          const mergedSettings = {
-              ...defaultSettings,
-              ...loadedSettings,
-              theme: loadedSettings.theme || getInitialTheme(),
-              voice: {
-                female: { ...defaultSettings.voice.female, ...(loadedVoice.female || {}) },
-                male: { ...defaultSettings.voice.male, ...(loadedVoice.male || {}) },
-              },
-              apiKeys: { ...defaultSettings.apiKeys, ...(loadedSettings.apiKeys || {}) },
-              avatarMap: { ...defaultSettings.avatarMap, ...(loadedSettings.avatarMap || {}) },
-              emotionTuning: { ...defaultSettings.emotionTuning, ...(loadedSettings.emotionTuning || {}) }
-          };
-          setSettings(mergedSettings);
-          setChatHistory(user.chatHistory || []);
-          return { success: true };
-      } catch (e) {
-          console.error("Login failed:", e);
-          return { success: false, message: 'auth.error.unexpected' };
-      }
-  };
-
-  const handleSignUp = (name: string, email: string, phone: string, password: string): { success: boolean, message: string } => {
-    try {
-        const allUsers = JSON.parse(localStorage.getItem('kaniska-users') || '[]');
-        const normalizedEmail = email.toLowerCase().trim();
-        const trimmedName = name.trim();
-        const trimmedPhone = phone.trim();
-
-        if (allUsers.some(u => u.email.toLowerCase() === normalizedEmail)) {
-            return { success: false, message: 'auth.error.emailExists' };
-        }
-        if (allUsers.some(u => u.name === trimmedName)) {
-            return { success: false, message: 'auth.error.usernameExists' };
-        }
-        
-        const newUserId = `user-${Date.now()}`;
-        const newSettings = {
-            ...defaultSettings,
-            userId: newUserId,
-        };
-
-        const newUser = {
-            id: newUserId,
-            name: trimmedName,
-            email: normalizedEmail,
-            phone: trimmedPhone,
-            password: password,
-            settings: newSettings,
-            chatHistory: [],
-        };
-
-        allUsers.push(newUser);
-        localStorage.setItem('kaniska-users', JSON.stringify(allUsers));
-        handleLogin(email, password);
-        return { success: true, message: '' };
-    } catch (e) {
-        console.error("Signup failed:", e);
-        return { success: false, message: 'auth.error.unexpected' };
+  const handleYoutubeControl = (action: string) => {
+    if (!playerRef.current) return;
+    switch(action) {
+        case 'toggle':
+            if (playerState === window.YT.PlayerState.PLAYING) playerRef.current.pauseVideo();
+            else playerRef.current.playVideo();
+            break;
+        case 'close':
+            if (playerRef.current) {
+                playerRef.current.destroy();
+                playerRef.current = null;
+            }
+            setYoutubeVideoId(null);
+            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+            break;
     }
-  };
-
-  const handleLogout = () => {
-    saveCurrentUserChanges();
-    localStorage.removeItem('kaniska-session-userId');
-    setCurrentUser(null);
-    setIsConnected(false);
-    setChatHistory([]);
   };
 
   const onPlayerReady = (event: any) => {
@@ -1677,40 +1695,34 @@ export const App = () => {
     }
   };
 
+  const onPlayerError = useCallback((event: any) => {
+      console.error("YouTube Player Error:", event.data);
+      handleYoutubeControl('close');
+      const errorMsg = t('errors.youtubePlayback');
+      setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: errorMsg, isError: true }]);
+      speak(errorMsg, settings.voice[settings.gender].main, 'sad', () => {
+          if (isConnectedRef.current) {
+              startRecognition();
+          }
+      });
+  }, [t, speak, settings.voice, settings.gender, startRecognition]);
+
   useEffect(() => {
     if (youtubeVideoId && isYTReady) {
-        if (!playerRef.current) {
-            playerRef.current = new window.YT.Player('youtube-player', {
-                videoId: youtubeVideoId,
-                playerVars: { 'autoplay': 1, 'controls': 0, 'modestbranding': 1, 'rel': 0 },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
-                }
-            });
-        } else {
-            playerRef.current.loadVideoById(youtubeVideoId);
+        if (playerRef.current) {
+            playerRef.current.destroy();
         }
-    }
-  }, [youtubeVideoId, isYTReady]);
-  
-  const handleYoutubeControl = (action: string) => {
-    if (!playerRef.current) return;
-    switch(action) {
-        case 'toggle':
-            if (playerState === window.YT.PlayerState.PLAYING) playerRef.current.pauseVideo();
-            else playerRef.current.playVideo();
-            break;
-        case 'close':
-            if (playerRef.current) {
-                playerRef.current.destroy();
-                playerRef.current = null;
+        playerRef.current = new window.YT.Player('youtube-player', {
+            videoId: youtubeVideoId,
+            playerVars: { 'autoplay': 1, 'controls': 0, 'modestbranding': 1, 'rel': 0 },
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange,
+                'onError': onPlayerError
             }
-            setYoutubeVideoId(null);
-            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-            break;
+        });
     }
-  };
+  }, [youtubeVideoId, isYTReady, onPlayerError]);
   
   const formatTime = (seconds: number) => {
     const min = Math.floor(seconds / 60);
@@ -1718,55 +1730,97 @@ export const App = () => {
     return `${min}:${sec < 10 ? '0' : ''}${sec}`;
   };
 
-  const stopRecognition = useCallback(() => {
-    if (recognitionRef.current) {
-        recognitionRef.current.stop();
-    }
-  }, []);
-
   const executeYoutubeSearch = useCallback(async (query: string) => {
       try {
           setAssistantState('thinking');
           const videoId = await searchYouTube(settings.apiKeys.youtube, query);
           if (videoId) {
+              setWeatherData(null);
+              setTimer(null);
               setYoutubeVideoId(videoId);
           } else {
               const notFoundMsg = `I couldn't find a suitable video for "${query}".`;
               setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: notFoundMsg }]);
-              await speak(notFoundMsg, settings.voice[settings.gender].main);
+              await speak(notFoundMsg, settings.voice[settings.gender].main, 'sad');
           }
-          if (!isContinuousListeningActiveRef.current) {
-            setAssistantState('idle');
+          if (isConnectedRef.current) {
+            startRecognition();
           } else {
-            setIsAwake(false);
-            setAssistantState('listening');
+            setAssistantState('idle');
           }
       } catch (e: any) {
           addErrorMessageToChat(e, () => executeYoutubeSearch(query));
       }
-  }, [settings.apiKeys.youtube, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+  }, [settings.apiKeys.youtube, addErrorMessageToChat, speak, settings.voice, settings.gender, startRecognition]);
 
   const executeWeatherFetch = useCallback(async (location: string) => {
       try {
           setAssistantState('thinking');
-          const weatherSummary = await fetchWeatherSummary(location, settings.apiKeys.weather);
-          setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: weatherSummary }]);
-          await speak(weatherSummary, settings.voice[settings.gender].main);
+          const data = await fetchWeatherSummary(location, settings.apiKeys.weather);
+          setYoutubeVideoId(null);
+          setTimer(null);
+          setWeatherData(data);
+          await speak(data.summary, settings.voice[settings.gender].main, 'formal', () => {
+            if (isConnectedRef.current) startRecognition();
+          });
       } catch (e: any) {
           addErrorMessageToChat(e, () => executeWeatherFetch(location));
       }
-  }, [settings.apiKeys.weather, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+  }, [settings.apiKeys.weather, addErrorMessageToChat, speak, settings.voice, settings.gender, startRecognition]);
 
   const executeNewsFetch = useCallback(async (query: string) => {
       try {
           setAssistantState('thinking');
           const newsSummary = await fetchNews(settings.apiKeys.news, query);
           setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: newsSummary }]);
-          await speak(newsSummary, settings.voice[settings.gender].main);
+          await speak(newsSummary, settings.voice[settings.gender].main, 'formal', () => {
+             if (isConnectedRef.current) startRecognition();
+          });
       } catch (e: any) {
           addErrorMessageToChat(e, () => executeNewsFetch(query));
       }
-  }, [settings.apiKeys.news, addErrorMessageToChat, speak, settings.voice, settings.gender]);
+  }, [settings.apiKeys.news, addErrorMessageToChat, speak, settings.voice, settings.gender, startRecognition]);
+  
+    const executeSetTimer = useCallback((duration: number) => {
+        if (duration <= 0) return;
+        setYoutubeVideoId(null);
+        setWeatherData(null);
+        setTimer({
+            key: Date.now(),
+            duration,
+            remaining: duration,
+            isActive: true,
+        });
+    }, []);
+
+    const onTimerFinish = useCallback(() => {
+        if (timerAudioRef.current) {
+            timerAudioRef.current.play().catch(e => console.error("Error playing timer sound", e));
+        }
+        speak("Time's up!", settings.voice[settings.gender].main, 'excited', () => {
+             if (isConnectedRef.current) {
+                startRecognition();
+            }
+        });
+        setTimer(null);
+    }, [speak, settings.voice, settings.gender, startRecognition]);
+
+    useEffect(() => {
+        if (timer?.isActive) {
+            timerIntervalRef.current = window.setInterval(() => {
+                setTimer(currentTimer => {
+                    if (currentTimer && currentTimer.remaining > 0) {
+                        return { ...currentTimer, remaining: currentTimer.remaining - 1 };
+                    }
+                    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                    return currentTimer ? { ...currentTimer, isActive: false } : null;
+                });
+            }, 1000);
+        }
+        return () => {
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        };
+    }, [timer?.key, timer?.isActive]);
 
   const executeSingSong = useCallback(async (artist: string, title: string) => {
     setAssistantState('composing');
@@ -1775,29 +1829,158 @@ export const App = () => {
         if (!lyrics) {
             const notFoundMsg = `I'm sorry, I couldn't find the lyrics for "${title}" by ${artist}.`;
             setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: notFoundMsg }]);
-            await speak(notFoundMsg, settings.voice[settings.gender].main);
+            await speak(notFoundMsg, settings.voice[settings.gender].main, 'sad', () => {
+                if (isConnectedRef.current) startRecognition();
+            });
             return;
         }
 
-        setAssistantState('singing');
-        const base64Audio = await generateSong(lyrics, settings.voice[settings.gender].main.name);
-        
-        const onSongEnd = () => {
-          if (isContinuousListeningActiveRef.current) {
-            setIsAwake(false);
-            setAssistantState('listening');
-          } else {
-            setAssistantState('idle');
-          }
-        };
+        const lyricsMessageText = `Here are the lyrics for "${title}" by ${artist}:\n\n${lyrics}`;
+        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: lyricsMessageText }]);
 
-        await playAudio(base64Audio, onSongEnd);
+        setAssistantState('singing');
+        const base64Audio = await generateSong(lyrics, settings.voice[settings.gender].main.name, settings.singingEmotionTuning);
+        
+        await playRawAudio(base64Audio, () => {
+            if (isConnectedRef.current) {
+                startRecognition();
+            } else {
+                setAssistantState('idle');
+            }
+        });
 
     } catch (e: any) {
         addErrorMessageToChat(e, () => executeSingSong(artist, title));
     }
-  }, [settings.voice, settings.gender, addErrorMessageToChat, speak, playAudio]);
+  }, [settings.voice, settings.gender, settings.singingEmotionTuning, addErrorMessageToChat, speak, playRawAudio, startRecognition]);
 
+  const executeLyricsFetch = useCallback(async (artist: string, title: string) => {
+    setAssistantState('thinking');
+    try {
+        const lyrics = await fetchLyrics(artist, title);
+        let assistantMessageText: string;
+        let speakText: string;
+        const lyricsFound = !!lyrics;
+
+        if (lyricsFound) {
+            assistantMessageText = `Lyrics for "${title}" by ${artist}:\n\n${lyrics}`;
+            speakText = `Here are the lyrics for "${title}" by ${artist}.`;
+        } else {
+            assistantMessageText = `I'm sorry, I couldn't find the lyrics for "${title}" by ${artist}. Please try another song.`;
+            speakText = assistantMessageText;
+        }
+
+        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'assistant', text: assistantMessageText }]);
+        await speak(speakText, settings.voice[settings.gender].main, lyricsFound ? 'happy' : 'sad', () => {
+            if (isConnectedRef.current) {
+                startRecognition();
+            } else {
+                setAssistantState('idle');
+            }
+        });
+
+    } catch (e: any) {
+        addErrorMessageToChat(e, () => executeLyricsFetch(artist, title));
+    }
+  }, [settings.voice, settings.gender, addErrorMessageToChat, speak, startRecognition]);
+
+  const handleDisconnect = useCallback(() => {
+    if (recognitionRef.current) {
+        recognitionRef.current.abort();
+    }
+    speechSourcesRef.current.forEach(source => {
+        source.onended = null;
+        source.stop();
+    });
+    speechSourcesRef.current.clear();
+    isSpeakingRef.current = false;
+    setAssistantState('idle');
+    setCurrentTranscript('');
+    setIsConnected(false);
+  }, []);
+  
+  const stopCurrentAction = useCallback(() => {
+    if (recognitionRef.current) {
+        recognitionRef.current.abort();
+    }
+    speechSourcesRef.current.forEach(source => {
+        source.onended = null;
+        source.stop();
+    });
+    speechSourcesRef.current.clear();
+    isSpeakingRef.current = false;
+    setAssistantState('idle');
+    setCurrentTranscript('');
+  }, []);
+
+  const sendEmail = useCallback((recipient: string, subject: string, body: string) => {
+    const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const a = document.createElement('a');
+    a.href = mailtoLink;
+    // Use a small delay to ensure the speech starts before the email client potentially steals focus
+    setTimeout(() => {
+        a.click();
+    }, 300);
+    
+    speak("I've opened your email client with the draft.", settings.voice[settings.gender].main, 'happy', () => {
+         if (isConnectedRef.current) startRecognition();
+    });
+    setEmailComposer({ stage: 'idle', recipient: '', subject: '', body: '' });
+  }, [settings.gender, settings.voice, speak, startRecognition]);
+
+  const handleEmailInput = useCallback(async (transcript: string) => {
+    const currentState = emailComposerRef.current;
+    let nextState = { ...currentState };
+    let question = '';
+    let emotion: Emotion = 'curious';
+
+    if (assistantStateRef.current === 'speaking' || isSpeakingRef.current) {
+        stopCurrentAction();
+        startRecognition();
+        return;
+    }
+    setAssistantState('thinking');
+
+    switch (currentState.stage) {
+        case 'getEmail':
+            // Simple email regex for basic validation
+            if (/\S+@\S+\.\S+/.test(transcript.replace(/\s/g, ''))) {
+                 nextState = { ...nextState, recipient: transcript.replace(/\s/g, ''), stage: 'getSubject' };
+                 question = 'Got it. What is the subject of the email?';
+            } else {
+                question = "That doesn't sound like a valid email address. Could you please provide the recipient's email again?";
+                emotion = 'empathetic';
+            }
+            break;
+        case 'getSubject':
+            nextState = { ...nextState, subject: transcript, stage: 'getBody' };
+            question = 'Okay. And what should the message say?';
+            break;
+        case 'getBody':
+            nextState = { ...nextState, body: transcript, stage: 'confirmSend' };
+            question = `Alright. I have an email to ${nextState.recipient} with the subject "${nextState.subject}". Should I prepare it for you to send?`;
+            break;
+        case 'confirmSend':
+            const confirmation = transcript.toLowerCase();
+            if (confirmation.includes('yes') || confirmation.includes('yeah') || confirmation.includes('correct') || confirmation.includes('prepare it')) {
+                sendEmail(currentState.recipient, currentState.subject, currentState.body);
+                return;
+            } else {
+                question = 'Okay, I am cancelling this email.';
+                setEmailComposer({ stage: 'idle', recipient: '', subject: '', body: '' });
+                emotion = 'neutral';
+            }
+            break;
+    }
+
+    setEmailComposer(nextState);
+
+    speak(question, settings.voice[settings.gender].main, emotion, () => {
+        if (isConnectedRef.current) {
+            startRecognition();
+        }
+    });
+  }, [settings.gender, settings.voice, speak, startRecognition, sendEmail, stopCurrentAction]);
 
   const handleCommand = useCallback(async (transcript: string) => {
       setAssistantState('thinking');
@@ -1845,64 +2028,44 @@ export const App = () => {
                       commandExecuted = true;
                   }
                   break;
+              case 'GET_LYRICS':
+                  if (response.songTitle && response.songArtist) {
+                      executeLyricsFetch(response.songArtist, response.songTitle);
+                      commandExecuted = true;
+                  }
+                  break;
+               case 'SET_TIMER':
+                  if (response.timerDurationSeconds && response.timerDurationSeconds > 0) {
+                      executeSetTimer(response.timerDurationSeconds);
+                      commandExecuted = true;
+                  }
+                  break;
               case 'DEACTIVATE_LISTENING':
-                  stopAll();
+                  handleDisconnect();
                   commandExecuted = true;
+                  break;
+              case 'SEND_EMAIL':
+                  setEmailComposer({ stage: 'getEmail', recipient: '', subject: '', body: '' });
+                  commandExecuted = false;
                   break;
           }
 
-          if (!commandExecuted) { // Only for REPLY, SEND_EMAIL, or if other commands had no query
-              if (isContinuousListeningActiveRef.current) {
-                setIsAwake(false);
-                setAssistantState('listening');
-              } else {
-                setAssistantState('idle');
-              }
+          if (!commandExecuted && isConnectedRef.current) {
+              startRecognition();
+          } else if (!commandExecuted && !isConnectedRef.current) {
+              setAssistantState('idle');
           }
       };
       
-      speak(response.reply, settings.voice[settings.gender].main, onReplyEnd);
+      speak(response.reply, settings.voice[settings.gender].main, response.emotion, onReplyEnd);
       
   }, [
       chatHistory, settings.gender, settings.bias, settings.emotionTuning, 
-      settings.voice, speak,
-      addErrorMessageToChat, executeYoutubeSearch, executeWeatherFetch, executeNewsFetch, executeSingSong
+      settings.voice, speak, handleDisconnect, addErrorMessageToChat, 
+      executeYoutubeSearch, executeWeatherFetch, executeNewsFetch, executeSingSong, 
+      executeLyricsFetch, executeSetTimer, startRecognition
   ]);
   
-  const stopAll = useCallback(() => {
-    if (recognitionRef.current) {
-        recognitionRef.current.abort();
-    }
-    if (speechSourceRef.current) {
-        speechSourceRef.current.onended = null;
-        speechSourceRef.current.stop();
-        speechSourceRef.current = null;
-    }
-    isSpeakingRef.current = false;
-    setIsContinuousListeningActive(false);
-    setIsAwake(false);
-    setAssistantState('idle');
-    setCurrentTranscript('');
-  }, []);
-  
-const goToSleep = useCallback(() => {
-  setIsContinuousListeningActive(false);
-  setIsAwake(false);
-  if (recognitionRef.current) {
-      recognitionRef.current.abort();
-  }
-  setAssistantState('sleep');
-  if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-  setChatHistory(prev => [...prev, {id: Date.now(), sender: 'assistant', text: t('main.status.goingToSleep')}]);
-}, [t]);
-
-  const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    if (isContinuousListeningActiveRef.current) {
-        inactivityTimeoutRef.current = window.setTimeout(goToSleep, 3 * 60 * 1000); // 3 minutes
-    }
-  }, [goToSleep]);
-
   const handleConnect = useCallback(() => {
     if (isConnected) return;
     if (!hasInteracted) setHasInteracted(true);
@@ -1918,21 +2081,10 @@ const goToSleep = useCallback(() => {
     if (chatHistory.length === 0) {
       setChatHistory(prev => [...prev, greetingMessage]);
     }
-    speak(settings.greeting, settings.voice[settings.gender].greeting, () => {
-        if (settings.enableContinuousListening) {
-            setIsContinuousListeningActive(true);
-            startRecognition();
-            resetInactivityTimer();
-        } else {
-            setAssistantState('idle');
-        }
+    speak(settings.greeting, settings.voice[settings.gender].greeting, 'happy', () => {
+        startRecognition();
     });
-  }, [isConnected, hasInteracted, settings.connectionSoundUrl, settings.greeting, settings.voice, settings.gender, settings.enableContinuousListening, speak, chatHistory.length, startRecognition, resetInactivityTimer]);
-
-  const handleDisconnect = useCallback(() => {
-    stopAll();
-    setIsConnected(false);
-  }, [stopAll]);
+  }, [isConnected, hasInteracted, settings.connectionSoundUrl, settings.greeting, settings.voice, settings.gender, speak, chatHistory.length, startRecognition]);
   
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1948,23 +2100,21 @@ const goToSleep = useCallback(() => {
     recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
 
     recognition.onstart = () => {
-      if (!isSpeakingRef.current) {
-        setAssistantState('listening');
+      if (isSpeakingRef.current) {
+        speechSourcesRef.current.forEach(source => {
+          source.onended = null;
+          source.stop();
+        });
+        speechSourcesRef.current.clear();
+        isSpeakingRef.current = false;
       }
+      setAssistantState('listening');
     };
 
     recognition.onresult = (event: any) => {
-        if (isSpeakingRef.current) {
-            return;
-        }
+        if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+        setListeningHint(null);
         
-        const currentSettings = settingsRef.current;
-
-        if (currentSettings.enableContinuousListening) {
-          resetInactivityTimer();
-        }
-
-        noSpeechErrorCountRef.current = 0;
         let finalTranscript = '';
         let interimTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -1976,40 +2126,27 @@ const goToSleep = useCallback(() => {
             }
         }
         
+        setCurrentTranscript(interimTranscript);
+
         finalTranscript = finalTranscript.trim();
-        const currentText = (finalTranscript || interimTranscript).toLowerCase().trim();
-
-        if (currentSettings.enableContinuousListening && isContinuousListeningActiveRef.current) {
-            let wakeWord = '';
-            if (currentSettings.wakeWordMode === 'custom' && currentSettings.customWakeWord.trim()) {
-                wakeWord = currentSettings.customWakeWord.trim().toLowerCase();
-            } else {
-                wakeWord = currentSettings.gender === 'female' ? 'kaniska' : 'kanishk';
+        if (finalTranscript) {
+            if (isSpeakingRef.current) {
+                // Interruption detected!
+                stopCurrentAction();
+                // A small delay to allow state changes to propagate before processing the new command.
+                setTimeout(() => {
+                    if (emailComposerRef.current.stage !== 'idle') {
+                        handleEmailInput(finalTranscript);
+                    } else {
+                        handleCommand(finalTranscript);
+                    }
+                }, 50);
+                return;
             }
-            
-            const wakeWordWithHey = `hey ${wakeWord}`;
 
-            if (isAwake) {
-                setCurrentTranscript(interimTranscript);
-                if (finalTranscript) {
-                    if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
-                    const command = finalTranscript.toLowerCase().replace(wakeWordWithHey, '').replace(wakeWord, '').trim();
-                    if (command) handleCommand(command);
-                }
+            if (emailComposerRef.current.stage !== 'idle') {
+                handleEmailInput(finalTranscript);
             } else {
-                if (currentText.includes(wakeWordWithHey) || currentText.includes(wakeWord)) {
-                    setIsAwake(true);
-                    wakeAudioRef.current?.play().catch(e => console.error("Error playing wake sound:", e));
-                    if (awakeTimeoutRef.current) clearTimeout(awakeTimeoutRef.current);
-                    awakeTimeoutRef.current = window.setTimeout(() => setIsAwake(false), 15000); // Stays "awake" for 15s
-                    setCurrentTranscript('');
-                } else {
-                    setCurrentTranscript(interimTranscript);
-                }
-            }
-        } else { // Push-to-talk mode
-            setCurrentTranscript(interimTranscript);
-            if (finalTranscript) {
                 handleCommand(finalTranscript);
             }
         }
@@ -2019,19 +2156,24 @@ const goToSleep = useCallback(() => {
       if (event.error === 'aborted') return;
       console.error("Speech recognition error", event.error, event.message);
 
-      // Stop listening hint if it's active
+      if (isSpeakingRef.current) {
+        speechSourcesRef.current.forEach(source => {
+          source.onended = null;
+          source.stop();
+        });
+        speechSourcesRef.current.clear();
+        isSpeakingRef.current = false;
+      }
+      
       if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
       setListeningHint(null);
 
-      noSpeechErrorCountRef.current = 0; // Reset for most errors
-
       switch (event.error) {
         case 'no-speech':
-          noSpeechErrorCountRef.current += 1;
-          setListeningHint(t('main.noSpeechHint'));
-          hintTimeoutRef.current = window.setTimeout(() => setListeningHint(null), 2500);
-          // Don't set global error state for this, it's common.
-          break;
+            if (isConnectedRef.current) {
+                startRecognition();
+            }
+          return;
         case 'not-allowed':
         case 'service-not-allowed':
           addErrorMessageToChat(new Error(t('errors.micNotAllowed')));
@@ -2043,23 +2185,10 @@ const goToSleep = useCallback(() => {
           addErrorMessageToChat(new Error(t('errors.network')));
           break;
         default:
-          // For other errors, set the state to error.
           addErrorMessageToChat(new Error(t('errors.speechRecognitionGeneric')));
           setAssistantState('error');
           break;
       }
-    };
-
-    recognition.onend = () => {
-        if (isContinuousListeningActiveRef.current) {
-            setTimeout(() => {
-                if (isContinuousListeningActiveRef.current) {
-                   startRecognition();
-                }
-            }, 250);
-        } else if (assistantStateRef.current === 'listening') {
-            setAssistantState('idle');
-        }
     };
 
     return () => {
@@ -2068,46 +2197,30 @@ const goToSleep = useCallback(() => {
         recognitionRef.current.stop();
       }
     };
-  }, [lang, handleCommand, t, isAwake, resetInactivityTimer, addErrorMessageToChat, startRecognition]);
+  }, [lang, handleCommand, t, addErrorMessageToChat, startRecognition, handleEmailInput, stopCurrentAction]);
 
   const handleRecordButtonClick = () => {
-    if (settings.enableContinuousListening) {
-        if (isContinuousListeningActive) { // Is active, so turn off
-            setIsContinuousListeningActive(false);
-            setIsAwake(false);
-            stopRecognition();
-            setAssistantState('idle');
-            if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-        } else { // Is not active (idle, error, or sleep), so turn on
-            setIsContinuousListeningActive(true);
-            startRecognition();
-            resetInactivityTimer();
-        }
-    } else { // Push-to-talk
-        const isBusy = ['listening', 'thinking', 'speaking', 'singing'].includes(assistantState);
-        if (isBusy) {
-            stopAll();
-        } else {
-            startRecognition();
-        }
+    if (!isConnected) return;
+
+    if (assistantState === 'listening') {
+        recognitionRef.current?.stop();
+        setAssistantState('idle');
+    } else {
+        stopCurrentAction();
+        startRecognition();
     }
   };
 
   const getAssistantStatusText = () => {
     if (listeningHint) return <span className="state-text-animation text-yellow-400">{listeningHint}</span>;
-    
-    if (settings.enableContinuousListening && isContinuousListeningActive) {
-        let wakeWord = '';
-        if (settings.wakeWordMode === 'custom' && settings.customWakeWord.trim()) {
-            wakeWord = `Hey ${settings.customWakeWord.trim()}`;
-        } else {
-            wakeWord = settings.gender === 'female' ? "Hey Kaniska" : "Hey Kanishk";
-        }
 
-        if (isAwake) {
-            return <span className="listening-text-pulse">{currentTranscript || t('main.status.awake')}</span>
+    if (emailComposer.stage !== 'idle') {
+        switch (emailComposer.stage) {
+            case 'getEmail': return 'Listening for recipient\'s email...';
+            case 'getSubject': return 'Listening for the subject...';
+            case 'getBody': return 'Listening for the message...';
+            case 'confirmSend': return 'Listening for confirmation...';
         }
-        return <span className="state-text-animation">{currentTranscript || t('main.status.listeningForWakeWord', { wakeWord })}</span>
     }
 
     switch(assistantState) {
@@ -2116,7 +2229,6 @@ const goToSleep = useCallback(() => {
         case 'speaking': return t('main.status.speaking');
         case 'singing': return t('main.status.singing');
         case 'error': return <span className="text-red-400">{t('main.status.error')}</span>;
-        case 'sleep': return <span className="state-text-animation">{t('main.status.sleep')}</span>;
         default: return isConnected ? t('main.status.idle') : t('main.status.offline');
     }
   };
@@ -2130,16 +2242,53 @@ const goToSleep = useCallback(() => {
     setIsSettingsOpen(true);
   };
   
-  if (!currentUser) {
-      return <Auth onLogin={handleLogin} onSignUp={handleSignUp} />;
-  }
+  const renderSidePanelContent = () => {
+      if (youtubeVideoId) {
+        return (
+            <div className="p-2 flex flex-col h-full">
+                <div id="youtube-player" className="youtube-container flex-grow"></div>
+                <div className="flex-shrink-0 p-2 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-mono text-text-color-muted">
+                        <span>{formatTime(playerProgress.currentTime)}</span>
+                        <div className="w-full bg-border-color h-1 rounded">
+                            <div className="bg-primary-color h-1 rounded" style={{ width: `${playerProgress.duration > 0 ? (playerProgress.currentTime / playerProgress.duration) * 100 : 0}%` }}></div>
+                        </div>
+                        <span>{formatTime(playerProgress.duration)}</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-4">
+                        <button onClick={() => handleYoutubeControl('toggle')} className="youtube-control-button play-pause-btn p-3" disabled={playerState === null}>
+                            {playerState === window.YT?.PlayerState?.PLAYING ? <PauseIcon className="w-8 h-8"/> : <PlayIcon className="w-8 h-8"/>}
+                        </button>
+                        <button onClick={() => handleYoutubeControl('close')} className="youtube-control-button bg-red-500/20 text-red-400 hover:bg-red-500/30">
+                            <StopIcon/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+      }
+      if (weatherData) {
+          return <WeatherPanel data={weatherData} onClose={() => setWeatherData(null)} />;
+      }
+      if (timer) {
+          return <TimerPanel duration={timer.duration} remaining={timer.remaining} onClose={() => setTimer(null)} onFinish={onTimerFinish} />;
+      }
+      return (
+          <div ref={chatLogRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
+              <ChatLog history={chatHistory} onOpenSettings={openApiSettings} />
+          </div>
+      );
+  };
 
-  const isBusy = !settings.enableContinuousListening && ['listening', 'thinking', 'speaking', 'singing'].includes(assistantState);
+  const isBusy = ['listening', 'thinking', 'speaking', 'singing', 'composing', 'sad', 'celebrating', 'surprised'].includes(assistantState) || emailComposer.stage !== 'idle';
 
   return (
-    <div className="bg-bg-color text-text-color w-screen h-screen flex flex-col overflow-hidden">
+    <div className="bg-transparent text-text-color w-screen h-screen flex flex-col overflow-hidden">
       <header className="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
-        <h1 className="text-xl font-bold tracking-wider glowing-text">{t('appName')}</h1>
+        <div className="flex items-center gap-3">
+          <KaniskaLogo />
+          <h1 className="text-xl font-bold tracking-wider glowing-text">{t('appName')}</h1>
+        </div>
         <div className="flex items-center gap-2">
           <Clock />
            <button onClick={toggleTheme} className="footer-button" aria-label={t('header.toggleTheme')}>
@@ -2177,7 +2326,14 @@ const goToSleep = useCallback(() => {
 
       <main className="flex-grow flex min-h-0">
         <div className="flex-grow flex flex-col items-center justify-center p-4 relative">
-            <div className={`hologram-container ${assistantState === 'listening' || isAwake ? 'listening-hologram' : ''}`}>
+            <div className="hologram-container">
+                {assistantState === 'listening' && (
+                    <div className="listening-waveform">
+                        <div className="waveform-circle"></div>
+                        <div className="waveform-circle"></div>
+                        <div className="waveform-circle"></div>
+                    </div>
+                )}
                 {(assistantState === 'thinking' || assistantState === 'composing') && (
                     <div className="typing-indicator">
                         <div className="typing-dot"></div>
@@ -2186,9 +2342,9 @@ const goToSleep = useCallback(() => {
                     </div>
                 )}
                 <img 
-                    src={settings.avatarMap[isAwake ? 'listening' : assistantState] || PLACEHOLDER_AVATAR_URL} 
+                    src={settings.avatarMap[assistantState] || PLACEHOLDER_AVATAR_URL} 
                     alt="Kaniska Avatar" 
-                    className={`avatar expression-${assistantState} ${isAwake ? 'expression-awake' : ''}`}
+                    className={`avatar expression-${assistantState}`}
                 />
             </div>
           <p className="mt-6 text-lg text-text-color-muted h-8 text-center state-text-animation">
@@ -2196,33 +2352,8 @@ const goToSleep = useCallback(() => {
           </p>
         </div>
 
-        <aside className="w-[380px] flex-shrink-0 bg-panel-bg border-l border-border-color flex flex-col animate-panel-enter">
-          {youtubeVideoId ? (
-             <div className="p-2 flex flex-col h-full">
-                <div id="youtube-player" className="youtube-container flex-grow"></div>
-                <div className="flex-shrink-0 p-2 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-mono text-text-color-muted">
-                        <span>{formatTime(playerProgress.currentTime)}</span>
-                        <div className="w-full bg-border-color h-1 rounded">
-                            <div className="bg-primary-color h-1 rounded" style={{ width: `${playerProgress.duration > 0 ? (playerProgress.currentTime / playerProgress.duration) * 100 : 0}%` }}></div>
-                        </div>
-                        <span>{formatTime(playerProgress.duration)}</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-4">
-                        <button onClick={() => handleYoutubeControl('toggle')} className="youtube-control-button play-pause-btn p-3" disabled={playerState === null}>
-                            {playerState === window.YT?.PlayerState?.PLAYING ? <PauseIcon className="w-8 h-8"/> : <PlayIcon className="w-8 h-8"/>}
-                        </button>
-                        <button onClick={() => handleYoutubeControl('close')} className="youtube-control-button bg-red-500/20 text-red-400 hover:bg-red-500/30">
-                            <StopIcon/>
-                        </button>
-                    </div>
-                </div>
-            </div>
-          ) : (
-            <div ref={chatLogRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
-              <ChatLog history={chatHistory} onOpenSettings={openApiSettings} />
-            </div>
-          )}
+        <aside className="w-[380px] flex-shrink-0 bg-panel-bg border-l border-border-color flex flex-col animate-panel-enter relative">
+          {renderSidePanelContent()}
         </aside>
       </main>
       
@@ -2243,9 +2374,9 @@ const goToSleep = useCallback(() => {
                 onClick={handleRecordButtonClick}
                 disabled={!isConnected}
                 className="flex items-center justify-center w-16 h-16 rounded-full bg-primary-color text-bg-color font-bold text-lg hover:opacity-90 transition transform hover:scale-105 active:scale-100 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
-                aria-label={isBusy || isContinuousListeningActive ? t('footer.stop') : t('footer.record')}
+                aria-label={isBusy ? t('footer.stop') : t('footer.record')}
             >
-                {isBusy || isContinuousListeningActive ? <StopIcon className="w-8 h-8" /> : <MicrophoneIcon className="w-8 h-8" />}
+                {isBusy ? <StopIcon className="w-8 h-8" /> : <MicrophoneIcon className="w-8 h-8" />}
             </button>
         </div>
         
@@ -2261,12 +2392,8 @@ const goToSleep = useCallback(() => {
         settings={settings}
         onSettingChange={handleSettingChange}
         onTestVoice={handleTestVoice}
-        onLogout={handleLogout}
         initialTab={settingsInitialTab}
       />
-      <audio ref={ambientAudioRef} loop />
-      <audio ref={connectionAudioRef} />
-      <audio ref={wakeAudioRef} />
     </div>
   );
 };

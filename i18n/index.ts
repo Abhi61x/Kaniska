@@ -3,33 +3,6 @@ import React, { createContext, useContext, useState, useCallback, FC } from 'rea
 
 const en = {
   "appName": "Kaniska",
-  "auth": {
-    "loginMessage": "Please log in to continue",
-    "signupMessage": "Create an account to begin",
-    "login": "Login",
-    "signup": "Sign Up",
-    "identifierLabel": "Username, Email, or Phone",
-    "identifierPlaceholder": "Enter your identifier",
-    "passwordLabel": "Password",
-    "passwordPlaceholder": "Enter your password",
-    "signupNameLabel": "Name / Username",
-    "signupNamePlaceholder": "Choose a username",
-    "signupEmailLabel": "Email",
-    "signupEmailPlaceholder": "your@email.com",
-    "signupPhoneLabel": "Phone Number",
-    "signupPhonePlaceholder": "10-digit phone number",
-    "signupPasswordPlaceholder": "Create a strong password",
-    "toggleToSignup": "Don't have an account? Sign Up",
-    "toggleToLogin": "Already have an account? Login",
-    "error": {
-      "fillFields": "Please fill in all fields.",
-      "userNotFound": "No account found with that username, email, or phone number.",
-      "invalidPassword": "The password you entered is incorrect. Please try again.",
-      "emailExists": "An account with this email already exists.",
-      "usernameExists": "This username is already taken.",
-      "unexpected": "An unexpected error occurred."
-    }
-  },
   "header": {
     "settings": "Settings",
     "toggleTheme": "Toggle Theme"
@@ -42,11 +15,7 @@ const en = {
       "speaking": "Speaking...",
       "singing": "Singing...",
       "error": "An error occurred.",
-      "idle": "Idle",
-      "listeningForWakeWord": "Listening for '{{wakeWord}}'",
-      "awake": "Awake. Listening for command...",
-      "sleep": "Sleeping. Click the mic to wake me up.",
-      "goingToSleep": "Going to sleep due to inactivity. Click the microphone to wake me up."
+      "idle": "Idle"
     },
     "noSpeechHint": "I didn't hear anything."
   },
@@ -64,6 +33,9 @@ const en = {
     "sources": "Sources:",
     "goToApiSettings": "Go to API Key Settings"
   },
+  "timer": {
+    "title": "Timer"
+  },
   "settings": {
     "title": "Settings",
     "tabs": {
@@ -72,7 +44,6 @@ const en = {
       "voice": "Voice",
       "avatar": "Avatar",
       "apiKeys": "API Keys",
-      "account": "Account & Data",
       "help": "Help & Support"
     },
     "personaTab": {
@@ -85,18 +56,6 @@ const en = {
       "greeting": {
         "title": "Greeting Message",
         "description": "This is what the assistant says when you first connect."
-      },
-      "continuousListening": {
-        "title": "Continuous Listening",
-        "description": "Allow the assistant to listen continuously without needing to press the record button each time.",
-        "enable": "Enable Continuous Listening"
-      },
-       "wakeWord": {
-        "title": "Wake Word",
-        "description": "Set a custom phrase to activate the assistant in continuous listening mode.",
-        "default": "Default",
-        "custom": "Custom",
-        "placeholder": "Enter custom wake word"
       },
       "tuning": {
         "title": "Emotional Tuning",
@@ -130,6 +89,13 @@ const en = {
         "description": "Choose the assistant's gender, which affects its name and default greeting.",
         "female": "Female",
         "male": "Male"
+      },
+      "dataManagement": {
+        "title": "Data Management",
+        "clearHistory": {
+          "button": "Clear Conversation History",
+          "description": "This will permanently remove all conversation transcripts from this browser's local storage."
+        }
       }
     },
     "biasTab": {
@@ -161,6 +127,15 @@ const en = {
       },
       "mainVoiceLabel": "Main Voice",
       "greetingVoiceLabel": "Greeting Voice",
+      "singingTuning": {
+        "title": "Singing Emotion Tuning",
+        "description": "Fine-tune the emotional delivery for the assistant's singing voice."
+      },
+      "speed": {
+        "title": "General Voice Settings",
+        "description": "Adjust global voice properties like speaking speed.",
+        "label": "Speaking Rate"
+      },
       "test": "Test Voice",
       "save": "Save Voice Settings"
     },
@@ -178,30 +153,12 @@ const en = {
       },
       "optional": {
         "title": "Optional API Keys",
-        "description": "Provide API keys for additional features like weather and YouTube search. Your keys are saved locally to your account."
+        "description": "Provide API keys for additional features like weather and YouTube search. Your keys are saved locally to your browser."
       },
       "weatherKey": "Visual Crossing Weather Key",
       "newsKey": "GNews API Key",
       "youtubeKey": "Google Cloud API Key (for YouTube)",
-      "save": "Save All Keys"
-    },
-    "accountTab": {
-      "session": {
-        "title": "Session Information",
-        "description": "This is your unique identifier for this browser session."
-      },
-      "data": {
-        "title": "Data Management",
-        "description": "Manage your conversation history and other stored data."
-      },
-      "clearHistory": {
-        "button": "Clear Conversation History",
-        "description": "This will permanently remove all conversation transcripts from your account."
-      },
-      "logout": {
-        "button": "Log Out",
-        "description": "This will end your current session. Your data will be saved to your account."
-      }
+      "save": "Save & Validate Keys"
     },
     "helpTab": {
       "faqTitle": "Frequently Asked Questions",
@@ -217,7 +174,7 @@ const en = {
         "youtubeTitle": "Google Cloud API Key (for YouTube)",
         "youtubeSteps": "1. Go to the <1>Google Cloud Console</1>.\n2. Create a new project (or select an existing one).\n3. In the search bar, find and enable the \"YouTube Data API v3\".\n4. Go to \"APIs & Services\" > \"Credentials\".\n5. Click \"+ CREATE CREDENTIALS\" and select \"API key\".\n6. Your new API key will be displayed. Copy it.",
         "inputTitle": "Where do I input the keys?",
-        "inputSteps": "1. In this app, go to Settings ⚙️ > API Keys.\n2. Paste your copied key into the corresponding input field.\n3. Click the \"Save All Keys\" button."
+        "inputSteps": "1. In this app, go to Settings ⚙️ > API Keys.\n2. Paste your copied key into the corresponding input field.\n3. Click the \"Save & Validate Keys\" button."
       }
     },
     "common": {
@@ -230,40 +187,14 @@ const en = {
       "micNotAllowed": "Microphone access is not allowed. Please enable it in your browser settings to continue.",
       "micAudioCapture": "I can't hear you. Please check if your microphone is connected and working correctly.",
       "network": "A network error occurred with the speech service. Please check your internet connection.",
-      "speechRecognitionGeneric": "An unexpected error occurred with speech recognition."
+      "speechRecognitionGeneric": "An unexpected error occurred with speech recognition.",
+      "youtubePlayback": "I'm sorry, I couldn't play that video. It might be restricted from being played here. Please try another one."
     }
   }
 };
 
 const hi = {
   "appName": "कनिष्का",
-  "auth": {
-    "loginMessage": "जारी रखने के लिए कृपया लॉग इन करें",
-    "signupMessage": "शुरू करने के लिए एक खाता बनाएं",
-    "login": "लॉग इन करें",
-    "signup": "साइन अप करें",
-    "identifierLabel": "उपयोगकर्ता नाम, ईमेल, या फ़ोन",
-    "identifierPlaceholder": "अपना पहचानकर्ता दर्ज करें",
-    "passwordLabel": "पासवर्ड",
-    "passwordPlaceholder": "अपना पासवर्ड डालें",
-    "signupNameLabel": "नाम / उपयोगकर्ता नाम",
-    "signupNamePlaceholder": "एक उपयोगकर्ता नाम चुनें",
-    "signupEmailLabel": "ईमेल",
-    "signupEmailPlaceholder": "आपका@email.com",
-    "signupPhoneLabel": "फ़ोन नंबर",
-    "signupPhonePlaceholder": "10-अंकीय फ़ोन नंबर",
-    "signupPasswordPlaceholder": "एक मजबूत पासवर्ड बनाएं",
-    "toggleToSignup": "खाता नहीं है? साइन अप करें",
-    "toggleToLogin": "पहले से ही एक खाता है? लॉग इन करें",
-    "error": {
-      "fillFields": "कृपया सभी फ़ील्ड भरें।",
-      "userNotFound": "उस उपयोगकर्ता नाम, ईमेल या फ़ोन नंबर से कोई खाता नहीं मिला।",
-      "invalidPassword": "आपके द्वारा दर्ज किया गया पासवर्ड गलत है। कृपया पुनः प्रयास करें।",
-      "emailExists": "इस ईमेल से एक खाता पहले से मौजूद है।",
-      "usernameExists": "यह उपयोगकर्ता नाम पहले ही लिया जा चुका है।",
-      "unexpected": "एक अप्रत्याशित त्रुटि हुई।"
-    }
-  },
   "header": {
     "settings": "सेटिंग्स",
     "toggleTheme": "थीम टॉगल करें"
@@ -276,11 +207,7 @@ const hi = {
       "speaking": "बोल रही हूँ...",
       "singing": "गा रही हूँ...",
       "error": "एक त्रुटि हुई।",
-      "idle": "निष्क्रिय",
-      "listeningForWakeWord": "'{{wakeWord}}' के लिए सुन रही हूँ",
-      "awake": "जागृत। कमांड के लिए सुन रही हूँ...",
-      "sleep": "सो रही हूँ। मुझे जगाने के लिए माइक पर क्लिक करें।",
-      "goingToSleep": "निष्क्रियता के कारण सोने जा रही हूँ। मुझे जगाने के लिए माइक्रोफ़ोन पर क्लिक करें।"
+      "idle": "निष्क्रिय"
     },
     "noSpeechHint": "मैंने कुछ नहीं सुना।"
   },
@@ -298,6 +225,9 @@ const hi = {
     "sources": "स्रोत:",
     "goToApiSettings": "एपीआई कुंजी सेटिंग्स पर जाएं"
   },
+  "timer": {
+    "title": "टाइमर"
+  },
   "settings": {
     "title": "सेटिंग्स",
     "tabs": {
@@ -306,7 +236,6 @@ const hi = {
       "voice": "आवाज़",
       "avatar": "अवतार",
       "apiKeys": "एपीआई कुंजी",
-      "account": "खाता और डेटा",
       "help": "सहायता"
     },
     "personaTab": {
@@ -319,18 +248,6 @@ const hi = {
       "greeting": {
         "title": "अभिवादन संदेश",
         "description": "जब आप पहली बार कनेक्ट होते हैं तो सहायक यह कहता है।"
-      },
-       "continuousListening": {
-        "title": "सतत सुनना",
-        "description": "सहायक को हर बार रिकॉर्ड बटन दबाए बिना लगातार सुनने की अनुमति दें।",
-        "enable": "सतत सुनना सक्षम करें"
-      },
-      "wakeWord": {
-        "title": "वेक वर्ड",
-        "description": "सतत सुनने की मोड में सहायक को सक्रिय करने के लिए एक कस्टम वाक्यांश सेट करें।",
-        "default": "डिफ़ॉल्ट",
-        "custom": "कस्टम",
-        "placeholder": "कस्टम वेक वर्ड दर्ज करें"
       },
       "tuning": {
         "title": "भावनात्मक ट्यूनिंग",
@@ -364,6 +281,13 @@ const hi = {
         "description": "सहायक का लिंग चुनें, जो उसके नाम और डिफ़ॉल्ट अभिवादन को प्रभावित करता है।",
         "female": "महिला",
         "male": "पुरुष"
+      },
+      "dataManagement": {
+          "title": "डेटा प्रबंधन",
+          "clearHistory": {
+              "button": "बातचीत का इतिहास साफ़ करें",
+              "description": "यह इस ब्राउज़र के स्थानीय संग्रहण से सभी बातचीत के प्रतिलेखों को स्थायी रूप से हटा देगा।"
+          }
       }
     },
     "biasTab": {
@@ -395,6 +319,15 @@ const hi = {
       },
       "mainVoiceLabel": "मुख्य आवाज़",
       "greetingVoiceLabel": "अभिवादन की आवाज़",
+      "singingTuning": {
+        "title": "गायन भावना ट्यूनिंग",
+        "description": "सहायक की गायन आवाज के लिए भावनात्मक प्रस्तुति को ठीक करें।"
+      },
+      "speed": {
+        "title": "सामान्य आवाज़ सेटिंग्स",
+        "description": "बोलने की गति जैसे वैश्विक आवाज गुणों को समायोजित करें।",
+        "label": "बोलने की दर"
+      },
       "test": "आवाज़ का परीक्षण करें",
       "save": "आवाज़ सेटिंग्स सहेजें"
     },
@@ -412,30 +345,12 @@ const hi = {
       },
       "optional": {
         "title": "वैकल्पिक एपीआई कुंजी",
-        "description": "मौसम और यूट्यूब खोज जैसी अतिरिक्त सुविधाओं के लिए एपीआई कुंजी प्रदान करें। आपकी कुंजियाँ स्थानीय रूप से आपके खाते में सहेजी जाती हैं।"
+        "description": "मौसम और यूट्यूब खोज जैसी अतिरिक्त सुविधाओं के लिए एपीआई कुंजी प्रदान करें। आपकी कुंजियाँ स्थानीय रूप से आपके ब्राउज़र में सहेजी जाती हैं।"
       },
       "weatherKey": "विज़ुअल क्रॉसिंग वेदर कुंजी",
       "newsKey": "जीन्यूज एपीआई कुंजी",
       "youtubeKey": "गूगल क्लाउड एपीआई कुंजी (यूट्यूब के लिए)",
-      "save": "सभी कुंजियाँ सहेजें"
-    },
-    "accountTab": {
-      "session": {
-        "title": "सत्र की जानकारी",
-        "description": "यह इस ब्राउज़र सत्र के लिए आपका अद्वितीय पहचानकर्ता है।"
-      },
-      "data": {
-        "title": "डेटा प्रबंधन",
-        "description": "अपनी बातचीत के इतिहास और अन्य संग्रहीत डेटा को प्रबंधित करें।"
-      },
-      "clearHistory": {
-        "button": "बातचीत का इतिहास साफ़ करें",
-        "description": "यह आपके खाते से सभी बातचीत के प्रतिलेखों को स्थायी रूप से हटा देगा।"
-      },
-      "logout": {
-        "button": "लॉग आउट",
-        "description": "यह आपके वर्तमान सत्र को समाप्त कर देगा। आपका डेटा आपके खाते में सहेजा जाएगा।"
-      }
+      "save": "कुंजी सहेजें और मान्य करें"
     },
     "helpTab": {
       "faqTitle": "अक्सर पूछे जाने वाले प्रश्न",
@@ -451,7 +366,7 @@ const hi = {
         "youtubeTitle": "गूगल क्लाउड एपीआई कुंजी (यूट्यूब के लिए)",
         "youtubeSteps": "1. <1>गूगल क्लाउड कंसोल</1> पर जाएं।\n2. एक नया प्रोजेक्ट बनाएं (या किसी मौजूदा का चयन करें)।\n3. सर्च बार में, \"YouTube Data API v3\" ढूंढें और सक्षम करें।\n4. \"एपीआई और सेवाएं\" > \"क्रेडेंशियल\" पर जाएं।\n5. \"+ क्रेडेंशियल बनाएं\" पर क्लिक करें और \"एपीआई कुंजी\" चुनें।\n6. आपकी नई एपीआई कुंजी प्रदर्शित होगी। इसे कॉपी करें।",
         "inputTitle": "मैं कुंजियाँ कहाँ दर्ज करूँ?",
-        "inputSteps": "1. इस ऐप में, सेटिंग्स ⚙️ > एपीआई कुंजी पर जाएं।\n2. अपनी कॉपी की गई कुंजी को संबंधित इनपुट फ़ील्ड में पेस्ट करें।\n3. \"सभी कुंजियाँ सहेजें\" बटन पर क्लिक करें।"
+        "inputSteps": "1. इस ऐप में, सेटिंग्स ⚙️ > एपीआई कुंजी पर जाएं।\n2. अपनी कॉपी की गई कुंजी को संबंधित इनपुट फ़ील्ड में पेस्ट करें।\n3. \"कुंजी सहेजें और मान्य करें\" बटन पर क्लिक करें।"
       }
     },
     "common": {
@@ -464,7 +379,8 @@ const hi = {
       "micNotAllowed": "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। जारी रखने के लिए कृपया इसे अपनी ब्राउज़र सेटिंग्स में सक्षम करें।",
       "micAudioCapture": "मैं आपको सुन नहीं सकती। कृपया जांचें कि आपका माइक्रोफ़ोन जुड़ा हुआ है और ठीक से काम कर रहा है।",
       "network": "स्पीच सेवा में नेटवर्क त्रुटि हुई। कृपया अपना इंटरनेट कनेक्शन जांचें।",
-      "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई।"
+      "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई।",
+      "youtubePlayback": "मुझे खेद है, मैं वह वीडियो नहीं चला सकी। हो सकता है कि उसे यहां चलाने पर प्रतिबंध हो। कृपया कोई दूसरा प्रयास करें।"
     }
   }
 };
