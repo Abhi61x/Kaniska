@@ -26,6 +26,7 @@ const AvatarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" heig
 const ApiKeysIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16.5 7.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="m18.5 9.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="m14.5 11.5 2.5-2.5-2.5-2.5-2.5 2.5 2.5 2.5z"/><path d="M2 18v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><circle cx="8" cy="7" r="2"/></svg>;
 const HelpSupportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>;
 const SlidersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>;
+const StarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
 const ConnectIcon = ({ className = "w-6 h-6" }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M12 14q1.25 0 2.125-.875T15 11V5q0-1.25-.875-2.125T12 2q-1.25 0-2.125.875T9 5v6q0 1.25.875 2.125T12 14Zm-1 7v-3.05q-2.825-.2-4.913-2.288T4 11H6q0 2.5 1.75 4.25T12 17q2.5 0 4.25-1.75T18 11h2q0 2.825-2.088 4.913T13 18.05V21h-2Z"/></svg>;
 const DisconnectIcon = ({ className = "w-6 h-6" }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M13 3h-2v10h2V3ZM17.8 5.2 16.4 6.6C17.6 7.8 18.5 9.2 18.9 10.8H21.1C20.6 8.6 19.5 6.7 17.8 5.2ZM20 12H22C22 13.3 21.7 14.6 21.1 15.7C20.6 16.8 19.8 17.8 18.9 18.5L20.3 19.9C21.4 18.9 22.2 17.7 22.7 16.3C23.2 15 23.5 13.5 23.5 12C23.5 9.2 22.4 6.7 20.4 4.7C18.4 2.7 15.9 1.6 13.1 1.5V3.5C15.4 3.6 17.4 4.5 18.9 6.1L17.5 7.5C16.4 6.5 15.1 5.8 13.6 5.5C12.1 5.2 10.6 5.2 9.1 5.5C7.6 5.8 6.3 6.5 5.2 7.5L3.8 6.1C5.3 4.5 7.3 3.6 9.6 3.5V1.5C6.8 1.6 4.3 2.7 2.3 4.7C0.3 6.7 -0.8 9.2 0.2 12C1 14.2 2.2 16.1 3.9 17.5L5.3 16.1C4.3 15.1 3.6 13.8 3.3 12.3C3 10.8 3 9.3 3.3 7.8C3.6 6.3 4.3 5 5.3 3.9L6.7 5.3C5.5 6.5 4.6 7.9 4.2 9.5H6.4C6.8 8.4 7.5 7.4 8.4 6.6L9.8 8C9 8.7 8.4 9.5 8 10.4H11V12H8.9C8.9 12.1 8.9 12.2 8.9 12.3C8.9 13.4 9.2 14.4 9.7 15.3L11.1 13.9C10.7 13.3 10.5 12.6 10.5 11.8H13.5V13.8L11.8 15.5C12.7 15.8 13.6 16 14.5 16H15.5V18H14.5C13.4 18 12.3 17.8 11.2 17.3L15.4 21.5L16.8 20.1L5 8.3L3.6 6.9L2.1 5.4L18.7 22L20.1 20.6L17.8 18.2L16.4 16.8L13.5 13.9V12H15.5C15.5 11.2 15.3 10.5 14.9 9.9L16.3 8.5C16.8 9.4 17.1 10.4 17.1 11.5H18.9C18.9 11.3 18.9 11.1 18.9 10.9L19.5 11.5L20.9 10.1L20.2 9.4C20.6 8.3 20.7 7.1 20.5 6H18.4C18.3 6.4 18.2 6.7 18.1 7.1L16.7 5.7C17 5.5 17.3 5.4 17.6 5.3L16.2 3.9L17.6 2.5L19 3.9L17.8 5.1Z"/></svg>;
 const MicrophoneIcon = ({ className = "w-6 h-6" }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M12 14q-1.25 0-2.125-.875T9 11V5q0-1.25.875-2.125T12 2q1.25 0 2.125.875T15 5v6q0 1.25-.875-2.125T12 14Zm-1 7v-3.05q-2.825-.2-4.913-2.288T4 11H6q0 2.5 1.75 4.25T12 17q2.5 0 4.25-1.75T18 11h2q0 2.825-2.088 4.913T13 18.05V21h-2Z"/></svg>;
@@ -296,6 +297,7 @@ const SettingsModal = ({
         { id: 'voice', label: t('settings.tabs.voice'), icon: <VoiceIcon /> },
         { id: 'avatar', label: t('settings.tabs.avatar'), icon: <AvatarIcon /> },
         { id: 'apiKeys', label: t('settings.tabs.apiKeys'), icon: <ApiKeysIcon /> },
+        { id: 'subscription', label: t('settings.tabs.subscription'), icon: <StarIcon /> },
         { id: 'help', label: t('settings.tabs.help'), icon: <HelpSupportIcon /> },
     ];
 
@@ -310,6 +312,7 @@ const SettingsModal = ({
             case 'voice': return <VoiceContent settings={settings} onUpdate={onSettingChange} onTestVoice={onTestVoice} />;
             case 'avatar': return <AvatarContent settings={settings} onUpdate={handleUpdate} />;
             case 'apiKeys': return <ApiKeysContent settings={settings} onUpdate={handleUpdate} />;
+            case 'subscription': return <SubscriptionContent />;
             case 'help': return <HelpSupportContent />;
             default: return null;
         }
@@ -959,6 +962,38 @@ const ApiKeysContent = ({ settings, onUpdate }: {
                 </div>
                 <div className="mt-6 flex justify-end">
                     <button onClick={handleSave} className="quick-action-button save-button px-4">{t('settings.apiKeysTab.save')}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SubscriptionContent = () => {
+    const { t } = useTranslation();
+    return (
+        <div className="settings-section">
+            <div className="settings-card">
+                <div className="settings-section-header">
+                    <h3>{t('settings.subscriptionTab.title')}</h3>
+                    <p>{t('settings.subscriptionTab.description')}</p>
+                </div>
+                <div className="mt-6 bg-assistant-bubble-bg p-6 rounded-lg border border-border-color flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <p className="text-sm text-text-color-muted">{t('settings.subscriptionTab.currentPlan')}</p>
+                        <p className="text-xl font-semibold text-text-color">{t('settings.subscriptionTab.planName')}</p>
+                        <p className="text-lg font-bold text-primary-color mt-1">{t('settings.subscriptionTab.price')}</p>
+                    </div>
+                    <button className="quick-action-button save-button px-4 w-full sm:w-auto" disabled>
+                        {t('settings.subscriptionTab.manageButton')}
+                    </button>
+                </div>
+                <div className="mt-6">
+                    <h4 className="font-semibold text-text-color">{t('settings.subscriptionTab.featuresTitle')}</h4>
+                    <ul className="list-disc list-inside mt-2 space-y-2 text-text-color-muted">
+                        <li>{t('settings.subscriptionTab.feature1')}</li>
+                        <li>{t('settings.subscriptionTab.feature2')}</li>
+                        <li>{t('settings.subscriptionTab.feature3')}</li>
+                    </ul>
                 </div>
             </div>
         </div>

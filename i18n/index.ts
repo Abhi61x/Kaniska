@@ -44,6 +44,7 @@ const en = {
       "voice": "Voice",
       "avatar": "Avatar",
       "apiKeys": "API Keys",
+      "subscription": "Subscription",
       "help": "Help & Support"
     },
     "personaTab": {
@@ -160,6 +161,18 @@ const en = {
       "youtubeKey": "Google Cloud API Key (for YouTube)",
       "save": "Save & Validate Keys"
     },
+    "subscriptionTab": {
+      "title": "Subscription",
+      "description": "Manage your Kaniska Pro subscription.",
+      "currentPlan": "Current Plan",
+      "planName": "Kaniska Pro",
+      "price": "₹100 / month",
+      "manageButton": "Manage Subscription",
+      "featuresTitle": "Pro Features included:",
+      "feature1": "Higher priority access during peak times",
+      "feature2": "Access to advanced and experimental voice models",
+      "feature3": "Exclusive avatar packs and visual customizations"
+    },
     "helpTab": {
       "faqTitle": "Frequently Asked Questions",
       "contactTitle": "Contact Support",
@@ -236,6 +249,7 @@ const hi = {
       "voice": "आवाज़",
       "avatar": "अवतार",
       "apiKeys": "एपीआई कुंजी",
+      "subscription": "सदस्यता",
       "help": "सहायता"
     },
     "personaTab": {
@@ -351,6 +365,18 @@ const hi = {
       "newsKey": "जीन्यूज एपीआई कुंजी",
       "youtubeKey": "गूगल क्लाउड एपीआई कुंजी (यूट्यूब के लिए)",
       "save": "कुंजी सहेजें और मान्य करें"
+    },
+     "subscriptionTab": {
+      "title": "सदस्यता",
+      "description": "अपनी कनिष्का प्रो सदस्यता प्रबंधित करें।",
+      "currentPlan": "वर्तमान योजना",
+      "planName": "कनिष्का प्रो",
+      "price": "₹100 / महीना",
+      "manageButton": "सदस्यता प्रबंधित करें",
+      "featuresTitle": "प्रो सुविधाओं में शामिल हैं:",
+      "feature1": "व्यस्त समय के दौरान उच्च प्राथमिकता वाली पहुंच।",
+      "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच।",
+      "feature3": "विशेष अवतार पैक और दृश्य अनुकूलन।"
     },
     "helpTab": {
       "faqTitle": "अक्सर पूछे जाने वाले प्रश्न",
