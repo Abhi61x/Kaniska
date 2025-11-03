@@ -97,6 +97,11 @@ const en = {
           "button": "Clear Conversation History",
           "description": "This will permanently remove all conversation transcripts from this browser's local storage."
         }
+      },
+      "proFeature": {
+        "title": "Pro Feature",
+        "description": "Full persona customization is available with Kaniska Pro.",
+        "button": "Upgrade Now"
       }
     },
     "biasTab": {
@@ -167,7 +172,9 @@ const en = {
       "currentPlan": "Current Plan",
       "planName": "Kaniska Pro",
       "price": "₹100 / month",
-      "manageButton": "Manage Subscription",
+      "subscribeButton": "Subscribe Now",
+      "cancelButton": "Cancel Subscription",
+      "statusActive": "Active",
       "featuresTitle": "Pro Features included:",
       "feature1": "Higher priority access during peak times",
       "feature2": "Access to advanced and experimental voice models",
@@ -192,6 +199,7 @@ const en = {
     },
     "common": {
       "save": "Save",
+      "saved": "Saved!",
       "copy": "Copy",
       "copied": "Copied!",
       "retry": "Retry"
@@ -302,6 +310,11 @@ const hi = {
               "button": "बातचीत का इतिहास साफ़ करें",
               "description": "यह इस ब्राउज़र के स्थानीय संग्रहण से सभी बातचीत के प्रतिलेखों को स्थायी रूप से हटा देगा।"
           }
+      },
+      "proFeature": {
+        "title": "प्रो फ़ीचर",
+        "description": "पूर्ण व्यक्तित्व अनुकूलन कनिष्का प्रो के साथ उपलब्ध है।",
+        "button": "अभी अपग्रेड करें"
       }
     },
     "biasTab": {
@@ -372,7 +385,9 @@ const hi = {
       "currentPlan": "वर्तमान योजना",
       "planName": "कनिष्का प्रो",
       "price": "₹100 / महीना",
-      "manageButton": "सदस्यता प्रबंधित करें",
+      "subscribeButton": "अभी सदस्यता लें",
+      "cancelButton": "सदस्यता रद्द करें",
+      "statusActive": "सक्रिय",
       "featuresTitle": "प्रो सुविधाओं में शामिल हैं:",
       "feature1": "व्यस्त समय के दौरान उच्च प्राथमिकता वाली पहुंच।",
       "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच।",
@@ -397,6 +412,7 @@ const hi = {
     },
     "common": {
       "save": "सहेजें",
+      "saved": "सहेजा गया!",
       "copy": "कॉपी करें",
       "copied": "कॉपी किया गया!",
       "retry": "पुनः प्रयास करें"

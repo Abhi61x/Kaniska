@@ -114,14 +114,6 @@ HOW TO DECIDE THE JSON VALUES:
 - IMPORTANT: You have access to Google Search for any questions about general topics you don't know. Formulate your 'reply' based on the findings in your own words. Do NOT use it for weather or news queries; use the GET_WEATHER or GET_NEWS commands for those.
 `;
 
-const getSystemPrompt = (gender: Gender) => {
-    const name = gender === 'female' ? 'Kaniska' : 'Kanishk';
-    return DEFAULT_SYSTEM_PROMPT
-        .replace(/{{name}}/g, name)
-        .replace(/{{gender}}/g, gender);
-};
-
-
 const PLACEHOLDER_AVATAR_URL = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2' fill='%2330363d'/%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E`;
 
 const DEFAULT_AVATAR_MAP: Record<AssistantState, string> = {
@@ -179,6 +171,7 @@ const defaultSettings = {
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     gender: 'female' as Gender,
     theme: getInitialTheme(),
+    isSubscribed: false,
     avatarMap: DEFAULT_AVATAR_MAP,
     bias: 'balanced',
     voice: {
@@ -307,12 +300,12 @@ const SettingsModal = ({
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'persona': return <PersonaContent settings={settings} onUpdate={onSettingChange} />;
+            case 'persona': return <PersonaContent settings={settings} onUpdate={onSettingChange} setActiveTab={setActiveTab} />;
             case 'bias': return <BiasContent settings={settings} onUpdate={handleUpdate} />;
             case 'voice': return <VoiceContent settings={settings} onUpdate={onSettingChange} onTestVoice={onTestVoice} />;
             case 'avatar': return <AvatarContent settings={settings} onUpdate={handleUpdate} />;
             case 'apiKeys': return <ApiKeysContent settings={settings} onUpdate={handleUpdate} />;
-            case 'subscription': return <SubscriptionContent />;
+            case 'subscription': return <SubscriptionContent settings={settings} onSettingChange={onSettingChange} />;
             case 'help': return <HelpSupportContent />;
             default: return null;
         }
@@ -343,15 +336,20 @@ const SettingsModal = ({
     );
 };
 
-const PersonaContent = ({ settings, onUpdate }: { 
+const PersonaContent = ({ settings, onUpdate, setActiveTab }: { 
     settings: typeof defaultSettings;
     onUpdate: (updates: Partial<typeof defaultSettings & { clearHistory?: boolean }>) => void;
+    setActiveTab: React.Dispatch<React.SetStateAction<string>>;
 }) => {
     const { t } = useTranslation();
     const [greetingInput, setGreetingInput] = useState(settings.greeting);
     const [systemPromptInput, setSystemPromptInput] = useState(settings.systemPrompt);
+    const [greetingSaved, setGreetingSaved] = useState(false);
+    const [promptSaved, setPromptSaved] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const testAudioRef = useRef<HTMLAudioElement>(null);
+
+    const { isSubscribed } = settings;
 
     useEffect(() => {
         setGreetingInput(settings.greeting);
@@ -360,6 +358,18 @@ const PersonaContent = ({ settings, onUpdate }: {
     useEffect(() => {
         setSystemPromptInput(settings.systemPrompt);
     }, [settings.systemPrompt]);
+    
+    const handleGreetingSave = () => {
+        onUpdate({ greeting: greetingInput });
+        setGreetingSaved(true);
+        setTimeout(() => setGreetingSaved(false), 2000);
+    };
+
+    const handlePromptSave = () => {
+        onUpdate({ systemPrompt: systemPromptInput });
+        setPromptSaved(true);
+        setTimeout(() => setPromptSaved(false), 2000);
+    };
 
     const emotionTuning = settings.emotionTuning || defaultSettings.emotionTuning;
 
@@ -384,7 +394,13 @@ const PersonaContent = ({ settings, onUpdate }: {
         const newGreeting = gender === 'female' 
             ? "Hello, I am Kaniska. How can I assist you today?"
             : "Hello, I am Kanishk. How may I help you?";
-        onUpdate({ gender, greeting: newGreeting });
+        
+        const name = gender === 'female' ? 'Kaniska' : 'Kanishk';
+        const newSystemPrompt = DEFAULT_SYSTEM_PROMPT
+            .replace(/{{name}}/g, name)
+            .replace(/{{gender}}/g, gender);
+
+        onUpdate({ gender, greeting: newGreeting, systemPrompt: newSystemPrompt });
     };
     
     const handleSliderUpdate = (key: keyof typeof emotionTuning, value: string) => {
@@ -398,170 +414,201 @@ const PersonaContent = ({ settings, onUpdate }: {
 
     return (
         <div className="settings-section">
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.appearance.title')}</h3>
-                    <p>{t('settings.personaTab.appearance.description')}</p>
+            {!isSubscribed && (
+                <div className="settings-card border-primary-color/50 bg-primary-color/10 flex items-center justify-between gap-4">
+                    <div>
+                        <h4 className="font-semibold text-primary-color">{t('settings.personaTab.proFeature.title')}</h4>
+                        <p className="text-sm text-text-color-muted mt-1">{t('settings.personaTab.proFeature.description')}</p>
+                    </div>
+                    <button onClick={() => setActiveTab('subscription')} className="quick-action-button save-button px-4 flex-shrink-0">{t('settings.personaTab.proFeature.button')}</button>
                 </div>
-                <div className="mt-4 flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="theme"
-                            value="light"
-                            checked={settings.theme === 'light'}
-                            onChange={() => onUpdate({ theme: 'light' })}
-                            className="h-4 w-4 shrink-0 accent-primary-color"
-                        />
-                        <span>{t('settings.personaTab.appearance.light')}</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="theme"
-                            value="dark"
-                            checked={settings.theme === 'dark'}
-                            onChange={() => onUpdate({ theme: 'dark' })}
-                            className="h-4 w-4 shrink-0 accent-primary-color"
-                        />
-                        <span>{t('settings.personaTab.appearance.dark')}</span>
-                    </label>
-                </div>
-            </div>
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.gender.title')}</h3>
-                    <p>{t('settings.personaTab.gender.description')}</p>
-                </div>
-                <div className="mt-4 flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="gender"
-                            value="female"
-                            checked={settings.gender === 'female'}
-                            onChange={() => handleGenderChange('female')}
-                             className="h-4 w-4 shrink-0 accent-primary-color"
-                        />
-                        <span>{t('settings.personaTab.gender.female')} (Kaniska)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="radio"
-                            name="gender"
-                            value="male"
-                            checked={settings.gender === 'male'}
-                            onChange={() => handleGenderChange('male')}
-                            className="h-4 w-4 shrink-0 accent-primary-color"
-                        />
-                        <span>{t('settings.personaTab.gender.male')} (Kanishk)</span>
-                    </label>
-                </div>
-            </div>
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.greeting.title')}</h3>
-                    <p>{t('settings.personaTab.greeting.description')}</p>
-                </div>
-                <div className="mt-4 flex items-center gap-3">
-                    <input
-                        type="text"
-                        value={greetingInput}
-                        onChange={e => setGreetingInput(e.target.value)}
-                        className="flex-grow p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition text-text-color"
-                    />
-                    <button onClick={() => onUpdate({ greeting: greetingInput })} className="quick-action-button save-button px-4">{t('settings.common.save')}</button>
-                </div>
-            </div>
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.tuning.title')}</h3>
-                    <p>{t('settings.personaTab.tuning.description')}</p>
-                </div>
-                <div className="mt-4 space-y-4">
-                    {Object.keys(emotionTuning).map(key => (
-                        <div key={key}>
-                            <label htmlFor={`${key}-slider`} className="text-sm text-text-color-muted block mb-1 flex justify-between capitalize">
-                                <span>{t(`settings.personaTab.tuning.${key}`)}</span>
-                                <span>{emotionTuning[key as keyof typeof emotionTuning]}%</span>
-                            </label>
+            )}
+
+            <fieldset disabled={!isSubscribed} className="space-y-6 disabled:opacity-60">
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.appearance.title')}</h3>
+                        <p>{t('settings.personaTab.appearance.description')}</p>
+                    </div>
+                    <div className="mt-4 flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
                             <input
-                                id={`${key}-slider`}
-                                type="range" min="0" max="100" step="1"
-                                value={emotionTuning[key as keyof typeof emotionTuning]}
-                                onChange={e => handleSliderUpdate(key as keyof typeof emotionTuning, e.target.value)}
-                                className="w-full mt-1"
+                                type="radio"
+                                name="theme"
+                                value="light"
+                                checked={settings.theme === 'light'}
+                                onChange={() => onUpdate({ theme: 'light' })}
+                                className="h-4 w-4 shrink-0 accent-primary-color"
                             />
-                        </div>
-                    ))}
+                            <span>{t('settings.personaTab.appearance.light')}</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="theme"
+                                value="dark"
+                                checked={settings.theme === 'dark'}
+                                onChange={() => onUpdate({ theme: 'dark' })}
+                                className="h-4 w-4 shrink-0 accent-primary-color"
+                            />
+                            <span>{t('settings.personaTab.appearance.dark')}</span>
+                        </label>
+                    </div>
                 </div>
-            </div>
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.ambient.title')}</h3>
-                    <p>{t('settings.personaTab.ambient.description')}</p>
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.gender.title')}</h3>
+                        <p>{t('settings.personaTab.gender.description')}</p>
+                    </div>
+                    <div className="mt-4 flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="gender"
+                                value="female"
+                                checked={settings.gender === 'female'}
+                                onChange={() => handleGenderChange('female')}
+                                 className="h-4 w-4 shrink-0 accent-primary-color"
+                            />
+                            <span>{t('settings.personaTab.gender.female')} (Kaniska)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="gender"
+                                value="male"
+                                checked={settings.gender === 'male'}
+                                onChange={() => handleGenderChange('male')}
+                                className="h-4 w-4 shrink-0 accent-primary-color"
+                            />
+                            <span>{t('settings.personaTab.gender.male')} (Kanishk)</span>
+                        </label>
+                    </div>
                 </div>
-                <div className="mt-4">
-                    <label htmlFor="ambient-volume-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
-                        <span>{t('settings.personaTab.ambient.volume')}</span>
-                        <span>{Math.round(settings.ambientVolume * 100)}%</span>
-                    </label>
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.greeting.title')}</h3>
+                        <p>{t('settings.personaTab.greeting.description')}</p>
+                    </div>
+                    <div className="mt-4 flex items-center gap-3">
+                        <input
+                            type="text"
+                            value={greetingInput}
+                            onChange={e => setGreetingInput(e.target.value)}
+                            className="flex-grow p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition text-text-color"
+                        />
+                        <button onClick={handleGreetingSave} className="quick-action-button save-button px-4 w-28 flex items-center justify-center gap-2">
+                            {greetingSaved ? (
+                                <>
+                                    <CheckIcon />
+                                    <span>{t('settings.common.saved')}</span>
+                                </>
+                            ) : (
+                                <span>{t('settings.common.save')}</span>
+                            )}
+                        </button>
+                    </div>
+                </div>
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.tuning.title')}</h3>
+                        <p>{t('settings.personaTab.tuning.description')}</p>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                        {Object.keys(emotionTuning).map(key => (
+                            <div key={key}>
+                                <label htmlFor={`${key}-slider`} className="text-sm text-text-color-muted block mb-1 flex justify-between capitalize">
+                                    <span>{t(`settings.personaTab.tuning.${key}`)}</span>
+                                    <span>{emotionTuning[key as keyof typeof emotionTuning]}%</span>
+                                </label>
+                                <input
+                                    id={`${key}-slider`}
+                                    type="range" min="0" max="100" step="1"
+                                    value={emotionTuning[key as keyof typeof emotionTuning]}
+                                    onChange={e => handleSliderUpdate(key as keyof typeof emotionTuning, e.target.value)}
+                                    className="w-full mt-1"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.ambient.title')}</h3>
+                        <p>{t('settings.personaTab.ambient.description')}</p>
+                    </div>
+                    <div className="mt-4">
+                        <label htmlFor="ambient-volume-slider" className="text-sm text-text-color-muted block mb-1 flex justify-between">
+                            <span>{t('settings.personaTab.ambient.volume')}</span>
+                            <span>{Math.round(settings.ambientVolume * 100)}%</span>
+                        </label>
+                        <input
+                            id="ambient-volume-slider"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={settings.ambientVolume}
+                            onChange={e => onUpdate({ ambientVolume: parseFloat(e.target.value) })}
+                            className="w-full mt-1"
+                        />
+                    </div>
+                </div>
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.connectionSound.title')}</h3>
+                        <p>{t('settings.personaTab.connectionSound.description')}</p>
+                    </div>
                     <input
-                        id="ambient-volume-slider"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={settings.ambientVolume}
-                        onChange={e => onUpdate({ ambientVolume: parseFloat(e.target.value) })}
-                        className="w-full mt-1"
+                        type="file"
+                        ref={audioInputRef}
+                        onChange={handleAudioUpload}
+                        accept="audio/*"
+                        className="hidden"
                     />
+                    <div className="mt-4 flex items-center gap-3">
+                        <button onClick={() => audioInputRef.current?.click()} className="quick-action-button">
+                            {t('settings.personaTab.connectionSound.upload')}
+                        </button>
+                        {settings.connectionSoundUrl && (
+                            <>
+                                <audio ref={testAudioRef} src={settings.connectionSoundUrl} preload="auto" className="hidden" />
+                                <button onClick={playTestSound} className="quick-action-button !p-2" title={t('settings.personaTab.connectionSound.test')}>
+                                    <PlayIcon className="w-5 h-5" />
+                                </button>
+                                <button onClick={() => onUpdate({ connectionSoundUrl: null })} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30">
+                                    {t('settings.personaTab.connectionSound.remove')}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
-            </div>
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.connectionSound.title')}</h3>
-                    <p>{t('settings.personaTab.connectionSound.description')}</p>
+                <div className="settings-card">
+                    <div className="settings-section-header">
+                        <h3>{t('settings.personaTab.systemPrompt.title')}</h3>
+                        <p>{t('settings.personaTab.systemPrompt.description')}</p>
+                    </div>
+                    <textarea
+                        value={systemPromptInput}
+                        onChange={e => setSystemPromptInput(e.target.value)}
+                        rows={10}
+                        className="w-full mt-4 p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition font-mono text-xs text-text-color"
+                    />
+                    <div className="mt-3 flex justify-end">
+                        <button onClick={handlePromptSave} className="quick-action-button save-button px-4 w-36 flex items-center justify-center gap-2">
+                            {promptSaved ? (
+                                <>
+                                    <CheckIcon />
+                                    <span>{t('settings.common.saved')}</span>
+                                </>
+                            ) : (
+                                <span>{t('settings.personaTab.systemPrompt.save')}</span>
+                            )}
+                        </button>
+                    </div>
                 </div>
-                <input
-                    type="file"
-                    ref={audioInputRef}
-                    onChange={handleAudioUpload}
-                    accept="audio/*"
-                    className="hidden"
-                />
-                <div className="mt-4 flex items-center gap-3">
-                    <button onClick={() => audioInputRef.current?.click()} className="quick-action-button">
-                        {t('settings.personaTab.connectionSound.upload')}
-                    </button>
-                    {settings.connectionSoundUrl && (
-                        <>
-                            <audio ref={testAudioRef} src={settings.connectionSoundUrl} preload="auto" className="hidden" />
-                            <button onClick={playTestSound} className="quick-action-button !p-2" title={t('settings.personaTab.connectionSound.test')}>
-                                <PlayIcon className="w-5 h-5" />
-                            </button>
-                            <button onClick={() => onUpdate({ connectionSoundUrl: null })} className="quick-action-button bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30">
-                                {t('settings.personaTab.connectionSound.remove')}
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
-            <div className="settings-card">
-                <div className="settings-section-header">
-                    <h3>{t('settings.personaTab.systemPrompt.title')}</h3>
-                    <p>{t('settings.personaTab.systemPrompt.description')}</p>
-                </div>
-                <textarea
-                    value={systemPromptInput}
-                    onChange={e => setSystemPromptInput(e.target.value)}
-                    rows={10}
-                    className="w-full mt-4 p-2 rounded bg-assistant-bubble-bg border border-border-color focus:ring-1 focus:ring-primary-color focus:border-primary-color transition font-mono text-xs text-text-color"
-                />
-                <div className="mt-3 flex justify-end">
-                    <button onClick={() => onUpdate({ systemPrompt: systemPromptInput })} className="quick-action-button save-button px-4">{t('settings.personaTab.systemPrompt.save')}</button>
-                </div>
-            </div>
+            </fieldset>
+
             <div className="settings-card border-yellow-500/50">
                 <div className="settings-section-header">
                     <h3 className="text-yellow-400">{t('settings.personaTab.dataManagement.title')}</h3>
@@ -968,8 +1015,17 @@ const ApiKeysContent = ({ settings, onUpdate }: {
     );
 };
 
-const SubscriptionContent = () => {
+const SubscriptionContent = ({ settings, onSettingChange }: {
+    settings: typeof defaultSettings;
+    onSettingChange: (newSettings: Partial<typeof defaultSettings>) => void;
+}) => {
     const { t } = useTranslation();
+    const { isSubscribed } = settings;
+    
+    const handleSubscription = () => {
+        onSettingChange({ isSubscribed: !isSubscribed });
+    };
+
     return (
         <div className="settings-section">
             <div className="settings-card">
@@ -980,11 +1036,25 @@ const SubscriptionContent = () => {
                 <div className="mt-6 bg-assistant-bubble-bg p-6 rounded-lg border border-border-color flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                         <p className="text-sm text-text-color-muted">{t('settings.subscriptionTab.currentPlan')}</p>
-                        <p className="text-xl font-semibold text-text-color">{t('settings.subscriptionTab.planName')}</p>
+                        <p className="text-xl font-semibold text-text-color flex items-center gap-2">
+                            <span>{t('settings.subscriptionTab.planName')}</span>
+                            {isSubscribed && (
+                                <span className="text-xs font-semibold bg-green-500/20 text-green-300 px-2 py-1 rounded-full">
+                                    {t('settings.subscriptionTab.statusActive')}
+                                </span>
+                            )}
+                        </p>
                         <p className="text-lg font-bold text-primary-color mt-1">{t('settings.subscriptionTab.price')}</p>
                     </div>
-                    <button className="quick-action-button save-button px-4 w-full sm:w-auto" disabled>
-                        {t('settings.subscriptionTab.manageButton')}
+                    <button 
+                        onClick={handleSubscription} 
+                        className={`quick-action-button px-4 w-full sm:w-auto ${
+                            isSubscribed 
+                                ? 'bg-red-500/20 border-red-500/80 text-red-400 hover:bg-red-500/30' 
+                                : 'save-button'
+                        }`}
+                    >
+                        {isSubscribed ? t('settings.subscriptionTab.cancelButton') : t('settings.subscriptionTab.subscribeButton')}
                     </button>
                 </div>
                 <div className="mt-6">
@@ -2023,7 +2093,10 @@ export const App = () => {
       const updatedHistory = [...chatHistory, userMessage];
       setChatHistory(updatedHistory);
 
-      const systemInstruction = getSystemPrompt(settings.gender);
+      const name = settings.gender === 'female' ? 'Kaniska' : 'Kanishk';
+      const systemInstruction = settings.systemPrompt
+          .replace(/{{name}}/g, name)
+          .replace(/{{gender}}/g, settings.gender);
       
       let response;
       try {
@@ -2095,7 +2168,7 @@ export const App = () => {
       speak(response.reply, settings.voice[settings.gender].main, response.emotion, onReplyEnd);
       
   }, [
-      chatHistory, settings.gender, settings.bias, settings.emotionTuning, 
+      chatHistory, settings.gender, settings.bias, settings.emotionTuning, settings.systemPrompt,
       settings.voice, speak, handleDisconnect, addErrorMessageToChat, 
       executeYoutubeSearch, executeWeatherFetch, executeNewsFetch, executeSingSong, 
       executeLyricsFetch, executeSetTimer, startRecognition
