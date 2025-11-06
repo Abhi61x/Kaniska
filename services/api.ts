@@ -85,9 +85,9 @@ Your 'emotion' value in the JSON output must reflect this adaptive process.
         return {
             command: parsed.command,
             reply: parsed.reply,
-            youtubeQuery: parsed.youtubeQuery,
+            youtubeQuery: parsed.youtubeQuery || '',
             newsQuery: parsed.newsQuery || '',
-            location: parsed.location,
+            location: parsed.location || '',
             imagePrompt: parsed.imagePrompt || '',
             emotion: validatedEmotion,
             sources,

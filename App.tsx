@@ -1877,7 +1877,7 @@ export const App = () => {
     speak(text, config, emotion);
   };
   
-  const handleYoutubeControl = (action: string) => {
+  const handleYoutubeControl = useCallback((action: string) => {
     if (!playerRef.current) return;
     switch(action) {
         case 'toggle':
@@ -1893,14 +1893,14 @@ export const App = () => {
             if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
             break;
     }
-  };
+  }, [playerState]);
 
-  const onPlayerReady = (event: any) => {
+  const onPlayerReady = useCallback((event: any) => {
     playerRef.current = event.target;
     playerRef.current.setVolume(50);
-  };
+  }, []);
   
-  const onPlayerStateChange = (event: any) => {
+  const onPlayerStateChange = useCallback((event: any) => {
     setPlayerState(event.data);
     if (event.data === window.YT.PlayerState.PLAYING) {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -1913,7 +1913,7 @@ export const App = () => {
     } else {
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     }
-  };
+  }, []);
 
   const onPlayerError = useCallback((event: any) => {
       console.error("YouTube Player Error:", event.data);
@@ -1925,7 +1925,7 @@ export const App = () => {
               startRecognition();
           }
       });
-  }, [t, speak, settings.voice, settings.gender, startRecognition]);
+  }, [t, speak, settings.voice, settings.gender, startRecognition, handleYoutubeControl]);
 
   useEffect(() => {
     if (youtubeVideoId && isYTReady) {
@@ -1942,7 +1942,7 @@ export const App = () => {
             }
         });
     }
-  }, [youtubeVideoId, isYTReady, onPlayerError]);
+  }, [youtubeVideoId, isYTReady, onPlayerReady, onPlayerStateChange, onPlayerError]);
   
   const formatTime = (seconds: number) => {
     const min = Math.floor(seconds / 60);

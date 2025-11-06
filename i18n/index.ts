@@ -504,14 +504,5 @@ export const useTranslation = (): TranslationContextType => {
 
 export const availableLanguages: { code: Language; name: string; bcp47: string; }[] = [
     { code: 'en', name: 'English (India)', bcp47: 'en-IN' },
-    { code: 'en_us', name: 'English (US)', bcp47: 'en-US' },
-    { code: 'en_gb', name: 'English (UK)', bcp47: 'en-GB' },
     { code: 'hi', name: 'हिंदी (Hindi)', bcp47: 'hi-IN' },
-    { code: 'es', name: 'Español', bcp47: 'es-ES' },
-    { code: 'fr', name: 'Français', bcp47: 'fr-FR' },
-    { code: 'de', name: 'Deutsch', bcp47: 'de-DE' },
-    { code: 'ja', name: '日本語', bcp47: 'ja-JP' },
-    { code: 'ru', name: 'Русский', bcp47: 'ru-RU' },
-    { code: 'pt', name: 'Português (BR)', bcp47: 'pt-BR' },
-    { code: 'zh', name: '中文 (Mandarin)', bcp47: 'zh-CN' },
 ];
