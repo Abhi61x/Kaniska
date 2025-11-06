@@ -76,7 +76,7 @@ Your 'emotion' value in the JSON output must reflect this adaptive process.
         const cleanJsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
         const parsed = JSON.parse(cleanJsonText);
 
-        if (typeof parsed.command !== 'string' || typeof parsed.reply !== 'string' || typeof parsed.youtubeQuery !== 'string' || typeof parsed.location !== 'string' || typeof parsed.emotion !== 'string' || typeof parsed.newsQuery !== 'string') {
+        if (typeof parsed.command !== 'string' || typeof parsed.reply !== 'string' || typeof parsed.youtubeQuery !== 'string' || typeof parsed.location !== 'string' || typeof parsed.emotion !== 'string' || typeof parsed.newsQuery !== 'string' || typeof parsed.imagePrompt !== 'string') {
             throw new Error('Invalid JSON structure from Gemini');
         }
 
@@ -88,6 +88,7 @@ Your 'emotion' value in the JSON output must reflect this adaptive process.
             youtubeQuery: parsed.youtubeQuery,
             newsQuery: parsed.newsQuery || '',
             location: parsed.location,
+            imagePrompt: parsed.imagePrompt || '',
             emotion: validatedEmotion,
             sources,
             songTitle: parsed.songTitle || '',
@@ -107,6 +108,7 @@ Your 'emotion' value in the JSON output must reflect this adaptive process.
             youtubeQuery: '',
             newsQuery: '',
             location: '',
+            imagePrompt: '',
             emotion: 'neutral',
             sources,
         };
@@ -132,6 +134,64 @@ Your 'emotion' value in the JSON output must reflect this adaptive process.
   }
 }
 
+export async function processCodeCommand(
+    code: string,
+    language: string,
+    instruction: string
+): Promise<{ newCode: string; explanation: string; }> {
+    const systemInstruction = `You are an expert coding assistant. Your task is to modify the provided code based on the user's instruction.
+Return ONLY a valid JSON object with the following structure:
+{
+  "newCode": "The full, updated code as a single string. Do not use markdown.",
+  "explanation": "A brief, conversational explanation of the changes you made. This will be spoken to the user."
+}
+
+If the user's instruction is to debug, find and fix any errors in the code. If the user asks to write new code, the "current code" might be empty.
+Do not add any comments to the code unless specifically asked to.
+The user's instruction is: "${instruction}".
+The programming language is: "${language}".`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro', // Use a more powerful model for coding
+            contents: [{ role: 'user', parts: [{ text: `Current code:\n\`\`\`${language}\n${code}\n\`\`\`` }] }],
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        newCode: { type: Type.STRING, description: 'The full, updated code.' },
+                        explanation: { type: Type.STRING, description: 'An explanation of the changes.' },
+                    },
+                    required: ['newCode', 'explanation'],
+                },
+                temperature: 0.1, // Be precise for coding
+            },
+        });
+        
+        const jsonText = response.text.trim();
+        const parsed = JSON.parse(jsonText);
+
+        if (typeof parsed.newCode !== 'string' || typeof parsed.explanation !== 'string') {
+            throw new Error('Invalid JSON structure from Gemini for code command');
+        }
+
+        return {
+            newCode: parsed.newCode,
+            explanation: parsed.explanation,
+        };
+
+    } catch (apiError: any) {
+        console.error("Error processing code command with Gemini:", apiError);
+        const errorMessage = (apiError.message || apiError.toString() || '').toLowerCase();
+        if (errorMessage.includes('api key not valid')) {
+            throw new MainApiKeyError("I can't process this code because the main Gemini API key is invalid.");
+        }
+        throw new Error("I had trouble processing that code instruction. Please try again.");
+    }
+}
+
 export async function fetchWeatherSummary(location: string, apiKey: string): Promise<WeatherData> {
     if (!apiKey) {
       throw new ApiKeyError("To enable weather forecasts, please go to Settings > API Keys and enter your Visual Crossing API key.");
@@ -141,176 +201,128 @@ export async function fetchWeatherSummary(location: string, apiKey: string): Pro
     const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodedLocation}?unitGroup=metric&key=${apiKey}&contentType=json`;
 
     try {
-      const weatherResponse = await fetch(url);
-      if (!weatherResponse.ok) {
-        const errorText = await weatherResponse.text();
-        // Log detailed error for debugging
-        console.error("Visual Crossing API Error:", { 
-            status: weatherResponse.status, 
-            responseText: errorText,
-            location: location 
-        });
-        if (weatherResponse.status === 401 || errorText.toLowerCase().includes("api key")) {
-            throw new ApiKeyError("The weather API key seems to be invalid. Please check it in Settings > API Keys.");
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorText = await response.text();
+            if (response.status === 401 || errorText.toLowerCase().includes('invalid api key')) {
+                throw new ApiKeyError("The Visual Crossing API key is invalid. Please check it in Settings > API Keys.");
+            }
+            throw new Error(`Weather service returned status ${response.status}: ${errorText}`);
         }
-        if (errorText.includes('Bad data') || errorText.includes('find location')) {
-             throw new Error(`I couldn't find any weather data for "${location}". Please try another location.`);
+        const data = await response.json();
+        
+        if (!data.currentConditions) {
+            throw new Error("Invalid weather data structure received.");
         }
-        // More user-friendly generic error
-        throw new Error("I'm sorry, the weather service seems to be unavailable right now. Please try again in a little while.");
-      }
-      
-      const weatherData = await weatherResponse.json();
 
-      const current = weatherData.currentConditions;
-      const today = weatherData.days[0];
-
-      const simplifiedData = {
-        resolvedAddress: weatherData.resolvedAddress,
-        current: {
-          temp: current.temp,
-          feelslike: current.feelslike,
-          conditions: current.conditions,
-          windspeed: current.windspeed,
-          humidity: current.humidity,
-        },
-        today: {
-          description: today.description,
-          tempmax: today.tempmax,
-          tempmin: today.tempmin,
-          precipprob: today.precipprob,
+        return {
+            summary: data.description || 'No summary available.',
+            location: data.resolvedAddress || location,
+            temp: Math.round(data.currentConditions.temp),
+            conditions: data.currentConditions.conditions,
+            icon: data.currentConditions.icon,
+        };
+    } catch (error: any) {
+        if (error instanceof ApiKeyError) {
+            throw error;
         }
-      };
+        console.error("Error fetching weather data:", error);
+        throw new Error("I'm having trouble fetching the weather forecast right now. Please try again later.");
+    }
+}
 
-      const summaryPrompt = `You are a friendly, conversational weather reporter. Summarize the following JSON weather data for a user.
-      - Keep it concise and natural, like a real person talking (2-3 sentences max).
-      - Start by confirming the location from 'resolvedAddress'.
-      - Mention the current temperature ('temp') and what it feels like ('feelslike').
-      - Briefly describe the current conditions.
-      - Give a simple forecast for the day, mentioning the high ('tempmax'), low ('tempmin'), and chance of rain ('precipprob').
+// FIX: Added missing functions that were used in App.tsx but not defined.
+export async function validateWeatherKey(apiKey: string): Promise<{ success: boolean; message: string }> {
+    if (!apiKey) {
+        return { success: true, message: "No key provided. Weather will be disabled." };
+    }
+    const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/London?unitGroup=metric&key=${apiKey}&contentType=json`;
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            return { success: true, message: "Weather key is valid." };
+        }
+        return { success: false, message: "Invalid API key." };
+    } catch (e) {
+        return { success: false, message: "Network error during validation." };
+    }
+}
 
-      Weather Data:
-      ${JSON.stringify(simplifiedData, null, 2)}`;
-      
-      const summaryResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: summaryPrompt,
-          config: { temperature: 0.6 }
-      });
-      
-      return {
-          summary: summaryResponse.text.trim(),
-          location: weatherData.resolvedAddress,
-          temp: Math.round(current.temp),
-          conditions: current.conditions,
-          icon: current.icon
-      };
+export async function validateNewsKey(apiKey: string): Promise<{ success: boolean; message: string }> {
+    if (!apiKey) {
+        return { success: true, message: "No key provided. News will be disabled." };
+    }
+    const url = `https://gnews.io/api/v4/search?q=example&lang=en&max=1&apikey=${apiKey}`;
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            return { success: true, message: "News key is valid." };
+        }
+        const data = await response.json();
+        return { success: false, message: data.errors?.[0] || "Invalid API key." };
+    } catch (e) {
+        return { success: false, message: "Network error during validation." };
+    }
+}
 
-    } catch (error) {
-      // Log the original, detailed error for debugging.
-      console.error("Error fetching or processing weather data:", error);
-      
-      // If it's one of our specific, user-friendly errors, pass it along.
-      if (error instanceof ApiKeyError || (error instanceof Error && (error.message.startsWith("I couldn't") || error.message.startsWith("I'm sorry")))) {
-        throw error;
-      }
-
-      // For everything else (network errors, etc.), throw a generic user-friendly error.
-      throw new Error("I had trouble fetching the weather. Please check your internet connection and try again.");
+export async function validateYouTubeKey(apiKey: string): Promise<{ success: boolean; message: string }> {
+    if (!apiKey) {
+        return { success: true, message: "No key provided. YouTube search will be disabled." };
+    }
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=music&maxResults=1&key=${apiKey}`;
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            return { success: true, message: "YouTube key is valid." };
+        }
+        const data = await response.json();
+        return { success: false, message: data.error?.message || "Invalid API key." };
+    } catch (e) {
+        return { success: false, message: "Network error during validation." };
     }
 }
 
 export async function fetchNews(apiKey: string, query: string): Promise<string> {
     if (!apiKey) {
-        throw new ApiKeyError("I'm sorry, the news service isn't configured. Please add a GNews API key in Settings > API Keys to fetch news.");
+        throw new ApiKeyError("To get news updates, please go to Settings > API Keys and enter your GNews API key.");
     }
-
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://gnews.io/api/v4/search?q=${encodedQuery}&lang=en&max=5&token=${apiKey}`;
-
+    const url = `https://gnews.io/api/v4/search?q=${encodedQuery}&lang=en&max=5&apikey=${apiKey}`;
     try {
-        const newsResponse = await fetch(url);
-        if (!newsResponse.ok) {
-            const errorData = await newsResponse.json();
-            // Log detailed error for debugging
-            console.error("GNews API Error:", { 
-                status: newsResponse.status, 
-                responseData: errorData,
-                query: query
-            });
-            if (newsResponse.status === 401 || newsResponse.status === 403) {
-                throw new ApiKeyError("The GNews API key appears to be invalid. Please go to Settings > API Keys to update it.");
-            }
-            throw new Error("I couldn't fetch the news right now. The news service might be temporarily unavailable.");
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error("Could not fetch news from the service.");
         }
-        const newsData = await newsResponse.json();
-        if (!newsData.articles || newsData.articles.length === 0) {
+        const data = await response.json();
+        if (!data.articles || data.articles.length === 0) {
             return `I couldn't find any recent news articles about "${query}".`;
         }
-
-        const summaryPrompt = `You are a news anchor. Summarize the following news articles into a concise, 2-3 sentence brief. Mention the most important headlines.
-
-        Articles JSON:
-        ${JSON.stringify(newsData.articles, null, 2)}`;
-
-        const summaryResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: summaryPrompt,
-            config: { temperature: 0.5 }
-        });
-        
-        return summaryResponse.text.trim();
-
+        const summary = data.articles.map((article: any, index: number) => 
+            `${index + 1}. ${article.title}`
+        ).join('\n');
+        return `Here are the top headlines about "${query}":\n${summary}`;
     } catch (error) {
-        // Log the original, detailed error for debugging.
-        console.error("Error fetching or processing news:", error);
-
-        // If it's one of our specific, user-friendly errors, pass it along.
-        if (error instanceof ApiKeyError || (error instanceof Error && error.message.startsWith("I couldn't"))) {
-          throw error;
-        }
-        
-        // For everything else (network errors, etc.), throw a generic user-friendly error.
-        throw new Error("I had trouble fetching the news. Please check your internet connection and try again.");
+        console.error("Error fetching news:", error);
+        throw new Error("I'm having trouble fetching the news right now.");
     }
 }
 
-
 export async function searchYouTube(apiKey: string, query: string): Promise<string | null> {
     if (!apiKey) {
-        throw new ApiKeyError("I'm sorry, YouTube search isn't configured. You'll need to add a Google Cloud API key in Settings > API Keys.");
+        throw new ApiKeyError("To search YouTube, please go to Settings > API Keys and enter your Google Cloud API key.");
     }
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodedQuery}&type=video&maxResults=1&key=${apiKey}`;
-
     try {
-        const ytResponse = await fetch(url);
-        if (!ytResponse.ok) {
-            const errorData = await ytResponse.json();
-            // Log detailed error for debugging
-            console.error("YouTube API Error:", { 
-                responseData: errorData,
-                query: query
-            });
-            const errorMessage = errorData?.error?.message || '';
-            if (ytResponse.status === 400 && errorMessage.toLowerCase().includes('api key not valid')) {
-                throw new ApiKeyError("The Google Cloud API key for YouTube is invalid. Please correct it in Settings > API Keys.");
-            }
-            throw new Error("I couldn't search YouTube at the moment. The service may be temporarily unavailable.");
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error("Could not search YouTube at the moment.");
         }
-        const ytData = await ytResponse.json();
-        return ytData.items?.[0]?.id?.videoId || null;
+        const data = await response.json();
+        return data.items?.[0]?.id?.videoId || null;
     } catch (error) {
-        // Log the original, detailed error for debugging.
         console.error("Error searching YouTube:", error);
-
-        // If it's one of our specific, user-friendly errors, pass it along.
-        if (error instanceof ApiKeyError || (error instanceof Error && (error.message.startsWith("I couldn't") || error.message.startsWith("I'm sorry")))) {
-          throw error;
-        }
-
-        // For everything else (network errors, etc.), throw a generic user-friendly error.
-        throw new Error("I had trouble searching YouTube. Please check your internet connection and try again.");
+        throw new Error("I'm having trouble with YouTube search right now.");
     }
 }
 
@@ -318,197 +330,78 @@ export async function generateSpeech(text: string, voiceName: string): Promise<s
     try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: text }] }],
+            contents: [{ parts: [{ text }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: voiceName || 'Kore' },
+                        prebuiltVoiceConfig: { voiceName: voiceName },
                     },
                 },
             },
         });
-        
-        if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-            console.warn('Speech generation blocked for safety reasons.', { text });
-            throw new Error("I'm unable to say that due to safety guidelines.");
-        }
-
-        let base64Audio: string | undefined;
-        const parts = response.candidates?.[0]?.content?.parts;
-        if (parts) {
-            for (const part of parts) {
-                if (part.inlineData?.data) {
-                    base64Audio = part.inlineData.data;
-                    break;
-                }
-            }
-        }
-
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (!base64Audio) {
-            console.warn('API response for TTS did not contain audio data.', { response });
-            throw new Error("API did not return audio data.");
+            throw new Error("No audio data received from TTS API.");
         }
         return base64Audio;
     } catch (error) {
-        console.error("Error generating speech with Gemini API:", error);
-        if (error instanceof Error && (error.message.includes("safety") || error.message.includes("API did not return"))) {
-            throw error; // Re-throw our specific errors
-        }
-        throw new Error("I'm having trouble with my voice right now. The speech generation service may be down. Please try again in a moment.");
+        console.error("Error generating speech:", error);
+        throw new Error("I'm having trouble with my voice right now. The text-to-speech service might be down.");
     }
 }
 
 export async function fetchLyrics(artist: string, title: string): Promise<string | null> {
-    const artistEnc = encodeURIComponent(artist.trim());
-    const titleEnc = encodeURIComponent(title.trim());
-    const url = `https://api.lyrics.ovh/v1/${artistEnc}/${titleEnc}`;
     try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            if (response.status === 404) {
-                 // Not an error, just no lyrics found.
-                 return null;
+        const prompt = `Please provide the full lyrics for the song "${title}" by ${artist}. Only return the lyrics text, with no extra commentary or formatting.`;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                temperature: 0.1,
             }
-            // Other server errors.
-            throw new Error(`Lyrics service returned status: ${response.status}`);
-        }
-        const data = await response.json();
-        
-        // The API can return an empty 'lyrics' field, which we treat as not found.
-        if (!data.lyrics || data.lyrics.trim() === '') {
+        });
+
+        const responseText = response.text.trim();
+        if (responseText.toLowerCase().includes("i'm sorry") || responseText.toLowerCase().includes("i cannot provide") || responseText.length < 20) {
             return null;
         }
 
-        // Clean up lyrics: remove RCR line and extra newlines
-        return data.lyrics
-            ? data.lyrics.replace(/Paroles de la chanson.*\r\n/, '').trim() 
-            : null;
+        return responseText;
     } catch (error) {
-        console.error("Error fetching lyrics:", error);
-        
-        // Re-throw with a more user-friendly message for network/service errors.
-        throw new Error("I'm having trouble connecting to the lyrics service. Please check your connection and try again.");
+        console.error(`Error fetching lyrics for ${title}:`, error);
+        return null;
     }
 }
 
-export async function generateSong(
-    lyrics: string, 
-    voiceName: string,
-    singingTuning: { happiness: number; sadness: number; excitement: number; }
-): Promise<string> {
+export async function generateSong(lyrics: string, voiceName: string, tuning: { happiness: number; sadness: number; excitement: number; }): Promise<string> {
+    let emotionalPrompt = "sing the following lyrics";
+    if (tuning.excitement > 70) emotionalPrompt = "energetically sing the following lyrics";
+    else if (tuning.happiness > 70) emotionalPrompt = "cheerfully sing the following lyrics";
+    else if (tuning.sadness > 70) emotionalPrompt = "sadly sing the following lyrics";
+
+    const fullPrompt = `${emotionalPrompt}:\n\n${lyrics}`;
+    
     try {
-        const { happiness, sadness, excitement } = singingTuning;
-        let emotionalDescriptor = "a balanced and neutral emotional tone";
-
-        // Prioritize strong emotions
-        if (sadness > 70 && sadness >= happiness && sadness >= excitement) {
-            emotionalDescriptor = "a deeply sad and melancholic tone";
-        } else if (excitement > 70 && excitement >= happiness) {
-            emotionalDescriptor = "an energetic and excited tone";
-        } else if (happiness > 70) {
-            emotionalDescriptor = "a joyful and very happy tone";
-        } else if (sadness > 50) {
-            emotionalDescriptor = "a somber and emotional tone";
-        } else if (excitement > 50) {
-            emotionalDescriptor = "an enthusiastic and upbeat tone";
-        } else if (happiness > 50) {
-            emotionalDescriptor = "a cheerful tone";
-        }
-
-        const instructionalText = `Your task is to sing the following lyrics. You MUST sing them with melody, rhythm, and genuine emotion. DO NOT speak, recite, or read them flatly.
-
-For this performance, adopt ${emotionalDescriptor}. Your singing should have variations in pitch and dynamics to convey this feeling. This is a song, not a speech.
-
-- Do not add any spoken intro or outro.
-- Sing only the provided lyrics.
-
-Lyrics to sing:
-${lyrics}`;
-
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: instructionalText }] }],
+            contents: [{ parts: [{ text: fullPrompt }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: voiceName || 'Kore' },
+                        prebuiltVoiceConfig: { voiceName: voiceName },
                     },
                 },
             },
         });
-
-        if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-            console.warn('Song generation blocked for safety reasons.', { lyrics });
-            throw new Error("I'm unable to sing that due to safety guidelines.");
-        }
-
-        let base64Audio: string | undefined;
-        const parts = response.candidates?.[0]?.content?.parts;
-        if (parts) {
-            for (const part of parts) {
-                if (part.inlineData?.data) {
-                    base64Audio = part.inlineData.data;
-                    break;
-                }
-            }
-        }
-
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (!base64Audio) {
-            throw new Error("API did not return audio data for the song.");
+            throw new Error("No audio data received from TTS API for singing.");
         }
         return base64Audio;
     } catch (error) {
-        console.error("Error generating song with Gemini API:", error);
-        if (error instanceof Error && error.message.includes("safety")) {
-            throw error;
-        }
-        throw new Error("I'm having trouble singing right now. My vocal synthesizer might be down.");
-    }
-}
-
-// --- API Key Validation Functions ---
-
-export async function validateWeatherKey(apiKey: string): Promise<{ success: boolean; message: string }> {
-    if (!apiKey) return { success: false, message: 'API key is missing.' };
-    const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/new%20york?unitGroup=metric&key=${apiKey}&contentType=json&include=current`;
-    try {
-        const response = await fetch(url);
-        if (response.ok) return { success: true, message: 'Valid key.' };
-        if (response.status === 401) return { success: false, message: 'Invalid API Key.' };
-        return { success: false, message: `API returned status ${response.status}.` };
-    } catch (error) {
-        return { success: false, message: 'Network error during validation.' };
-    }
-}
-
-export async function validateNewsKey(apiKey: string): Promise<{ success: boolean; message: string }> {
-    if (!apiKey) return { success: false, message: 'API key is missing.' };
-    const url = `https://gnews.io/api/v4/search?q=test&lang=en&max=1&token=${apiKey}`;
-    try {
-        const response = await fetch(url);
-        if (response.ok) return { success: true, message: 'Valid key.' };
-        if (response.status === 401 || response.status === 403) return { success: false, message: 'Invalid API Key.' };
-        return { success: false, message: `API returned status ${response.status}.` };
-    } catch (error) {
-        return { success: false, message: 'Network error during validation.' };
-    }
-}
-
-export async function validateYouTubeKey(apiKey: string): Promise<{ success: boolean; message: string }> {
-    if (!apiKey) return { success: false, message: 'API key is missing.' };
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key=${apiKey}`;
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        if (response.ok) return { success: true, message: 'Valid key.' };
-        const errorMessage = data?.error?.message || `API returned status ${response.status}.`;
-        if (response.status === 400 && errorMessage.toLowerCase().includes('api key not valid')) {
-             return { success: false, message: 'Invalid API Key.' };
-        }
-        return { success: false, message: 'Validation failed.' };
-    } catch (error) {
-        return { success: false, message: 'Network error during validation.' };
+        console.error("Error generating song:", error);
+        throw new Error("I'm having trouble with my singing voice right now. The service might be unavailable.");
     }
 }

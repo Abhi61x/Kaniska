@@ -1,6 +1,5 @@
 
 
-
 export type AssistantState =
   | 'idle'
   | 'listening'
@@ -12,7 +11,8 @@ export type AssistantState =
   | 'singing'
   | 'sad'
   | 'celebrating'
-  | 'surprised';
+  | 'surprised'
+  | 'coding';
 
 export interface Source {
   uri: string;
@@ -32,12 +32,13 @@ export interface ChatMessage {
 export type Emotion = 'neutral' | 'happy' | 'sad' | 'excited' | 'empathetic' | 'singing' | 'formal' | 'chirpy' | 'surprised' | 'curious' | 'thoughtful' | 'joking';
 
 export interface GeminiResponse {
-  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG' | 'GET_LYRICS' | 'DEACTIVATE_LISTENING' | 'SET_TIMER' | 'RANDOM_FACT';
+  command: 'REPLY' | 'YOUTUBE_SEARCH' | 'GET_WEATHER' | 'GET_NEWS' | 'SEND_EMAIL' | 'SING_SONG' | 'GET_LYRICS' | 'DEACTIVATE_LISTENING' | 'SET_TIMER' | 'RANDOM_FACT' | 'OPEN_CODE_EDITOR';
   reply: string;
   // FIX: youtubeQuery is always present as per the system prompt (can be an empty string).
   youtubeQuery: string;
   newsQuery: string;
   location: string;
+  imagePrompt: string;
   emotion: Emotion;
   sources: Source[];
   songTitle?: string;

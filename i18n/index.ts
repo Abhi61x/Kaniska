@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, FC } from 'react';
 
 const en = {
@@ -17,7 +16,8 @@ const en = {
       "error": "An error occurred.",
       "idle": "Idle"
     },
-    "noSpeechHint": "I didn't hear anything."
+    "noSpeechHint": "I didn't hear anything.",
+    "lowConfidenceHint": "I'm not sure I got that. Could you repeat?"
   },
   "footer": {
     "connect": "Connect",
@@ -230,7 +230,8 @@ const hi = {
       "error": "एक त्रुटि हुई।",
       "idle": "निष्क्रिय"
     },
-    "noSpeechHint": "मैंने कुछ नहीं सुना।"
+    "noSpeechHint": "मैंने कुछ नहीं सुना।",
+    "lowConfidenceHint": "मुझे ठीक से समझ नहीं आया। क्या आप दोहरा सकते हैं?"
   },
   "footer": {
     "connect": "कनेक्ट",
@@ -427,7 +428,17 @@ const hi = {
   }
 };
 
-const translationsData = { en, hi };
+const es = {};
+const fr = {};
+const de = {};
+const ja = {};
+const ru = {};
+const pt = {};
+const zh = {};
+const en_us = {};
+const en_gb = {};
+
+const translationsData = { en, hi, es, fr, de, ja, ru, pt, zh, en_us, en_gb };
 
 type Language = keyof typeof translationsData;
 
@@ -443,7 +454,6 @@ const getNested = (obj: any, path: string): string | undefined => {
   return path.split('.').reduce((o, key) => (o && o[key] !== undefined ? o[key] : undefined), obj);
 };
 
-// FIX: Changed to React.FC to make the component type explicit for the JSX transpiler.
 export const TranslationProvider: FC<{children: React.ReactNode}> = ({ children }) => {
   const [lang, setLangState] = useState<Language>((localStorage.getItem('kaniska-lang') as Language) || 'en');
 
@@ -456,15 +466,24 @@ export const TranslationProvider: FC<{children: React.ReactNode}> = ({ children 
 
   const t = useCallback((key: string, params?: { [key: string]: string }): string => {
     let translation = getNested(translationsData[lang], key) || getNested(translationsData['en'], key) || key;
+
+    // If the resolved translation is an object (because the key points to a whole section),
+    // it cannot be rendered by React. Fallback to rendering the key itself to prevent a crash.
+    if (typeof translation === 'object' && translation !== null) {
+      console.warn(`Translation for key "${key}" is an object, not a string. Falling back to the key.`);
+      return key;
+    }
+
     if (params) {
         Object.keys(params).forEach(paramKey => {
-            translation = translation.replace(`{{${paramKey}}}`, params[paramKey]);
+            // Coerce to string just in case.
+            translation = String(translation).replace(`{{${paramKey}}}`, params[paramKey]);
         });
     }
-    return translation;
+    // Coerce to string at the end as a final safety measure.
+    return String(translation);
   }, [lang]);
 
-  // FIX: Replaced JSX with React.createElement to be valid in a .ts file.
   return React.createElement(TranslationContext.Provider, { value: { lang, setLang, t } }, children);
 };
 
@@ -476,7 +495,16 @@ export const useTranslation = (): TranslationContextType => {
   return context;
 };
 
-export const availableLanguages: { code: Language; name: string }[] = [
-    { code: 'en', name: 'English' },
-    { code: 'hi', name: 'हिंदी' }
+export const availableLanguages: { code: Language; name: string; bcp47: string; }[] = [
+    { code: 'en', name: 'English (India)', bcp47: 'en-IN' },
+    { code: 'en_us', name: 'English (US)', bcp47: 'en-US' },
+    { code: 'en_gb', name: 'English (UK)', bcp47: 'en-GB' },
+    { code: 'hi', name: 'हिंदी (Hindi)', bcp47: 'hi-IN' },
+    { code: 'es', name: 'Español', bcp47: 'es-ES' },
+    { code: 'fr', name: 'Français', bcp47: 'fr-FR' },
+    { code: 'de', name: 'Deutsch', bcp47: 'de-DE' },
+    { code: 'ja', name: '日本語', bcp47: 'ja-JP' },
+    { code: 'ru', name: 'Русский', bcp47: 'ru-RU' },
+    { code: 'pt', name: 'Português (BR)', bcp47: 'pt-BR' },
+    { code: 'zh', name: '中文 (Mandarin)', bcp47: 'zh-CN' },
 ];

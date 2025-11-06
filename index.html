@@ -4,7 +4,10 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
     "react/": "https://aistudiocdn.com/react@^18.2.0/",
-    "react": "https://aistudiocdn.com/react@^18.2.0"
+    "react": "https://aistudiocdn.com/react@^18.2.0",
+    "react-simple-code-editor": "https://aistudiocdn.com/react-simple-code-editor@^0.13.1",
+    "prismjs": "https://aistudiocdn.com/prismjs@^1.29.0",
+    "prismjs/": "https://aistudiocdn.com/prismjs@^1.29.0/"
   }
 }
 </script>
@@ -18,6 +21,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+    <link href="https://aistudiocdn.com/prismjs@^1.29.0/themes/prism-tomorrow.css" rel="stylesheet" />
     <style>
       :root {
         --bg-color: #0d1117;
@@ -244,7 +248,7 @@
         50%  { transform: scale(1.015); opacity: 1; filter: drop-shadow(0 0 30px var(--primary-color)); border-color: rgba(34, 211, 238, 0.8); }
         100% { transform: scale(1); opacity: 0.9; filter: drop-shadow(0 0 18px var(--primary-color)); border-color: rgba(34, 211, 238, 0.5); }
       }
-      .avatar.expression-listening {
+      .avatar.expression-listening, .avatar.expression-coding {
         animation: listen-glow 3s infinite ease-in-out;
       }
 
@@ -776,12 +780,90 @@
       .spinner {
         animation: spin 1s linear infinite;
       }
+      
+      /* --- Code Editor Panel --- */
+      .code-editor-container {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          background-color: var(--bg-color);
+      }
+      .editor-controls-pane {
+          flex-shrink: 0;
+          padding: 8px;
+          border-bottom: 1px solid var(--border-color);
+          background-color: var(--bg-color);
+          display: flex;
+          align-items: center;
+          gap: 12px;
+      }
+      .editor-main-pane {
+          flex-grow: 1;
+          display: flex;
+          min-height: 0; /* Important for flex child scrolling */
+      }
+      .editor-pane {
+          flex: 1;
+          position: relative;
+          overflow: auto;
+          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+          font-size: 14px;
+          line-height: 1.5;
+      }
+      /* Style for react-simple-code-editor */
+      .editor-pane ._container {
+        height: 100%;
+      }
+      .editor-pane pre {
+          padding: 16px !important;
+          height: 100%;
+      }
+      .editor-pane textarea, .editor-pane pre {
+          outline: none !important;
+      }
+
+      .preview-pane {
+          flex: 1;
+          border-left: 1px solid var(--border-color);
+          background-color: #fff; /* Preview area should be white */
+      }
+      .preview-pane iframe {
+          width: 100%;
+          height: 100%;
+          border: none;
+      }
+      .editor-control-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 8px;
+          border: 1px solid var(--border-color);
+          border-radius: 6px;
+      }
+      .editor-language-select {
+          background-color: transparent;
+          border: none;
+          color: var(--text-color);
+          font-weight: 500;
+          padding: 4px;
+          border-radius: 4px;
+      }
+      .editor-language-select:focus {
+          outline: 1px solid var(--primary-color);
+      }
+      .editor-language-select option {
+          background-color: var(--panel-bg);
+          color: var(--text-color);
+      }
     </style>
   </head>
   <body>
     <video autoplay muted loop playsinline id="bg-video">
       <source src="https://storage.googleapis.com/aai-web-samples/kaniska-bg.mp4" type="video/mp4">
     </video>
+    <audio id="ambient-audio" loop preload="auto">
+      <source src="https://storage.googleapis.com/aai-web-samples/scifi-ambience.mp3" type="audio/mpeg">
+    </audio>
     <div id="video-overlay"></div>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>

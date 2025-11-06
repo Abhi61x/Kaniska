@@ -1,7 +1,15 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Editor from 'react-simple-code-editor';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-markup'; // for HTML
+import 'prismjs/components/prism-python';
 import type { AssistantState, ChatMessage, Emotion, Source, Gender, WeatherData } from './types.ts';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, processCodeCommand } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.ts';
 
 declare global {
@@ -44,6 +52,7 @@ const SunIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height=
 const MoonIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
 const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
 const LoadingSpinnerIcon = ({ className }: { className?: string }) => <svg className={`spinner ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity="0.25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
+const CodeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
 
 // Weather Icons
 const WeatherSunIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
@@ -67,11 +76,12 @@ ABOUT YOU:
 JSON OUTPUT STRUCTURE:
 Your entire response must be a single JSON object with this exact structure:
 {
-  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG" | "GET_LYRICS" | "DEACTIVATE_LISTENING" | "SET_TIMER" | "RANDOM_FACT",
+  "command": "REPLY" | "YOUTUBE_SEARCH" | "GET_WEATHER" | "GET_NEWS" | "SEND_EMAIL" | "SING_SONG" | "GET_LYRICS" | "DEACTIVATE_LISTENING" | "SET_TIMER" | "RANDOM_FACT" | "OPEN_CODE_EDITOR",
   "reply": "Your verbal response to the user. This is what will be spoken out loud. IMPORTANT: This text will be fed directly into a text-to-speech (TTS) engine. It MUST contain only plain, speakable words. Do not include markdown, emojis, or parenthetical non-speech descriptions like '(laughs)' or '♪'. Keep it concise and conversational.",
   "youtubeQuery": "A simplified keyword for the YouTube search. Examples: 'latest pop music', 'news highlights', 'funny cat videos'. Otherwise, an empty string.",
   "newsQuery": "The topic for the news search. Examples: 'technology', 'world headlines'. Otherwise, an empty string.",
   "location": "The city or place for the weather query. Examples: 'London', 'Tokyo'. Otherwise, an empty string.",
+  "imagePrompt": "Always an empty string. This feature is not used.",
   "emotion": "neutral" | "happy" | "sad" | "excited" | "empathetic" | "singing" | "formal" | "chirpy" | "surprised" | "curious" | "thoughtful" | "joking",
   "songTitle": "The title of the song to sing. Example: 'Kesariya'. Otherwise, an empty string.",
   "songArtist": "The artist of the song. Example: 'Arijit Singh'. Otherwise, an empty string.",
@@ -81,6 +91,7 @@ Your entire response must be a single JSON object with this exact structure:
 HOW TO DECIDE THE JSON VALUES:
 
 1. COMMAND:
+- If the user wants to write code, open a code editor, or start coding (e.g., "let's write some python", "open the code editor"), set command to "OPEN_CODE_EDITOR". Your 'reply' MUST be an acknowledgement, like "Opening the code editor. What language shall we use?".
 - If the user wants to end the conversation (e.g., "goodbye", "disconnect", "that's all for now"), set command to "DEACTIVATE_LISTENING". Your reply should be a simple confirmation like "Goodbye."
 - If the user asks for the lyrics of a specific song (e.g., "what are the lyrics for 'Bohemian Rhapsody'?", "show me the lyrics to..."), set command to "GET_LYRICS". Extract the songTitle and songArtist.
 - If the user asks you to sing a specific song (e.g., "sing Kesariya"), set command to "SING_SONG". You must extract the songTitle and songArtist. If the user does not provide an artist, you MUST use your knowledge to identify the most common or original artist for that song and populate the 'songArtist' field. For example, for the song "Kesariya", the artist is "Arijit Singh".
@@ -128,6 +139,7 @@ const DEFAULT_AVATAR_MAP: Record<AssistantState, string> = {
   sad: PLACEHOLDER_AVATAR_URL,
   celebrating: PLACEHOLDER_AVATAR_URL,
   surprised: PLACEHOLDER_AVATAR_URL,
+  coding: PLACEHOLDER_AVATAR_URL,
 };
 
 const GEMINI_TTS_VOICES = [
@@ -1305,6 +1317,106 @@ const TimerPanel = ({ duration, remaining, onClose, onFinish }: {
     );
 };
 
+const CodeEditorPanel = ({
+    content,
+    language,
+    onContentChange,
+    onLanguageChange,
+    onDebug,
+    onClose,
+}: {
+    content: string;
+    language: string;
+    onContentChange: (newContent: string) => void;
+    onLanguageChange: (newLang: string) => void;
+    onDebug: () => void;
+    onClose: () => void;
+}) => {
+    const { t } = useTranslation();
+    const [previewContent, setPreviewContent] = useState('');
+
+    useEffect(() => {
+        // Debounce the preview update to avoid excessive re-renders
+        const handler = setTimeout(() => {
+            if (language === 'html') {
+                setPreviewContent(content);
+            } else if (language === 'javascript') {
+                setPreviewContent(`<script>${content}</script>`);
+            } else if (language === 'css') {
+                setPreviewContent(`<style>${content}</style>`);
+            } else {
+                setPreviewContent('');
+            }
+        }, 300);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [content, language]);
+
+    const isPreviewable = ['html', 'javascript', 'css'].includes(language);
+
+    const highlight = (code: string) => {
+        if (Prism.languages[language]) {
+            return Prism.highlight(code, Prism.languages[language], language);
+        }
+        return code;
+    };
+
+    return (
+        <div className="code-editor-container">
+            <div className="editor-controls-pane">
+                <button onClick={onClose} className="p-1.5 rounded-full hover:bg-assistant-bubble-bg" aria-label="Close Editor">
+                    <XIcon />
+                </button>
+                <div className="editor-control-group">
+                    <label htmlFor="lang-select" className="text-sm font-medium pl-1">Language:</label>
+                    <select
+                        id="lang-select"
+                        value={language}
+                        onChange={(e) => onLanguageChange(e.target.value)}
+                        className="editor-language-select"
+                    >
+                        <option value="html">HTML</option>
+                        <option value="css">CSS</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="python">Python</option>
+                    </select>
+                </div>
+                <button onClick={onDebug} className="quick-action-button">Debug Code</button>
+                <button onClick={() => onContentChange('')} className="quick-action-button">Clear</button>
+            </div>
+            <div className="editor-main-pane">
+                <div className="editor-pane">
+                    <Editor
+                        value={content}
+                        onValueChange={onContentChange}
+                        highlight={highlight}
+                        padding={16}
+                        textareaClassName="focus:outline-none"
+                        preClassName="focus:outline-none"
+                        style={{
+                            fontFamily: '"Fira code", "Fira Mono", monospace',
+                            fontSize: 14,
+                            backgroundColor: '#011627', // Matches prism-tomorrow theme
+                            color: '#d6deeb',
+                        }}
+                    />
+                </div>
+                {isPreviewable && (
+                    <div className="preview-pane">
+                        <iframe
+                            srcDoc={previewContent}
+                            title="Live Code Preview"
+                            sandbox="allow-scripts"
+                        />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 type VoiceConfig = {
     name: string;
@@ -1387,6 +1499,9 @@ export const App = () => {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isYTReady, setIsYTReady] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isCodeEditorOpen, setIsCodeEditorOpen] = useState(false);
+  const [editorContent, setEditorContent] = useState('<h1>Hello World</h1>\n\n<style>\n  h1 {\n    color: cyan;\n    font-family: sans-serif;\n  }\n</style>');
+  const [editorLanguage, setEditorLanguage] = useState('html');
 
   // Email Composer State
   const [emailComposer, setEmailComposer] = useState<{
@@ -1480,11 +1595,9 @@ export const App = () => {
     gainNode.connect(context.destination);
     gainNodeRef.current = gainNode;
     
-    // Create persistent audio elements to avoid issues with re-renders
-    const ambient = new Audio("https://storage.googleapis.com/aai-web-samples/scifi-ambience.mp3");
-    ambient.loop = true;
-    ambient.preload = 'auto';
-    ambientAudioRef.current = ambient;
+    // Grab the audio element from the DOM instead of creating it dynamically.
+    // This can be more reliable for browser media loading and prevent "no supported sources" errors.
+    ambientAudioRef.current = document.getElementById('ambient-audio') as HTMLAudioElement;
 
     const connection = new Audio();
     connection.preload = 'auto';
@@ -1586,7 +1699,7 @@ export const App = () => {
     if (!hasInteracted) return;
     
     const targetVolume = settings.ambientVolume;
-    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused'];
+    const playStates: AssistantState[] = ['idle', 'listening', 'thinking', 'composing', 'confused', 'coding'];
 
     if (playStates.includes(assistantState) && isConnected) {
         fadeAmbientSound(targetVolume);
@@ -1615,6 +1728,7 @@ export const App = () => {
   }, []);
   
     const playRawAudio = useCallback(async (base64Audio: string, onEndCallback?: () => void) => {
+        recognitionRef.current?.stop(); // Stop listening to prevent echo
         speechSourcesRef.current.forEach(source => {
             source.onended = null;
             source.stop();
@@ -1648,6 +1762,7 @@ export const App = () => {
     }, [settings.voice.speakingRate]);
 
     const speak = useCallback(async (text: string, config: VoiceConfig, emotion: Emotion = 'neutral', onEndCallback?: () => void) => {
+        recognitionRef.current?.stop(); // Stop listening to prevent echo
         setAssistantState(getSpeakingStateFromEmotion(emotion));
 
         // Immediately stop any currently playing audio from the previous turn.
@@ -2087,6 +2202,31 @@ export const App = () => {
     });
   }, [settings.gender, settings.voice, speak, startRecognition, sendEmail, stopCurrentAction]);
 
+  const handleCodeCommand = useCallback(async (transcript: string, mode: 'write' | 'debug' = 'write') => {
+    setAssistantState('thinking');
+    
+    let instruction = transcript;
+    if (mode === 'debug') {
+        instruction = "Find and fix any bugs or errors in the following code. If there are no bugs, suggest improvements.";
+    }
+
+    try {
+        const result = await processCodeCommand(editorContent, editorLanguage, instruction);
+        setEditorContent(result.newCode);
+        speak(result.explanation, settings.voice[settings.gender].main, 'formal', () => {
+            // After explaining, go back to coding state to listen for next command
+            setAssistantState('coding');
+            if (isConnectedRef.current) {
+                // A brief delay before starting recognition again in coding mode
+                setTimeout(() => startRecognition(), 100);
+            }
+        });
+    } catch (e: any) {
+        addErrorMessageToChat(e, () => handleCodeCommand(transcript, mode));
+    }
+
+  }, [editorContent, editorLanguage, settings.voice, settings.gender, speak, addErrorMessageToChat, startRecognition]);
+
   const handleCommand = useCallback(async (transcript: string) => {
       setAssistantState('thinking');
       const userMessage: ChatMessage = { id: Date.now(), sender: 'user', text: transcript };
@@ -2156,6 +2296,11 @@ export const App = () => {
                   setEmailComposer({ stage: 'getEmail', recipient: '', subject: '', body: '' });
                   commandExecuted = false;
                   break;
+              case 'OPEN_CODE_EDITOR':
+                  setIsCodeEditorOpen(true);
+                  setAssistantState('coding');
+                  commandExecuted = false; // Let the default path handle starting recognition
+                  break;
           }
 
           if (!commandExecuted && isConnectedRef.current) {
@@ -2205,7 +2350,8 @@ export const App = () => {
     const recognition = recognitionRef.current;
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
+    const selectedLanguage = availableLanguages.find(l => l.code === lang) || availableLanguages[0];
+    recognition.lang = selectedLanguage.bcp47;
 
     recognition.onstart = () => {
       if (isSpeakingRef.current) {
@@ -2216,7 +2362,9 @@ export const App = () => {
         speechSourcesRef.current.clear();
         isSpeakingRef.current = false;
       }
-      setAssistantState('listening');
+      if(assistantStateRef.current !== 'coding') {
+         setAssistantState('listening');
+      }
     };
 
     recognition.onresult = (event: any) => {
@@ -2225,16 +2373,37 @@ export const App = () => {
         
         let finalTranscript = '';
         let interimTranscript = '';
+        let lastConfidence = 0;
+        let isFinal = false;
+
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const transcript = event.results[i][0].transcript;
+            const transcriptPart = event.results[i][0];
             if (event.results[i].isFinal) {
-                finalTranscript += transcript;
+                finalTranscript += transcriptPart.transcript;
+                lastConfidence = transcriptPart.confidence;
+                isFinal = true;
             } else {
-                interimTranscript += transcript;
+                interimTranscript += transcriptPart.transcript;
             }
         }
         
         setCurrentTranscript(interimTranscript);
+
+        if (isFinal && lastConfidence > 0 && lastConfidence < 0.5) {
+            console.warn(`Low confidence result: "${finalTranscript.trim()}" (Confidence: ${lastConfidence}). Ignoring.`);
+            setListeningHint(t('main.lowConfidenceHint'));
+            if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+            hintTimeoutRef.current = window.setTimeout(() => {
+                setListeningHint(null);
+                if (isConnectedRef.current) {
+                    if (recognitionRef.current) {
+                        recognitionRef.current.abort();
+                        setTimeout(() => startRecognition(), 100);
+                    }
+                }
+            }, 2500);
+            return;
+        }
 
         finalTranscript = finalTranscript.trim();
         if (finalTranscript) {
@@ -2243,7 +2412,9 @@ export const App = () => {
                 stopCurrentAction();
                 // A small delay to allow state changes to propagate before processing the new command.
                 setTimeout(() => {
-                    if (emailComposerRef.current.stage !== 'idle') {
+                    if (assistantStateRef.current === 'coding') {
+                       handleCodeCommand(finalTranscript);
+                    } else if (emailComposerRef.current.stage !== 'idle') {
                         handleEmailInput(finalTranscript);
                     } else {
                         handleCommand(finalTranscript);
@@ -2251,8 +2422,10 @@ export const App = () => {
                 }, 50);
                 return;
             }
-
-            if (emailComposerRef.current.stage !== 'idle') {
+            
+            if (assistantStateRef.current === 'coding') {
+                handleCodeCommand(finalTranscript);
+            } else if (emailComposerRef.current.stage !== 'idle') {
                 handleEmailInput(finalTranscript);
             } else {
                 handleCommand(finalTranscript);
@@ -2278,9 +2451,16 @@ export const App = () => {
 
       switch (event.error) {
         case 'no-speech':
-            if (isConnectedRef.current) {
-                startRecognition();
-            }
+          if (isConnectedRef.current) {
+            setListeningHint(t('main.noSpeechHint'));
+            if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+            hintTimeoutRef.current = window.setTimeout(() => {
+                setListeningHint(null);
+                if (isConnectedRef.current && assistantStateRef.current !== 'idle' && assistantStateRef.current !== 'error') {
+                    startRecognition();
+                }
+            }, 2500);
+          }
           return;
         case 'not-allowed':
         case 'service-not-allowed':
@@ -2305,17 +2485,28 @@ export const App = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [lang, handleCommand, t, addErrorMessageToChat, startRecognition, handleEmailInput, stopCurrentAction]);
+  }, [lang, handleCommand, t, addErrorMessageToChat, startRecognition, handleEmailInput, stopCurrentAction, handleCodeCommand]);
 
   const handleRecordButtonClick = () => {
     if (!isConnected) return;
 
-    if (assistantState === 'listening') {
+    if (assistantState === 'listening' || assistantState === 'coding') {
         recognitionRef.current?.stop();
         setAssistantState('idle');
     } else {
         stopCurrentAction();
         startRecognition();
+    }
+  };
+  
+  const handleCloseCodeEditor = () => {
+    setIsCodeEditorOpen(false);
+    if (assistantState === 'coding') {
+        if (isConnected) {
+            startRecognition(); // Go back to normal listening
+        } else {
+            setAssistantState('idle');
+        }
     }
   };
 
@@ -2333,6 +2524,7 @@ export const App = () => {
 
     switch(assistantState) {
         case 'listening': return <span className="listening-text-pulse">{currentTranscript || t('main.status.listening')}</span>;
+        case 'coding': return <span className="listening-text-pulse">{currentTranscript || 'Coding mode: awaiting instructions...'}</span>;
         case 'thinking': return t('main.status.thinking');
         case 'speaking': return t('main.status.speaking');
         case 'singing': return t('main.status.singing');
@@ -2351,6 +2543,16 @@ export const App = () => {
   };
   
   const renderSidePanelContent = () => {
+      if (isCodeEditorOpen) {
+          return <CodeEditorPanel
+              content={editorContent}
+              language={editorLanguage}
+              onContentChange={setEditorContent}
+              onLanguageChange={setEditorLanguage}
+              onDebug={() => handleCodeCommand('', 'debug')}
+              onClose={handleCloseCodeEditor}
+          />
+      }
       if (youtubeVideoId) {
         return (
             <div className="p-2 flex flex-col h-full">
@@ -2388,7 +2590,7 @@ export const App = () => {
       );
   };
 
-  const isBusy = ['listening', 'thinking', 'speaking', 'singing', 'composing', 'sad', 'celebrating', 'surprised'].includes(assistantState) || emailComposer.stage !== 'idle';
+  const isBusy = ['thinking', 'speaking', 'singing', 'composing', 'sad', 'celebrating', 'surprised'].includes(assistantState) || emailComposer.stage !== 'idle';
 
   return (
     <div className="bg-transparent text-text-color w-screen h-screen flex flex-col overflow-hidden">
@@ -2405,10 +2607,10 @@ export const App = () => {
            <div className="relative">
               <button onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)} className="footer-button flex items-center gap-2" aria-haspopup="true" aria-expanded={isLangDropdownOpen}>
                   <GlobeIcon />
-                  <span>{lang.toUpperCase()}</span>
+                  <span className='uppercase'>{lang.split('_')[0]}</span>
               </button>
               {isLangDropdownOpen && (
-                  <div className="absolute right-0 mt-2 py-1 w-28 bg-panel-bg border border-border-color rounded-md shadow-lg z-20">
+                  <div className="absolute right-0 mt-2 py-1 w-auto min-w-[8rem] bg-panel-bg border border-border-color rounded-md shadow-lg z-20">
                       {availableLanguages.map((l) => (
                           <a
                               href="#"
@@ -2418,7 +2620,7 @@ export const App = () => {
                                   setLang(l.code);
                                   setIsLangDropdownOpen(false);
                               }}
-                              className="block px-4 py-2 text-sm text-text-color-muted hover:bg-assistant-bubble-bg hover:text-text-color"
+                              className="block px-4 py-2 text-sm text-text-color-muted hover:bg-assistant-bubble-bg hover:text-text-color whitespace-nowrap"
                           >
                               {l.name}
                           </a>
@@ -2435,7 +2637,7 @@ export const App = () => {
       <main className="flex-grow flex min-h-0">
         <div className="flex-grow flex flex-col items-center justify-center p-4 relative">
             <div className="hologram-container">
-                {assistantState === 'listening' && (
+                {(assistantState === 'listening' || assistantState === 'coding') && (
                     <div className="listening-waveform">
                         <div className="waveform-circle"></div>
                         <div className="waveform-circle"></div>
@@ -2466,7 +2668,7 @@ export const App = () => {
       </main>
       
       <footer className="grid grid-cols-3 items-center justify-items-center p-3 border-t border-border-color flex-shrink-0">
-        <div className="justify-self-start ml-4">
+        <div className="justify-self-start ml-4 flex items-center gap-2">
             <button
                 onClick={!isConnected ? handleConnect : handleDisconnect}
                 className={`footer-button ${!isConnected ? 'text-green-400 hover:!text-green-300' : 'text-red-400 hover:!text-red-300'}`}
@@ -2474,6 +2676,15 @@ export const App = () => {
             >
                 {!isConnected ? <ConnectIcon className="w-7 h-7" /> : <DisconnectIcon className="w-7 h-7" />}
                 <span className="text-xs">{!isConnected ? t('footer.connect') : t('footer.disconnect')}</span>
+            </button>
+            <button
+                onClick={() => isCodeEditorOpen ? handleCloseCodeEditor() : setIsCodeEditorOpen(true)}
+                className={`footer-button ${isCodeEditorOpen ? 'active' : ''}`}
+                aria-label="Open Code Editor"
+                disabled={!isConnected}
+            >
+                <CodeIcon />
+                <span className="text-xs">Code</span>
             </button>
         </div>
 
