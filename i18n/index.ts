@@ -450,7 +450,7 @@ interface TranslationContextType {
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
 
-const getNested = (obj: any, path: string): string | undefined => {
+const getNested = (obj: any, path: string): any => {
   return path.split('.').reduce((o, key) => (o && o[key] !== undefined ? o[key] : undefined), obj);
 };
 
@@ -465,23 +465,30 @@ export const TranslationProvider: FC<{children: React.ReactNode}> = ({ children 
   }, []);
 
   const t = useCallback((key: string, params?: { [key: string]: string }): string => {
-    let translation = getNested(translationsData[lang], key) || getNested(translationsData['en'], key) || key;
+    let translation = getNested(translationsData[lang], key);
 
-    // If the resolved translation is an object (because the key points to a whole section),
-    // it cannot be rendered by React. Fallback to rendering the key itself to prevent a crash.
-    if (typeof translation === 'object' && translation !== null) {
-      console.warn(`Translation for key "${key}" is an object, not a string. Falling back to the key.`);
-      return key;
+    // Fallback to English if translation not found in current language
+    if (translation === undefined) {
+      translation = getNested(translationsData['en'], key);
     }
+    
+    // If translation is an object (e.g., a parent key was used) or still not found, return the key.
+    // This prevents React from trying to render an object.
+    if (typeof translation !== 'string') {
+        if (typeof translation === 'object' && translation !== null) {
+            console.warn(`Translation key "${key}" resolved to an object. Returning the key as fallback.`);
+        }
+        return key;
+    }
+
+    let result = translation;
 
     if (params) {
         Object.keys(params).forEach(paramKey => {
-            // Coerce to string just in case.
-            translation = String(translation).replace(`{{${paramKey}}}`, params[paramKey]);
+            result = result.replace(`{{${paramKey}}}`, params[paramKey]);
         });
     }
-    // Coerce to string at the end as a final safety measure.
-    return String(translation);
+    return result;
   }, [lang]);
 
   return React.createElement(TranslationContext.Provider, { value: { lang, setLang, t } }, children);
