@@ -10,7 +10,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 
 // Icon components
@@ -21,6 +21,7 @@ const PersonaIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org
 const VoiceIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), React.createElement('path', { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), React.createElement('line', { x1: "12", y1: "19", x2: "12", y2: "22" }));
 const ApiKeysIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19.9 5a1 1 0 0 0-1.4 0l-2.1 2.1a1 1 0 0 0 0 1.4z" }), React.createElement('path', { d: "m4 6 2-2" }), React.createElement('path', { d: "m10.5 10.5 5 5" }), React.createElement('path', { d: "m8.5 8.5 2 2" }), React.createElement('path', { d: "m14.5 14.5 2 2" }), React.createElement('path', { d: "M7 21a4 4 0 0 0 4-4" }), React.createElement('path', { d: "M12 12v4a4 4 0 0 0 4 4h4" }));
 const AboutIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('circle', { cx: "12", cy: "12", r: "10" }), React.createElement('line', { x1: "12", y1: "16", x2: "12", y2: "12" }), React.createElement('line', { x1: "12", y1: "8", x2: "12.01", y2: "8" }));
+const HelpIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('circle', { cx: "12", cy: "12", r: "10" }), React.createElement('path', { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }), React.createElement('line', { x1: "12", y1: "17", x2: "12.01", y2: "17" }));
 const ChatIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }));
 const WeatherIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" }));
 const YouTubeIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M10 15v-6l5 3-5 3Z" }), React.createElement('path', { d: "M21.54 8.63A2.08 2.08 0 0 0 20.06 7.5a21.46 21.46 0 0 0-8.06-.5 21.46 21.46 0 0 0-8.06.5A2.08 2.08 0 0 0 2.46 8.63 22.24 22.24 0 0 0 2 12c0 3.37.46 5.54 1.94 6.5A2.08 2.08 0 0 0 5.4 19.5a21.46 21.46 0 0 0 8.06.5 21.46 21.46 0 0 0 8.06-.5 2.08 2.08 0 0 0 1.48-1.13A22.24 22.24 0 0 0 22 12c0-3.37-.46-5.54-1.94-6.5Z" }));
@@ -743,7 +744,7 @@ export const App = () => {
             React.createElement('main', { className: "flex-grow flex flex-col items-center justify-center relative w-full p-4" },
                 React.createElement('div', { className: "hologram-container" },
                     React.createElement('img', {
-                        src: gender === 'female' ? "https://storage.googleapis.com/aai-web-samples/kaniska-avatar.png" : "https://storage.googleapis.com/aai-web-samples/kanishk-avatar.png",
+                        src: gender === 'female' ? "https://storage.googleapis.com/aai-web-samples/avatar-holographic-girl-2.png" : "https://storage.googleapis.com/aai-web-samples/kanishk-avatar.png",
                         alt: "AI Assistant Avatar",
                         className: `avatar ${expression}`
                     }),
@@ -1069,6 +1070,10 @@ export const App = () => {
             youtube: { status: 'idle', message: '' },
             auddio: { status: 'idle', message: '' }
         });
+        const [helpChatHistory, setHelpChatHistory] = React.useState([]);
+        const [helpInput, setHelpInput] = React.useState('');
+        const [isHelpAiThinking, setIsHelpAiThinking] = React.useState(false);
+
         const TTS_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
 
         const handleSaveAndValidate = async () => {
@@ -1154,6 +1159,25 @@ export const App = () => {
             }
         };
 
+        const handleSendHelpMessage = async () => {
+            if (!helpInput.trim() || isHelpAiThinking) return;
+
+            const newHistory = [...helpChatHistory, { sender: 'user', text: helpInput.trim() }];
+            setHelpChatHistory(newHistory);
+            setHelpInput('');
+            setIsHelpAiThinking(true);
+
+            try {
+                const response = await getSupportResponse(newHistory);
+                setHelpChatHistory(prev => [...prev, { sender: 'model', text: response }]);
+            } catch (error) {
+                setHelpChatHistory(prev => [...prev, { sender: 'model', text: error.message, isError: true }]);
+            } finally {
+                setIsHelpAiThinking(false);
+            }
+        };
+
+
         const emotionKeys = Object.keys(emotionTuning);
         
         const VoiceSelector = ({ label, selectedVoice, onSelect, onTest }) => {
@@ -1188,6 +1212,38 @@ export const App = () => {
                 )
             );
         };
+        
+        const LinkRenderer = ({ text, links }) => {
+            const parts = text.split(/<(\d)>(.*?)<\/(\d)>/g);
+            const elements = [];
+            let partIndex = 0;
+            while(partIndex < parts.length) {
+                const plainText = parts[partIndex];
+                if (plainText) {
+                    elements.push(plainText);
+                }
+                
+                const linkTagNumber = parts[partIndex + 1];
+                const linkText = parts[partIndex + 2];
+                
+                if (linkTagNumber && linkText) {
+                    const linkIndex = parseInt(linkTagNumber, 10) - 1;
+                    if (links && links[linkIndex]) {
+                         elements.push(React.createElement('a', {
+                            key: `link-${partIndex}`,
+                            href: links[linkIndex],
+                            target: '_blank',
+                            rel: 'noopener noreferrer',
+                            className: 'text-primary-color hover:underline'
+                        }, linkText));
+                    } else {
+                        elements.push(linkText); // Fallback
+                    }
+                }
+                partIndex += 4;
+            }
+            return React.createElement('span', null, ...elements);
+        };
 
 
         return (
@@ -1202,7 +1258,8 @@ export const App = () => {
                             React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'persona' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('persona') }, React.createElement(PersonaIcon, null), " ", t('settings.tabs.persona')),
                             React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'voice' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('voice') }, React.createElement(VoiceIcon, null), " ", t('settings.tabs.voice')),
                             React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'apiKeys' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('apiKeys') }, React.createElement(ApiKeysIcon, null), " ", t('settings.tabs.apiKeys')),
-                            React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'about' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('about') }, React.createElement(AboutIcon, null), " ", t('settings.tabs.about'))
+                            React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'about' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('about') }, React.createElement(AboutIcon, null), " ", t('settings.tabs.about')),
+                            React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'help' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('help') }, React.createElement(HelpIcon, null), " ", t('settings.tabs.help'))
                         ),
                         React.createElement('div', { className: "settings-content" },
                              activeSettingsTab === 'persona' && (
@@ -1317,6 +1374,62 @@ export const App = () => {
                                         React.createElement('p', { className: "text-sm text-text-color-muted mt-1" }, `${t('settings.aboutTab.version')} 1.0.0`),
                                         React.createElement('p', { className: "mt-4 text-base max-w-prose" }, t('settings.aboutTab.description')),
                                         React.createElement('a', { href: "#/privacy", target: "_blank", rel: "noopener noreferrer", className: "mt-6 inline-block text-primary-color hover:underline" }, t('settings.aboutTab.privacyPolicy'))
+                                    )
+                                )
+                            ),
+                            activeSettingsTab === 'help' && (
+                                React.createElement('div', { className: "settings-section" },
+                                    React.createElement('div', { className: "settings-card" },
+                                        React.createElement('div', { className: "settings-section-header mb-4" },
+                                            React.createElement('h3', null, t('settings.helpTab.aiChat.title')),
+                                            React.createElement('p', null, t('settings.helpTab.aiChat.description'))
+                                        ),
+                                        React.createElement('div', { className: "h-48 flex flex-col border border-border-color rounded-md" },
+                                            React.createElement('div', { className: "flex-grow overflow-y-auto p-2" },
+                                                helpChatHistory.map((msg, i) => React.createElement('div', { key: i, className: `text-sm my-1 ${msg.sender === 'user' ? 'text-right' : 'text-left'}` },
+                                                    React.createElement('span', { className: `px-2 py-1 rounded-lg inline-block ${msg.sender === 'user' ? 'bg-primary-color/20' : 'bg-assistant-bubble-bg'}` }, msg.text)
+                                                )),
+                                                isHelpAiThinking && React.createElement('div', { className: 'text-left' }, React.createElement('span', { className: 'px-2 py-1 rounded-lg inline-block bg-assistant-bubble-bg text-sm' }, '...'))
+                                            ),
+                                            React.createElement('div', { className: "p-2 border-t border-border-color flex gap-2" },
+                                                React.createElement('input', {
+                                                    type: 'text',
+                                                    value: helpInput,
+                                                    onChange: e => setHelpInput(e.target.value),
+                                                    onKeyPress: e => e.key === 'Enter' && handleSendHelpMessage(),
+                                                    placeholder: t('settings.helpTab.aiChat.placeholder'),
+                                                    className: 'flex-grow bg-assistant-bubble-bg border border-border-color rounded-md px-2 py-1 text-sm',
+                                                    disabled: isHelpAiThinking
+                                                }),
+                                                React.createElement('button', { onClick: handleSendHelpMessage, disabled: isHelpAiThinking || !helpInput.trim() }, t('settings.helpTab.aiChat.send'))
+                                            )
+                                        )
+                                    ),
+                                    React.createElement('div', { className: "settings-card" },
+                                        React.createElement('div', { className: "settings-section-header mb-4" },
+                                           React.createElement('h3', null, t('settings.helpTab.faqTitle'))
+                                        ),
+                                        React.createElement('div', { className: "space-y-4" },
+                                            React.createElement('details', null,
+                                                React.createElement('summary', { className: 'font-semibold cursor-pointer' }, t('settings.helpTab.q1')),
+                                                React.createElement('p', { className: 'text-sm text-text-color-muted mt-2 pl-4' }, t('settings.helpTab.a1'))
+                                            ),
+                                            React.createElement('details', null,
+                                                React.createElement('summary', { className: 'font-semibold cursor-pointer' }, t('settings.helpTab.q2')),
+                                                React.createElement('div', { className: 'text-sm text-text-color-muted mt-2 pl-4 space-y-3' },
+                                                    React.createElement('h4', { className: 'font-semibold text-text-color' }, t('settings.helpTab.a2.weatherTitle')),
+                                                    React.createElement('p', { className: 'whitespace-pre-line' }, 
+                                                        React.createElement(LinkRenderer, { text: t('settings.helpTab.a2.weatherSteps'), links: ['https://www.visualcrossing.com/weather-api'] })
+                                                    ),
+                                                    React.createElement('h4', { className: 'font-semibold text-text-color' }, t('settings.helpTab.a2.youtubeTitle')),
+                                                     React.createElement('p', { className: 'whitespace-pre-line' },
+                                                        React.createElement(LinkRenderer, { text: t('settings.helpTab.a2.youtubeSteps'), links: ['https://console.cloud.google.com/'] })
+                                                    ),
+                                                     React.createElement('h4', { className: 'font-semibold text-text-color' }, t('settings.helpTab.a2.inputTitle')),
+                                                     React.createElement('p', { className: 'whitespace-pre-line' }, t('settings.helpTab.a2.inputSteps'))
+                                                )
+                                            )
+                                        )
                                     )
                                 )
                             )

@@ -142,6 +142,49 @@ Your 'emotion' value in the JSON output must reflect this adaptive process.
   }
 }
 
+export async function getSupportResponse(history) {
+    const systemInstruction = `You are a helpful and friendly support assistant for an AI voice assistant application called Kaniska. Your role is to answer user questions about the app's features, settings, API keys, and troubleshooting. Do not go off-topic. Keep your answers concise and easy to understand.
+
+The app's features include:
+- Live voice conversations with an AI.
+- Searching and playing YouTube videos.
+- Getting weather forecasts (requires a Visual Crossing API key).
+- Fetching top news headlines (requires a GNews API key).
+- Setting timers.
+- Singing songs (requires Gemini to find lyrics).
+- Recognizing songs playing nearby (requires an Audd.io API key).
+- A code editor for writing and modifying code with AI assistance.
+
+Users can configure:
+- Persona: Gender (male/female), greeting message, and emotional tuning.
+- Voice: Specific TTS voices for each gender.
+- API Keys: For weather, news, YouTube, and song recognition.
+- Theme: Light or dark mode.
+
+When asked about API keys, guide them to the FAQ section in the Help & Support tab for detailed, step-by-step instructions.`;
+
+    try {
+        const contents = history.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text }]
+        }));
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: contents,
+            config: {
+                systemInstruction: systemInstruction,
+                temperature: 0.7,
+            }
+        });
+
+        return response.text.trim();
+    } catch (apiError) {
+        throw handleGeminiError(apiError, 'getting support response');
+    }
+}
+
+
 export async function processCodeCommand(
     code,
     language,

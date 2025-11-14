@@ -159,19 +159,22 @@ const en = {
     },
     "helpTab": {
       "faqTitle": "Frequently Asked Questions",
-      "contactTitle": "Contact Support",
-      "contactDescription": "If you're facing technical issues, you can get help via Instagram DM.",
-      "contactButton": "DM on Instagram",
+      "aiChat": {
+        "title": "Chat with Support AI",
+        "description": "Have a question? Ask our AI assistant for help with app features, settings, or troubleshooting.",
+        "placeholder": "Ask a question...",
+        "send": "Send"
+      },
       "q1": "How do I use Kaniska?",
-      "a1": "Click the \"Connect\" button to start a session. When the avatar indicates it's listening, speak your command. You can now interrupt the assistant at any time by simply speaking again.",
+      "a1": "Click the \"Connect\" button to start a session. When the avatar indicates it's listening, speak your command. You can interrupt the assistant at any time by simply speaking again.",
       "q2": "How do I get and set up API Keys?",
       "a2": {
         "weatherTitle": "Visual Crossing Weather API Key",
-        "weatherSteps": "1. Go to the <1>Visual Crossing Weather Data</1> website.\n2. Click \"Sign Up\" to create a free account.\n3. After signing in, navigate to your Account page from the top-right menu.\n4. Your API Key will be visible on this page. Copy it.",
+        "weatherSteps": "1. Go to the <1>Visual Crossing Weather Data</1> website.\n2. Click 'Sign Up' to create a free account.\n3. After signing in, click your account name in the top-right corner and select 'Account' from the dropdown menu.\n4. Your API Key will be visible on this page. Copy it.",
         "youtubeTitle": "Google Cloud API Key (for YouTube)",
-        "youtubeSteps": "1. Go to the <1>Google Cloud Console</1>.\n2. Create a new project (or select an existing one).\n3. In the search bar, find and enable the \"YouTube Data API v3\".\n4. Go to \"APIs & Services\" > \"Credentials\".\n5. Click \"+ CREATE CREDENTIALS\" and select \"API key\".\n6. Your new API key will be displayed. Copy it.",
+        "youtubeSteps": "1. Go to the <1>Google Cloud Console</1> and sign in.\n2. In the top bar, click the project selector dropdown (it might say 'Select a project') and click 'NEW PROJECT'.\n3. Give your project a name (e.g., 'Kaniska YouTube Key') and click 'CREATE'.\n4. Ensure your new project is selected in the top bar.\n5. In the top search bar, type 'YouTube Data API v3' and select it.\n6. Click the blue 'ENABLE' button.\n7. After it's enabled, open the navigation menu (☰) in the top-left, go to 'APIs & Services', then 'Credentials'.\n8. Click '+ CREATE CREDENTIALS' at the top and select 'API key'.\n9. A pop-up will show your new API key. Copy it.",
         "inputTitle": "Where do I input the keys?",
-        "inputSteps": "1. In this app, go to Settings ⚙️ > API Keys.\n2. Paste your copied key into the corresponding input field.\n3. Click the \"Save & Validate Keys\" button."
+        "inputSteps": "1. In this app, click the Settings icon (⚙️) in the top-right corner.\n2. Go to the 'API Keys' tab.\n3. Paste your copied key into the correct input field.\n4. Click 'Save & Validate Keys'."
       }
     },
     "aboutTab": {
@@ -252,7 +255,7 @@ const hi = {
       "voice": "आवाज़",
       "apiKeys": "एपीआई कुंजी",
       "subscription": "सदस्यता",
-      "help": "सहायता",
+      "help": "सहायता और समर्थन",
       "about": "बारे में"
     },
     "personaTab": {
@@ -358,19 +361,22 @@ const hi = {
     },
     "helpTab": {
       "faqTitle": "अक्सर पूछे जाने वाले प्रश्न",
-      "contactTitle": "समर्थन से संपर्क करें",
-      "contactDescription": "यदि आप तकनीकी समस्याओं का सामना कर रहे हैं, तो आप इंस्टाग्राम डीएम के माध्यम से सहायता प्राप्त कर सकते हैं।",
-      "contactButton": "इंस्टाग्राम पर डीएम करें",
+      "aiChat": {
+        "title": "सपोर्ट AI से चैट करें",
+        "description": "कोई प्रश्न है? ऐप की सुविधाओं, सेटिंग्स या समस्या निवारण में सहायता के लिए हमारे AI सहायक से पूछें।",
+        "placeholder": "एक प्रश्न पूछें...",
+        "send": "भेजें"
+      },
       "q1": "मैं कनिष्का का उपयोग कैसे करूँ?",
-      "a1": "सत्र शुरू करने के लिए \"कनेक्ट\" बटन पर क्लिक करें। जब अवतार सुनने का संकेत दे, तो अपना कमांड बोलें। अब आप किसी भी समय केवल दोबारा बोलकर सहायक को बाधित कर सकते हैं।",
+      "a1": "सत्र शुरू करने के लिए \"कनेक्ट\" बटन पर क्लिक करें। जब अवतार सुनने का संकेत दे, तो अपना कमांड बोलें। आप किसी भी समय केवल दोबारा बोलकर सहायक को बाधित कर सकते हैं।",
       "q2": "मैं एपीआई कुंजी कैसे प्राप्त और सेट करूं?",
       "a2": {
         "weatherTitle": "विज़ुअल क्रॉसिंग मौसम एपीआई कुंजी",
-        "weatherSteps": "1. <1>विज़ुअल क्रॉसिंग वेदर डेटा</1> वेबसाइट पर जाएं।\n2. एक निःशुल्क खाता बनाने के लिए \"साइन अप करें\" पर क्लिक करें।\n3. साइन इन करने के बाद, ऊपर-दाएं मेनू से अपने खाता पृष्ठ पर जाएं।\n4. आपकी एपीआई कुंजी इस पृष्ठ पर दिखाई देगी। इसे कॉपी करें।",
+        "weatherSteps": "1. <1>विज़ुअल क्रॉसिंग वेदर डेटा</1> वेबसाइट पर जाएं।\n2. एक निःशुल्क खाता बनाने के लिए 'साइन अप करें' पर क्लिक करें।\n3. साइन इन करने के बाद, ऊपर-दाएं कोने में अपने खाते के नाम पर क्लिक करें और ड्रॉपडाउन मेनू से 'अकाउंट' चुनें।\n4. आपकी एपीआई कुंजी इस पृष्ठ पर दिखाई देगी। इसे कॉपी करें।",
         "youtubeTitle": "गूगल क्लाउड एपीआई कुंजी (यूट्यूब के लिए)",
-        "youtubeSteps": "1. <1>गूगल क्लाउड कंसोल</1> पर जाएं।\n2. एक नया प्रोजेक्ट बनाएं (या किसी मौजूदा का चयन करें)।\n3. सर्च बार में, \"YouTube Data API v3\" ढूंढें और सक्षम करें।\n4. \"एपीआई और सेवाएं\" > \"क्रेडेंशियल\" पर जाएं।\n5. \"+ क्रेडेंशियल बनाएं\" पर क्लिक करें और \"एपीआई कुंजी\" चुनें।\n6. आपकी नई एपीआई कुंजी प्रदर्शित होगी। इसे कॉपी करें।",
+        "youtubeSteps": "1. <1>गूगल क्लाउड कंसोल</1> पर जाएं और साइन इन करें।\n2. ऊपरी बार में, प्रोजेक्ट चयनकर्ता ड्रॉपडाउन पर क्लिक करें (यह 'एक प्रोजेक्ट चुनें' कह सकता है) और 'नया प्रोजेक्ट' पर क्लिक करें।\n3. अपने प्रोजेक्ट को एक नाम दें (जैसे, 'कनिष्का यूट्यूब कुंजी') और 'बनाएं' पर क्लिक करें।\n4. सुनिश्चित करें कि आपका नया प्रोजेक्ट ऊपरी बार में चुना गया है।\n5. ऊपरी खोज बार में, 'YouTube Data API v3' टाइप करें और इसे चुनें।\n6. नीले 'सक्षम करें' बटन पर क्लिक करें।\n7. सक्षम होने के बाद, ऊपर-बाईं ओर नेविगेशन मेनू (☰) खोलें, 'एपीआई और सेवाएं' पर जाएं, फिर 'क्रेडेंशियल' पर जाएं।\n8. शीर्ष पर '+ क्रेडेंशियल बनाएं' पर क्लिक करें और 'एपीआई कुंजी' चुनें।\n9. एक पॉप-अप आपकी नई एपीआई कुंजी दिखाएगा। इसे कॉपी करें।",
         "inputTitle": "मैं कुंजियाँ कहाँ दर्ज करूँ?",
-        "inputSteps": "1. इस ऐप में, सेटिंग्स ⚙️ > एपीआई कुंजी पर जाएं।\n2. अपनी कॉपी की गई कुंजी को संबंधित इनपुट फ़ील्ड में पेस्ट करें।\n3. \"कुंजी सहेजें और मान्य करें\" बटन पर क्लिक करें।"
+        "inputSteps": "1. इस ऐप में, ऊपर-दाएं कोने में सेटिंग्स आइकन (⚙️) पर क्लिक करें।\n2. 'एपीआई कुंजी' टैब पर जाएं।\n3. अपनी कॉपी की गई कुंजी को सही इनपुट फ़ील्ड में पेस्ट करें।\n4. 'कुंजी सहेजें और मान्य करें' पर क्लिक करें।"
       }
     },
     "aboutTab": {
