@@ -338,17 +338,48 @@ export async function searchYouTube(apiKey, query) {
         throw new ApiKeyError("To search YouTube, please go to Settings > API Keys and enter your Google Cloud API key.");
     }
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodedQuery}&type=video&maxResults=1&key=${apiKey}`;
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodedQuery}&type=video&maxResults=1&key=${apiKey}`;
+    
     try {
-        const response = await fetch(url);
-        const data = await response.json();
-        if (!response.ok) {
-            if (data.error?.errors?.[0]?.reason === 'keyInvalid') {
+        const searchResponse = await fetch(searchUrl);
+        const searchData = await searchResponse.json();
+
+        if (!searchResponse.ok) {
+            if (searchData.error?.errors?.[0]?.reason === 'keyInvalid') {
                  throw new ApiKeyError("The YouTube API key is invalid or has exceeded its quota. Please go to Settings > API Keys to check or update it.");
             }
-            throw new Error(data.error?.message || "I couldn't search YouTube right now. The service may be temporarily unavailable.");
+            throw new Error(searchData.error?.message || "I couldn't search YouTube right now. The service may be temporarily unavailable.");
         }
-        return data.items?.[0]?.id?.videoId || null;
+        
+        const videoItem = searchData.items?.[0];
+        if (!videoItem?.id?.videoId) {
+            return null;
+        }
+
+        const videoId = videoItem.id.videoId;
+        const title = videoItem.snippet.title;
+        const channelTitle = videoItem.snippet.channelTitle;
+
+        // Now fetch view count
+        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}&key=${apiKey}`;
+        const detailsResponse = await fetch(detailsUrl);
+        const detailsData = await detailsResponse.json();
+
+        if (!detailsResponse.ok) {
+            // We have the video, but can't get stats. Log the error but proceed.
+            console.warn(`Could not fetch YouTube video statistics for ${videoId}:`, detailsData.error?.message);
+            return { videoId, title, channelTitle, viewCount: null };
+        }
+
+        const viewCount = detailsData.items?.[0]?.statistics?.viewCount || null;
+        
+        return {
+            videoId,
+            title,
+            channelTitle,
+            viewCount: viewCount ? parseInt(viewCount, 10) : null,
+        };
+
     } catch (error) {
          if (error instanceof ApiKeyError) {
             throw error;

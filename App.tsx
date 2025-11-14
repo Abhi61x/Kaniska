@@ -20,6 +20,7 @@ const DisconnectIcon = ({ className }) => React.createElement('svg', { className
 const PersonaIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('circle', { cx: "12", cy: "8", r: "5" }), React.createElement('path', { d: "M20 21a8 8 0 0 0-16 0" }));
 const VoiceIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), React.createElement('path', { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), React.createElement('line', { x1: "12", y1: "19", x2: "12", y2: "22" }));
 const ApiKeysIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19.9 5a1 1 0 0 0-1.4 0l-2.1 2.1a1 1 0 0 0 0 1.4z" }), React.createElement('path', { d: "m4 6 2-2" }), React.createElement('path', { d: "m10.5 10.5 5 5" }), React.createElement('path', { d: "m8.5 8.5 2 2" }), React.createElement('path', { d: "m14.5 14.5 2 2" }), React.createElement('path', { d: "M7 21a4 4 0 0 0 4-4" }), React.createElement('path', { d: "M12 12v4a4 4 0 0 0 4 4h4" }));
+const AboutIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('circle', { cx: "12", cy: "12", r: "10" }), React.createElement('line', { x1: "12", y1: "16", x2: "12", y2: "12" }), React.createElement('line', { x1: "12", y1: "8", x2: "12.01", y2: "8" }));
 const ChatIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }));
 const WeatherIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" }));
 const YouTubeIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M10 15v-6l5 3-5 3Z" }), React.createElement('path', { d: "M21.54 8.63A2.08 2.08 0 0 0 20.06 7.5a21.46 21.46 0 0 0-8.06-.5 21.46 21.46 0 0 0-8.06.5A2.08 2.08 0 0 0 2.46 8.63 22.24 22.24 0 0 0 2 12c0 3.37.46 5.54 1.94 6.5A2.08 2.08 0 0 0 5.4 19.5a21.46 21.46 0 0 0 8.06.5 21.46 21.46 0 0 0 8.06-.5 2.08 2.08 0 0 0 1.48-1.13A22.24 22.24 0 0 0 22 12c0-3.37-.46-5.54-1.94-6.5Z" }));
@@ -160,6 +161,7 @@ export const App = () => {
     const [weatherData, setWeatherData] = React.useState(null);
     const [timerData, setTimerData] = React.useState({ duration: 0, remaining: 0, intervalId: null });
     const [recentYouTubeSearches, setRecentYouTubeSearches] = usePersistentState('kaniska-recentYouTubeSearches', []);
+    const [youtubeVideoDetails, setYoutubeVideoDetails] = React.useState(null);
 
 
     // Settings
@@ -324,10 +326,11 @@ export const App = () => {
         try {
             switch (fc.name) {
                 case 'YOUTUBE_SEARCH':
-                    const videoId = await searchYouTube(apiKeys.youtube, fc.args.youtubeQuery);
-                    if (videoId) {
+                    const videoDetails = await searchYouTube(apiKeys.youtube, fc.args.youtubeQuery);
+                    if (videoDetails) {
+                        setYoutubeVideoDetails(videoDetails);
                         setActivePanel('youtube');
-                        playerRef.current.loadVideoById(videoId);
+                        playerRef.current.loadVideoById(videoDetails.videoId);
                         playerRef.current.playVideo();
                         
                         const newQuery = fc.args.youtubeQuery;
@@ -644,10 +647,11 @@ export const App = () => {
     const handleManualYouTubeSearch = React.useCallback(async (query) => {
         if (!query) return;
         try {
-            const videoId = await searchYouTube(apiKeys.youtube, query);
-            if (videoId) {
+            const videoDetails = await searchYouTube(apiKeys.youtube, query);
+            if (videoDetails) {
+                setYoutubeVideoDetails(videoDetails);
                 setActivePanel('youtube');
-                playerRef.current.loadVideoById(videoId);
+                playerRef.current.loadVideoById(videoDetails.videoId);
                 playerRef.current.playVideo();
                 
                 setRecentYouTubeSearches(prev => {
@@ -797,7 +801,7 @@ export const App = () => {
         );
     };
 
-    const YouTubePanel = ({ recentSearches, onSearch }) => (
+    const YouTubePanel = ({ recentSearches, onSearch, videoDetails }) => (
         React.createElement('div', { className: "h-full w-full flex flex-col p-4 gap-3" },
             React.createElement('div', { className: 'flex justify-between items-center flex-shrink-0' },
                 React.createElement('h3', { className: 'text-sm font-semibold text-text-color-muted' }, t('youtubePanel.title')),
@@ -819,7 +823,14 @@ export const App = () => {
                     )
                 )
             ),
-            React.createElement('div', { id: "youtube-player", className: "youtube-container flex-grow min-h-0" })
+            React.createElement('div', { id: "youtube-player", className: "youtube-container flex-shrink-0" }),
+            videoDetails && React.createElement('div', { className: 'flex-grow min-h-0 overflow-y-auto mt-2' },
+                React.createElement('h4', { className: 'font-semibold text-text-color truncate', title: videoDetails.title }, videoDetails.title),
+                React.createElement('p', { className: 'text-sm text-text-color-muted' }, videoDetails.channelTitle),
+                videoDetails.viewCount && React.createElement('p', { className: 'text-xs text-text-color-muted mt-1' },
+                    t('youtubePanel.views', { count: new Intl.NumberFormat().format(videoDetails.viewCount) })
+                )
+            )
         )
     );
 
@@ -1013,7 +1024,7 @@ export const App = () => {
     const Panels = () => {
         const panelMap = {
             chat: React.createElement(ChatPanel, null),
-            youtube: React.createElement(YouTubePanel, { recentSearches: recentYouTubeSearches, onSearch: handleManualYouTubeSearch }),
+            youtube: React.createElement(YouTubePanel, { recentSearches: recentYouTubeSearches, onSearch: handleManualYouTubeSearch, videoDetails: youtubeVideoDetails }),
             weather: React.createElement(WeatherPanel, null),
             timer: React.createElement(TimerPanel, null),
             code: React.createElement(CodePanel, null),
@@ -1190,7 +1201,8 @@ export const App = () => {
                         React.createElement('nav', { className: "settings-nav" },
                             React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'persona' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('persona') }, React.createElement(PersonaIcon, null), " ", t('settings.tabs.persona')),
                             React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'voice' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('voice') }, React.createElement(VoiceIcon, null), " ", t('settings.tabs.voice')),
-                            React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'apiKeys' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('apiKeys') }, React.createElement(ApiKeysIcon, null), " ", t('settings.tabs.apiKeys'))
+                            React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'apiKeys' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('apiKeys') }, React.createElement(ApiKeysIcon, null), " ", t('settings.tabs.apiKeys')),
+                            React.createElement('button', { className: `settings-nav-button ${activeSettingsTab === 'about' ? 'active' : ''}`, onClick: () => setActiveSettingsTab('about') }, React.createElement(AboutIcon, null), " ", t('settings.tabs.about'))
                         ),
                         React.createElement('div', { className: "settings-content" },
                              activeSettingsTab === 'persona' && (
@@ -1296,6 +1308,16 @@ export const App = () => {
                                             )
                                         )
                                    )
+                                )
+                            ),
+                            activeSettingsTab === 'about' && (
+                                React.createElement('div', { className: "settings-section" },
+                                    React.createElement('div', { className: "settings-card text-center flex flex-col items-center" },
+                                        React.createElement('h3', { className: "text-2xl font-bold" }, t('appName')),
+                                        React.createElement('p', { className: "text-sm text-text-color-muted mt-1" }, `${t('settings.aboutTab.version')} 1.0.0`),
+                                        React.createElement('p', { className: "mt-4 text-base max-w-prose" }, t('settings.aboutTab.description')),
+                                        React.createElement('a', { href: "#/privacy", target: "_blank", rel: "noopener noreferrer", className: "mt-6 inline-block text-primary-color hover:underline" }, t('settings.aboutTab.privacyPolicy'))
+                                    )
                                 )
                             )
                         )

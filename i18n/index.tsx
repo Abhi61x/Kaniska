@@ -43,7 +43,8 @@ const en = {
   },
   "youtubePanel": {
     "title": "YouTube Player",
-    "recentSearches": "Recent Searches"
+    "recentSearches": "Recent Searches",
+    "views": "{{count}} views"
   },
   "settings": {
     "title": "Settings",
@@ -52,7 +53,8 @@ const en = {
       "voice": "Voice",
       "apiKeys": "API Keys",
       "subscription": "Subscription",
-      "help": "Help & Support"
+      "help": "Help & Support",
+      "about": "About"
     },
     "personaTab": {
       "appearance": {
@@ -172,6 +174,12 @@ const en = {
         "inputSteps": "1. In this app, go to Settings ⚙️ > API Keys.\n2. Paste your copied key into the corresponding input field.\n3. Click the \"Save & Validate Keys\" button."
       }
     },
+    "aboutTab": {
+      "title": "About Kaniska",
+      "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using the browser's built-in text-to-speech.",
+      "version": "Version",
+      "privacyPolicy": "Privacy Policy"
+    },
     "common": {
       "save": "Save",
       "saved": "Saved!",
@@ -234,7 +242,8 @@ const hi = {
   },
   "youtubePanel": {
     "title": "यूट्यूब प्लेयर",
-    "recentSearches": "हाल की खोजें"
+    "recentSearches": "हाल की खोजें",
+    "views": "{{count}} बार देखा गया"
   },
   "settings": {
     "title": "सेटिंग्स",
@@ -243,7 +252,8 @@ const hi = {
       "voice": "आवाज़",
       "apiKeys": "एपीआई कुंजी",
       "subscription": "सदस्यता",
-      "help": "सहायता"
+      "help": "सहायता",
+      "about": "बारे में"
     },
     "personaTab": {
        "appearance": {
@@ -362,6 +372,12 @@ const hi = {
         "inputTitle": "मैं कुंजियाँ कहाँ दर्ज करूँ?",
         "inputSteps": "1. इस ऐप में, सेटिंग्स ⚙️ > एपीआई कुंजी पर जाएं।\n2. अपनी कॉपी की गई कुंजी को संबंधित इनपुट फ़ील्ड में पेस्ट करें।\n3. \"कुंजी सहेजें और मान्य करें\" बटन पर क्लिक करें।"
       }
+    },
+    "aboutTab": {
+      "title": "कनिष्का के बारे में",
+      "description": "कनिष्का, एक विज्ञान-कथा से प्रेरित महिला वॉयस असिस्टेंट है जो जेमिनी का उपयोग करके हिंदी में कमांड समझने, यूट्यूब पर खोजने और ब्राउज़र के अंतर्निहित टेक्स्ट-टू-स्पीच का उपयोग करके वॉयस रिप्लाई प्रदान करती है।",
+      "version": "संस्करण",
+      "privacyPolicy": "गोपनीयता नीति"
     },
     "common": {
       "save": "सहेजें",
