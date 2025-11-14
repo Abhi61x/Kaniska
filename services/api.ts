@@ -26,19 +26,19 @@ function handleGeminiError(error, context = 'processing your request') {
     const errorMessage = (error.message || error.toString() || '').toLowerCase();
 
     if (errorMessage.includes('api key not valid')) {
-        return new MainApiKeyError(`I can't complete this action because the main Gemini API key is invalid. Please ask the administrator to check it.`);
+        return new MainApiKeyError("I'm having trouble connecting to my core services because the main Gemini API key is invalid. The application administrator needs to fix this.");
     }
     if (errorMessage.includes('rate limit')) {
-        return new Error("I'm receiving a lot of requests right now. Please wait a moment before trying again.");
+        return new Error("I'm receiving a lot of requests right now. To avoid interruptions, please wait a moment before trying again.");
     }
     if (errorMessage.includes('blocked') || errorMessage.includes('safety')) {
-        return new Error("I'm sorry, but I can't provide a response to that due to my safety guidelines.");
+        return new Error("I am unable to provide a response to that due to my safety guidelines. Please try a different topic.");
     }
     if (error instanceof TypeError && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
-         return new Error("I'm having trouble connecting to my core services. Please check your internet connection and try again.");
+         return new Error("I'm unable to connect to Gemini services. Please check your internet connection and try again.");
     }
     // Generic error for other cases (500 errors, etc.)
-    return new Error("I'm having a little trouble thinking right now. The Gemini service might be temporarily unavailable. Please try again shortly.");
+    return new Error(`I encountered an unexpected issue while ${context}. The service might be temporarily busy. Please try again in a few moments.`);
 }
 
 export async function processUserCommand(
@@ -200,14 +200,14 @@ export async function fetchWeatherSummary(location, apiKey) {
         if (!response.ok) {
             const errorText = await response.text();
             if (response.status === 401 || errorText.toLowerCase().includes('invalid api key')) {
-                throw new ApiKeyError("The Visual Crossing API key is invalid. Please check it in Settings > API Keys.");
+                throw new ApiKeyError("The Visual Crossing API key appears to be invalid. Please go to Settings > API Keys to check or update it.");
             }
-            throw new Error("I'm having trouble fetching the weather forecast right now. The service might be temporarily unavailable.");
+            throw new Error("I'm having trouble fetching the weather forecast. The Visual Crossing service might be temporarily unavailable or the location may be invalid.");
         }
         const data = await response.json();
         
         if (!data.currentConditions) {
-            throw new Error("The weather service returned an unexpected response. Please try again later.");
+            throw new Error("The weather service returned a response I didn't understand. The location might be invalid, or the service could be down.");
         }
 
         return {
@@ -222,7 +222,7 @@ export async function fetchWeatherSummary(location, apiKey) {
             throw error;
         }
         console.error("Error fetching weather data:", error);
-        throw new Error("I'm having trouble fetching the weather forecast right now. Please try again later.");
+        throw new Error("I'm having trouble connecting to the weather service. Please check your internet connection and try again.");
     }
 }
 
@@ -309,9 +309,9 @@ export async function fetchNews(apiKey, query) {
         const response = await fetch(url);
         if (!response.ok) {
              if (response.status === 401) {
-                 throw new ApiKeyError("The GNews API key is invalid. Please check it in Settings > API Keys.");
+                 throw new ApiKeyError("The GNews API key appears to be invalid. Please go to Settings > API Keys to check or update it.");
             }
-            throw new Error("The news service seems to be unavailable right now. Please try again later.");
+            throw new Error("The news service seems to be unavailable at the moment. Please try again in a bit.");
         }
         const data = await response.json();
         if (!data.articles || data.articles.length === 0) {
@@ -327,7 +327,7 @@ export async function fetchNews(apiKey, query) {
         }
         console.error("Error fetching news:", error);
         if (error instanceof TypeError) { // Likely a network error
-            throw new Error("I'm having trouble fetching the news right now. Please check your internet connection.");
+            throw new Error("I couldn't connect to the news service. Please check your internet connection.");
         }
         throw new Error("I'm having trouble fetching the news right now. The service may be unavailable.");
     }
@@ -344,7 +344,7 @@ export async function searchYouTube(apiKey, query) {
         const data = await response.json();
         if (!response.ok) {
             if (data.error?.errors?.[0]?.reason === 'keyInvalid') {
-                 throw new ApiKeyError("The YouTube API key is invalid. Please check it in Settings > API Keys.");
+                 throw new ApiKeyError("The YouTube API key is invalid or has exceeded its quota. Please go to Settings > API Keys to check or update it.");
             }
             throw new Error(data.error?.message || "I couldn't search YouTube right now. The service may be temporarily unavailable.");
         }
@@ -355,7 +355,7 @@ export async function searchYouTube(apiKey, query) {
         }
         console.error("Error searching YouTube:", error);
         if (error instanceof TypeError) { // Likely a network error
-            throw new Error("I'm having trouble with YouTube search. Please check your internet connection.");
+            throw new Error("I'm having trouble connecting to YouTube. Please check your internet connection and try again.");
         }
         throw new Error("I'm having trouble with YouTube search right now. The service may be unavailable.");
     }
@@ -457,9 +457,9 @@ export async function recognizeSong(apiKey, audioBlob) {
 
         if (data.status === 'error') {
             if (data.error?.error_code === 300) { // Invalid API Token
-                 throw new ApiKeyError("The Audd.io API key is invalid. Please check it in Settings > API Keys.");
+                 throw new ApiKeyError("The Audd.io API key is invalid. Please go to Settings > API Keys to check or update it.");
             }
-            throw new Error(data.error?.error_message || 'The song recognition service returned an error. Please try again.');
+            throw new Error(data.error?.error_message || 'The song recognition service returned an error. This might be a temporary issue.');
         }
 
         if (data.status === 'success' && data.result) {
@@ -478,7 +478,7 @@ export async function recognizeSong(apiKey, audioBlob) {
         }
         console.error("Error recognizing song:", error);
         if (error instanceof TypeError) { // Likely a network error
-            throw new Error("I'm having trouble with song recognition. Please check your internet connection.");
+            throw new Error("I couldn't connect to the song recognition service. Please check your internet connection and try again.");
         }
         throw new Error("I'm having trouble with the song recognition service right now. The service may be unavailable.");
     }

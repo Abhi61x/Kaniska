@@ -159,6 +159,8 @@ export const App = () => {
     // Panels Data
     const [weatherData, setWeatherData] = React.useState(null);
     const [timerData, setTimerData] = React.useState({ duration: 0, remaining: 0, intervalId: null });
+    const [recentYouTubeSearches, setRecentYouTubeSearches] = usePersistentState('kaniska-recentYouTubeSearches', []);
+
 
     // Settings
     const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
@@ -327,6 +329,13 @@ export const App = () => {
                         setActivePanel('youtube');
                         playerRef.current.loadVideoById(videoId);
                         playerRef.current.playVideo();
+                        
+                        const newQuery = fc.args.youtubeQuery;
+                        setRecentYouTubeSearches(prev => {
+                            const updatedSearches = [newQuery, ...prev.filter(q => q !== newQuery)];
+                            return updatedSearches.slice(0, 5);
+                        });
+
                         result = { success: true, detail: `Playing video for query: ${fc.args.youtubeQuery}` };
                     } else {
                         result = { success: false, detail: `Could not find a video for "${fc.args.youtubeQuery}".` };
@@ -411,7 +420,7 @@ export const App = () => {
                 }
             });
         }
-    }, [apiKeys, timerData.intervalId, addMessageToHistory, speak, gender, femaleVoices.main, maleVoices.main, emotionTuning]);
+    }, [apiKeys, timerData.intervalId, addMessageToHistory, speak, gender, femaleVoices.main, maleVoices.main, emotionTuning, setRecentYouTubeSearches]);
 
     const disconnect = React.useCallback(async () => {
         if (mediaStreamRef.current) {
@@ -632,6 +641,36 @@ export const App = () => {
         addMessageToHistory('assistant', t('settings.errors.youtubePlayback'), { isError: true });
     };
 
+    const handleManualYouTubeSearch = React.useCallback(async (query) => {
+        if (!query) return;
+        try {
+            const videoId = await searchYouTube(apiKeys.youtube, query);
+            if (videoId) {
+                setActivePanel('youtube');
+                playerRef.current.loadVideoById(videoId);
+                playerRef.current.playVideo();
+                
+                setRecentYouTubeSearches(prev => {
+                    const updatedSearches = [query, ...prev.filter(q => q !== query)];
+                    return updatedSearches.slice(0, 5);
+                });
+                
+                addMessageToHistory('assistant', `Now playing a video for "${query}".`);
+
+            } else {
+                const message = `I couldn't find a video for "${query}".`;
+                addMessageToHistory('assistant', message, { isError: true });
+                speak(message);
+            }
+        } catch (e) {
+            const isApiError = e instanceof ApiKeyError || e instanceof MainApiKeyError;
+            const message = e.message || 'An error occurred while searching YouTube.';
+            addMessageToHistory('assistant', message, { isError: true, isApiKeyError: isApiError });
+            speak(message);
+        }
+    }, [apiKeys.youtube, setRecentYouTubeSearches, addMessageToHistory, speak]);
+
+
     const Header = () => (
         React.createElement('header', { className: "absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10" },
             React.createElement('div', { className: "flex items-center gap-3" },
@@ -758,9 +797,29 @@ export const App = () => {
         );
     };
 
-    const YouTubePanel = () => (
-        React.createElement('div', { className: "h-full w-full flex items-center justify-center p-4" },
-            React.createElement('div', { id: "youtube-player", className: "youtube-container" })
+    const YouTubePanel = ({ recentSearches, onSearch }) => (
+        React.createElement('div', { className: "h-full w-full flex flex-col p-4 gap-3" },
+            React.createElement('div', { className: 'flex justify-between items-center flex-shrink-0' },
+                React.createElement('h3', { className: 'text-sm font-semibold text-text-color-muted' }, t('youtubePanel.title')),
+                recentSearches && recentSearches.length > 0 && (
+                    React.createElement('div', { className: 'relative' },
+                        React.createElement('select', {
+                            className: 'quick-action-button recent-searches-select',
+                            onChange: (e) => {
+                                if (e.target.value) onSearch(e.target.value);
+                                e.target.value = ""; // Reset after selection to allow re-selecting
+                            },
+                            defaultValue: ""
+                        },
+                            React.createElement('option', { value: "", disabled: true }, t('youtubePanel.recentSearches')),
+                            recentSearches.map((query, index) => (
+                                React.createElement('option', { key: index, value: query }, query)
+                            ))
+                        )
+                    )
+                )
+            ),
+            React.createElement('div', { id: "youtube-player", className: "youtube-container flex-grow min-h-0" })
         )
     );
 
@@ -954,7 +1013,7 @@ export const App = () => {
     const Panels = () => {
         const panelMap = {
             chat: React.createElement(ChatPanel, null),
-            youtube: React.createElement(YouTubePanel, null),
+            youtube: React.createElement(YouTubePanel, { recentSearches: recentYouTubeSearches, onSearch: handleManualYouTubeSearch }),
             weather: React.createElement(WeatherPanel, null),
             timer: React.createElement(TimerPanel, null),
             code: React.createElement(CodePanel, null),
@@ -1057,7 +1116,6 @@ export const App = () => {
                 validation.status === 'invalid' && React.createElement('p', { className: 'text-xs text-red-400 mt-1' }, validation.message)
             );
         };
-
 
         const handleTestVoice = async (voiceName) => {
              if (!voiceName) return;

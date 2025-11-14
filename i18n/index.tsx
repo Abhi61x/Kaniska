@@ -41,6 +41,10 @@ const en = {
   "timer": {
     "title": "Timer"
   },
+  "youtubePanel": {
+    "title": "YouTube Player",
+    "recentSearches": "Recent Searches"
+  },
   "settings": {
     "title": "Settings",
     "tabs": {
@@ -177,14 +181,12 @@ const en = {
     },
     "errors": {
       "micNotAllowed": "Microphone access is not allowed. Please enable it in your browser settings to continue.",
-      "network": "A network error occurred with the speech service. Please check your internet connection.",
-      "speechRecognitionGeneric": "An unexpected error occurred with speech recognition. Please try again.",
+      "speechRecognitionGeneric": "An unexpected error occurred with speech recognition. Please try again. If it continues, try refreshing the page.",
       "speechRecognitionNetwork": "A network error prevented speech recognition. Please check your connection.",
-      "connection": "A connection error occurred with the live session. Please check your internet connection and try again.",
-      "youtubePlayback": "I'm sorry, I couldn't play that video. It might be restricted from being played here. Please try another one.",
-      "mainApiKeyError": "I'm having trouble connecting due to an invalid main API key. This needs to be fixed by an administrator, but you can go to settings to check the key status.",
+      "connection": "The live connection to my core services failed. Please check your internet connection. If the problem persists, the service may be temporarily down.",
+      "youtubePlayback": "I'm sorry, but there was an error playing that video. It might be private, deleted, or restricted from being embedded. Please try a different search.",
       "auddioKeyMissing": "Please set your Audd.io API key in the settings to use song recognition.",
-      "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted and try again."
+      "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again."
     }
   }
 };
@@ -229,6 +231,10 @@ const hi = {
   },
   "timer": {
     "title": "टाइमर"
+  },
+  "youtubePanel": {
+    "title": "यूट्यूब प्लेयर",
+    "recentSearches": "हाल की खोजें"
   },
   "settings": {
     "title": "सेटिंग्स",
@@ -366,14 +372,12 @@ const hi = {
     },
     "errors": {
       "micNotAllowed": "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। जारी रखने के लिए कृपया इसे अपनी ब्राउज़र सेटिंग्स में सक्षम करें।",
-      "network": "स्पीच सेवा में नेटवर्क त्रुटि हुई। कृपया अपना इंटरनेट कनेक्शन जांचें।",
-      "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई। कृपया पुनः प्रयास करें।",
+      "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई। कृपया पुनः प्रयास करें। यदि यह जारी रहता है, तो पृष्ठ को ताज़ा करने का प्रयास करें।",
       "speechRecognitionNetwork": "नेटवर्क त्रुटि के कारण वाक् पहचान बाधित हुई। कृपया अपना कनेक्शन जांचें।",
-      "connection": "लाइव सत्र में कनेक्शन त्रुटि हुई। कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।",
-      "youtubePlayback": "मुझे खेद है, मैं वह वीडियो नहीं चला सकी। हो सकता है कि उसे यहां चलाने पर प्रतिबंध हो। कृपया कोई दूसरा प्रयास करें।",
-      "mainApiKeyError": "अमान्य मुख्य API कुंजी के कारण मुझे कनेक्ट होने में समस्या आ रही है। इसे एक व्यवस्थापक द्वारा ठीक करने की आवश्यकता है, लेकिन आप कुंजी की स्थिति जांचने के लिए सेटिंग्स पर जा सकते हैं।",
+      "connection": "मेरी मुख्य सेवाओं से लाइव कनेक्शन विफल हो गया। कृपया अपना इंटरनेट कनेक्शन जांचें। यदि समस्या बनी रहती है, तो सेवा अस्थायी रूप से बंद हो सकती है।",
+      "youtubePlayback": "मुझे खेद है, लेकिन उस वीडियो को चलाने में एक त्रुटि हुई। यह निजी, हटा दिया गया, या एम्बेड करने से प्रतिबंधित हो सकता है। कृपया एक अलग खोज का प्रयास करें।",
       "auddioKeyMissing": "गाना पहचानने की सुविधा का उपयोग करने के लिए कृपया सेटिंग्स में अपनी Audd.io API कुंजी सेट करें।",
-      "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।"
+      "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।"
     }
   }
 };
