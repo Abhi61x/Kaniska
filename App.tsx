@@ -28,6 +28,10 @@ const CodeIcon = ({ className }) => React.createElement('svg', { className: clas
 const MicIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" }), React.createElement('path', { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), React.createElement('line', { x1: "12", y1: "19", x2: "12", y2: "23" }), React.createElement('line', { x1: "8", y1: "23", x2: "16", y2: "23" }));
 const MusicIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M9 18V5l12-2v13" }), React.createElement('circle', { cx: "6", cy: "18", r: "3" }), React.createElement('circle', { cx: "18", cy: "16", r: "3" }));
 const PlayIcon = ({className}) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: className }, React.createElement('polygon', { points: "5 3 19 12 5 21 5 3" }));
+const CheckCircleIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }), React.createElement('polyline', { points: "22 4 12 14.01 9 11.01" }));
+const XCircleIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('circle', { cx: "12", cy: "12", r: "10" }), React.createElement('line', { x1: "15", y1: "9", x2: "9", y2: "15" }), React.createElement('line', { x1: "9", y1: "9", x2: "15", y2: "15" }));
+const SpinnerIcon = ({ className }) => React.createElement('svg', { className: `spinner ${className}`, xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('line', { x1: "12", y1: "2", x2: "12", y2: "6" }), React.createElement('line', { x1: "12", y1: "18", x2: "12", y2: "22" }), React.createElement('line', { x1: "4.93", y1: "4.93", x2: "7.76", y2: "7.76" }), React.createElement('line', { x1: "16.24", y1: "16.24", x2: "19.07", y2: "19.07" }), React.createElement('line', { x1: "2", y1: "12", x2: "6", y2: "12" }), React.createElement('line', { x1: "18", y1: "12", x2: "22", y2: "12" }), React.createElement('line', { x1: "4.93", y1: "19.07", x2: "7.76", y2: "16.24" }), React.createElement('line', { x1: "16.24", y1: "7.76", x2: "19.07", y2: "4.93" }));
+
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -59,14 +63,15 @@ const DEFAULT_MALE_GREETING = "Greetings, user. I am Kanishk. Ready to assist.";
 const DEFAULT_SYSTEM_PROMPT = `You are Kaniska, a sophisticated and friendly female AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
 
 Your capabilities include:
-1.  **Responding to queries:** Answer questions conversationally.
-2.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video.
-3.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
-4.  **Getting News:** Use the 'GET_NEWS' tool to fetch top news headlines for a specific topic.
-5.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
-6.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
-7.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
-8.  **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
+1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
+2.  **Responding to queries:** Answer questions conversationally.
+3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video.
+4.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
+5.  **Getting News:** Use the 'GET_NEWS' tool to fetch top news headlines for a specific topic.
+6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
+7.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
+8.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
+9.  **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking you to sing without a song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -751,7 +756,15 @@ export const App = () => {
         React.createElement('div', { className: "h-full w-full flex flex-col items-center justify-center p-6 text-center info-panel" },
             React.createElement('h3', { className: "text-xl font-bold text-text-color-muted" }, weatherData.location),
             React.createElement('div', { className: "my-4" },
-                React.createElement('img', { src: `https://raw.githubusercontent.com/visualcrossing/WeatherIcons/main/PNG/2nd%20Set%20-%20Color/${weatherData.icon}.png`, alt: weatherData.conditions, className: "w-24 h-24 mx-auto weather-icon-glow" }),
+                React.createElement('img', { 
+                    src: `https://raw.githubusercontent.com/visualcrossing/WeatherIcons/main/PNG/2nd%20Set%20-%20Color/${weatherData.icon}.png`, 
+                    alt: weatherData.conditions, 
+                    className: "w-24 h-24 mx-auto weather-icon-glow",
+                    onError: (e) => {
+                        e.currentTarget.onerror = null; // Prevent infinite loops
+                        e.currentTarget.src = 'https://raw.githubusercontent.com/visualcrossing/WeatherIcons/main/PNG/2nd%20Set%20-%20Color/partly-cloudy-day.png';
+                    }
+                }),
                 React.createElement('p', { className: "text-6xl font-bold mt-2" }, `${weatherData.temp}°C`),
                 React.createElement('p', { className: "text-lg text-text-color-muted capitalize" }, weatherData.conditions)
             ),
@@ -967,7 +980,71 @@ export const App = () => {
 
     const SettingsModal = () => {
         const [activeSettingsTab, setActiveSettingsTab] = React.useState('persona');
+        const [validationStatus, setValidationStatus] = React.useState({
+            weather: { status: 'idle', message: '' },
+            news: { status: 'idle', message: '' },
+            youtube: { status: 'idle', message: '' },
+            auddio: { status: 'idle', message: '' }
+        });
         const TTS_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
+
+        const handleSaveAndValidate = async () => {
+            const keysToValidate = ['weather', 'news', 'youtube', 'auddio'];
+            
+            setValidationStatus(prev => {
+                const newState = {};
+                keysToValidate.forEach(key => {
+                    newState[key] = { status: 'validating', message: '' };
+                });
+                return newState;
+            });
+    
+            const validationPromises = {
+                weather: validateWeatherKey(apiKeys.weather),
+                news: validateNewsKey(apiKeys.news),
+                youtube: validateYouTubeKey(apiKeys.youtube),
+                auddio: validateAuddioKey(apiKeys.auddio)
+            };
+    
+            const results = await Promise.all(Object.values(validationPromises));
+    
+            setValidationStatus(prev => {
+                const newState = { ...prev };
+                Object.keys(validationPromises).forEach((key, index) => {
+                    const result = results[index];
+                    newState[key] = {
+                        status: result.success ? 'valid' : 'invalid',
+                        message: result.message
+                    };
+                });
+                return newState;
+            });
+        };
+        
+        const ApiKeyInput = ({ name, label, value, onChange, validation }) => {
+            const statusMap = {
+                validating: React.createElement(SpinnerIcon, { className: 'text-yellow-400' }),
+                valid: React.createElement(CheckCircleIcon, { className: 'text-green-400' }),
+                invalid: React.createElement(XCircleIcon, { className: 'text-red-400' }),
+                idle: null
+            };
+
+            return React.createElement('div', null,
+                React.createElement('label', { htmlFor: `${name}-key`, className: "block text-sm font-medium mb-1" }, label),
+                React.createElement('div', { className: 'relative flex items-center' },
+                    React.createElement('input', {
+                        id: `${name}-key`,
+                        type: "password",
+                        value: value,
+                        onChange: onChange,
+                        className: "w-full bg-assistant-bubble-bg border border-border-color rounded-md px-3 py-1.5 text-sm pr-10"
+                    }),
+                    React.createElement('div', { className: 'absolute right-2' }, statusMap[validation.status])
+                ),
+                validation.status === 'invalid' && React.createElement('p', { className: 'text-xs text-red-400 mt-1' }, validation.message)
+            );
+        };
+
 
         const handleTestVoice = async (voiceName) => {
              if (!voiceName) return;
@@ -1137,21 +1214,14 @@ export const App = () => {
                                            React.createElement('p', null, t('settings.apiKeysTab.optional.description'))
                                        ),
                                         React.createElement('div', { className: "mt-4 flex flex-col gap-4" },
-                                            React.createElement('div', null,
-                                                React.createElement('label', { className: "block text-sm font-medium mb-1" }, t('settings.apiKeysTab.weatherKey')),
-                                                React.createElement('input', { type: "password", value: apiKeys.weather, onChange: e => setApiKeys((k) => ({...k, weather: e.target.value})), className: "w-full bg-assistant-bubble-bg border border-border-color rounded-md px-3 py-1.5 text-sm" })
-                                            ),
-                                            React.createElement('div', null,
-                                                React.createElement('label', { className: "block text-sm font-medium mb-1" }, t('settings.apiKeysTab.newsKey')),
-                                                React.createElement('input', { type: "password", value: apiKeys.news, onChange: e => setApiKeys((k) => ({...k, news: e.target.value})), className: "w-full bg-assistant-bubble-bg border border-border-color rounded-md px-3 py-1.5 text-sm" })
-                                            ),
-                                            React.createElement('div', null,
-                                                React.createElement('label', { className: "block text-sm font-medium mb-1" }, t('settings.apiKeysTab.youtubeKey')),
-                                                React.createElement('input', { type: "password", value: apiKeys.youtube, onChange: e => setApiKeys((k) => ({...k, youtube: e.target.value})), className: "w-full bg-assistant-bubble-bg border border-border-color rounded-md px-3 py-1.5 text-sm" })
-                                            ),
-                                            React.createElement('div', null,
-                                                React.createElement('label', { className: "block text-sm font-medium mb-1" }, t('settings.apiKeysTab.auddioKey')),
-                                                React.createElement('input', { type: "password", value: apiKeys.auddio, onChange: e => setApiKeys((k) => ({...k, auddio: e.target.value})), className: "w-full bg-assistant-bubble-bg border border-border-color rounded-md px-3 py-1.5 text-sm" })
+                                            React.createElement(ApiKeyInput, { name: 'weather', label: t('settings.apiKeysTab.weatherKey'), value: apiKeys.weather, onChange: e => setApiKeys((k) => ({...k, weather: e.target.value})), validation: validationStatus.weather }),
+                                            React.createElement(ApiKeyInput, { name: 'news', label: t('settings.apiKeysTab.newsKey'), value: apiKeys.news, onChange: e => setApiKeys((k) => ({...k, news: e.target.value})), validation: validationStatus.news }),
+                                            React.createElement(ApiKeyInput, { name: 'youtube', label: t('settings.apiKeysTab.youtubeKey'), value: apiKeys.youtube, onChange: e => setApiKeys((k) => ({...k, youtube: e.target.value})), validation: validationStatus.youtube }),
+                                            React.createElement(ApiKeyInput, { name: 'auddio', label: t('settings.apiKeysTab.auddioKey'), value: apiKeys.auddio, onChange: e => setApiKeys((k) => ({...k, auddio: e.target.value})), validation: validationStatus.auddio })
+                                        ),
+                                        React.createElement('div', { className: "mt-6 flex justify-end" },
+                                            React.createElement('button', { onClick: handleSaveAndValidate, disabled: validationStatus.weather.status === 'validating', className: "px-4 py-2 text-sm font-semibold rounded-md save-button disabled:opacity-50" },
+                                                validationStatus.weather.status === 'validating' ? 'Validating...' : t('settings.apiKeysTab.save')
                                             )
                                         )
                                    )
