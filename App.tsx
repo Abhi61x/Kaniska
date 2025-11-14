@@ -78,6 +78,20 @@ Your capabilities include:
 When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.
 `;
 
+const RANDOM_FACTS = [
+  "A group of flamingos is called a flamboyance.",
+  "The unicorn is the national animal of Scotland.",
+  "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly edible.",
+  "A single cloud can weigh more than a million pounds.",
+  "The shortest war in history was between Britain and Zanzibar on August 27, 1896. Zanzibar surrendered after just 38 minutes.",
+  "Octopuses have three hearts.",
+  "Bananas are berries, but strawberries aren't.",
+  "There are more trees on Earth than stars in the Milky Way galaxy.",
+  "Wombat poop is cube-shaped.",
+  "A day on Venus is longer than a year on Venus.",
+  "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion."
+];
+
 // Helper to decode Base64 and create AudioBuffer
 const decode = (base64) => {
     const binaryString = atob(base64);
@@ -377,9 +391,8 @@ export const App = () => {
                     result = { success: true, detail: "Opened code editor." };
                     break;
                 case 'RANDOM_FACT':
-                    // This is a simple reply, so the model will generate it.
-                    // We just need to tell the model we "handled" it.
-                    result = { success: true, detail: "Fact will be provided in audio response." };
+                    const randomFact = RANDOM_FACTS[Math.floor(Math.random() * RANDOM_FACTS.length)];
+                    result = { success: true, detail: `Here is a fact you can tell the user: ${randomFact}` };
                     break;
             }
         } catch (e) {
