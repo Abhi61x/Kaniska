@@ -376,6 +376,20 @@
         animation: sing-pulse 2.5s infinite ease-in-out;
         border-color: rgba(192, 132, 252, 0.7); /* Vibrant violet */
       }
+      
+      @keyframes recognize-glow {
+        0% { filter: drop-shadow(0 0 20px #f472b6); opacity: 0.9; } /* pink-400 */
+        50% { filter: drop-shadow(0 0 35px #ec4899); opacity: 1; } /* pink-500 */
+        100% { filter: drop-shadow(0 0 20px #f472b6); opacity: 0.9; }
+      }
+      @keyframes recognize-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.025); }
+      }
+      .avatar.expression-recognizing-song {
+        animation: recognize-glow 2s infinite ease-in-out, recognize-pulse 3s infinite ease-in-out;
+        border-color: rgba(236, 72, 153, 0.7);
+      }
 
 
       /* --- Typing Indicator --- */

@@ -1,8 +1,7 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App.tsx';
-import { TranslationProvider } from './i18n/index.ts';
+import { TranslationProvider } from './i18n/index.tsx';
 
 window.addEventListener('DOMContentLoaded', () => {
   const rootElement = document.getElementById('root');
@@ -11,11 +10,16 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   const root = ReactDOM.createRoot(rootElement);
+  // FIX: Converted JSX to React.createElement to bypass potential tooling issues with parsing children, which could cause the "Property 'children' is missing" error.
   root.render(
-    <React.StrictMode>
-      <TranslationProvider>
-        <App />
-      </TranslationProvider>
-    </React.StrictMode>
+    React.createElement(
+      React.StrictMode,
+      null,
+      React.createElement(
+        TranslationProvider,
+        null,
+        React.createElement(App, null)
+      )
+    )
   );
 });
