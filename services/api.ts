@@ -552,7 +552,7 @@ export async function recognizeSong(apiKey, audioBlob) {
         }
         console.error("Error recognizing song:", error);
         if (error instanceof TypeError) { // Likely a network error
-            throw new Error("I couldn't connect to the song recognition service. Please check your internet connection and try again.");
+            throw new Error("I couldn't connect to the song recognition service. Please check your internet connection.");
         }
         throw new Error("I'm having trouble with the song recognition service right now. The service may be unavailable.");
     }
