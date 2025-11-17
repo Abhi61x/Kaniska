@@ -464,32 +464,32 @@
         border-radius: 8px;
         overflow: hidden;
       }
-
-      .youtube-control-button {
-        color: var(--text-color-muted);
-        transition: all 0.2s ease;
-        background: none;
-        border: none;
-        padding: 0.5rem;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      
+      .youtube-queue-item {
+        padding: 4px;
+        border-radius: 6px;
+        transition: background-color 0.2s ease-in-out;
       }
-      .youtube-control-button:hover:not(:disabled) {
+      .youtube-queue-item:hover {
+        background-color: var(--assistant-bubble-bg);
+      }
+      .youtube-queue-button {
+          background: none;
+          border: none;
+          padding: 4px;
+          border-radius: 50%;
+          color: var(--text-color-muted);
+          transition: all 0.2s ease-in-out;
+          opacity: 0;
+      }
+      .youtube-queue-item:hover .youtube-queue-button {
+          opacity: 1;
+      }
+      .youtube-queue-button:hover {
         color: var(--primary-color);
         background-color: var(--primary-color-muted, rgba(34, 211, 238, 0.1));
       }
-       .youtube-control-button:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-      }
-      .play-pause-btn {
-        color: var(--text-color);
-      }
-      .play-pause-btn:hover {
-        color: var(--primary-color);
-      }
+
 
       /* --- Quick Actions --- */
       .quick-action-button {
@@ -652,6 +652,21 @@
         box-shadow: none;
       }
       
+      /* --- Chat Panel --- */
+      .chat-container {
+        scroll-behavior: smooth;
+      }
+      .error-bubble {
+        background-color: rgba(239, 68, 68, 0.15); /* red-500/15 */
+        color: #f87171; /* red-400 */
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+      html[data-theme='light'] .error-bubble {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #b91c1c; /* red-700 */
+        border-color: rgba(220, 38, 38, 0.4);
+      }
+
       /* Chat bubble animation */
       @keyframes chat-bubble-in {
           from { opacity: 0; transform: translateY(10px) scale(0.95); }

@@ -194,7 +194,7 @@ const en = {
       "micNotAllowed": "Microphone access is not allowed. Please enable it in your browser settings to continue.",
       "speechRecognitionGeneric": "An unexpected error occurred with speech recognition. Please try again. If it continues, try refreshing the page.",
       "speechRecognitionNetwork": "A network error prevented speech recognition. Please check your connection.",
-      "connection": "The live connection to my core services failed. Please check your internet connection. If the problem persists, the service may be temporarily down.",
+      "connection": "Live connection failed. Please check your internet and try again. The service might be temporarily unavailable.",
       "youtubePlayback": "I'm sorry, but there was an error playing that video. It might be private, deleted, or restricted from being embedded. Please try a different search.",
       "auddioKeyMissing": "Please set your Audd.io API key in the settings to use song recognition.",
       "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again."
@@ -396,7 +396,7 @@ const hi = {
       "micNotAllowed": "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। जारी रखने के लिए कृपया इसे अपनी ब्राउज़र सेटिंग्स में सक्षम करें।",
       "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई। कृपया पुनः प्रयास करें। यदि यह जारी रहता है, तो पृष्ठ को ताज़ा करने का प्रयास करें।",
       "speechRecognitionNetwork": "नेटवर्क त्रुटि के कारण वाक् पहचान बाधित हुई। कृपया अपना कनेक्शन जांचें।",
-      "connection": "मेरी मुख्य सेवाओं से लाइव कनेक्शन विफल हो गया। कृपया अपना इंटरनेट कनेक्शन जांचें। यदि समस्या बनी रहती है, तो सेवा अस्थायी रूप से बंद हो सकती है।",
+      "connection": "लाइव कनेक्शन विफल हो गया। कृपया अपना इंटरनेट जांचें और फिर से प्रयास करें। सेवा अस्थायी रूप से अनुपलब्ध हो सकती है।",
       "youtubePlayback": "मुझे खेद है, लेकिन उस वीडियो को चलाने में एक त्रुटि हुई। यह निजी, हटा दिया गया, या एम्बेड करने से प्रतिबंधित हो सकता है। कृपया एक अलग खोज का प्रयास करें।",
       "auddioKeyMissing": "गाना पहचानने की सुविधा का उपयोग करने के लिए कृपया सेटिंग्स में अपनी Audd.io API कुंजी सेट करें।",
       "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।"
