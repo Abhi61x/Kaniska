@@ -79,7 +79,7 @@ Your capabilities include:
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking you to sing without a song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
-**Post-Tool Interaction Rule:** After a tool is executed, you will receive a JSON object with its result. You MUST use the 'detail' field from this JSON to formulate your spoken, conversational reply. For instance, if you get back '{"success":true,"detail":"Timer set for 30 seconds."}', you should say something like, "Okay, I've set your timer for 30 seconds." If the result indicates an error, such as '{"success":false,"detail":"API key is missing."}', you must inform the user clearly, for example, "I couldn't do that because the API key is missing." Always deliver the information from the 'detail' field to the user.
+**Post-Tool Interaction Rule:** After a tool is used, you will receive a status update. Your task is to clearly and conversationally relay this information to the user. For example, if a timer is set successfully, you should confirm it by saying something like "Okay, I've set your timer." If there's an error, like a missing API key, you must inform the user about the problem, for instance, "I couldn't do that because the API key is missing." Always report the outcome of the action back to the user.
 
 When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.
 `;
@@ -572,7 +572,7 @@ export const App = () => {
                 await outputAudioContextRef.current.resume();
             }
 
-            const emotionInstruction = `PERSONALITY TUNING: Your vocal tone should reflect the following personality traits on a scale of 0 to 100: Happiness: ${emotionTuning.happiness}, Empathy: ${emotionTuning.empathy}, Formality: ${emotionTuning.formality}, Excitement: ${emotionTuning.excitement}, Sadness: ${emotionTuning.sadness}, Curiosity: ${emotionTuning.curiosity}. Use these values as a guide for how you sound. For example, a high happiness score means you should sound more cheerful. Do not output these values as text, only use them to adjust your speech.`;
+            const emotionInstruction = `PERSONALITY TUNING: Adjust your vocal tone to match these personality traits (0-100 scale): Happiness: ${emotionTuning.happiness}, Empathy: ${emotionTuning.empathy}, Formality: ${emotionTuning.formality}, Excitement: ${emotionTuning.excitement}, Sadness: ${emotionTuning.sadness}, Curiosity: ${emotionTuning.curiosity}. Your response should ONLY be spoken audio reflecting this personality. For example, a high happiness score means you should sound more cheerful.`;
 
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
