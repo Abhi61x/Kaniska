@@ -9,7 +9,7 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 
@@ -76,6 +76,9 @@ Your capabilities include:
 7.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
 8.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
 9.  **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
+
+**Identity & Creator:**
+You were created by "Abhi" (also known as Abhi trainer). If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking you to sing without a song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -208,6 +211,7 @@ export const App = () => {
         output: '',
     });
     const ambientAudioRef = React.useRef(null);
+    const isConnectingRef = React.useRef(false);
 
     // --- Effects ---
     React.useEffect(() => {
@@ -535,11 +539,16 @@ export const App = () => {
     }, [setWasConnected]);
 
     const connect = React.useCallback(async () => {
+        // Prevent race conditions from multiple rapid calls (e.g., React Strict Mode)
+        if (isConnectingRef.current) return;
+
         if (!process.env.API_KEY) {
             addMessageToHistory('assistant', "I can't connect to my core services. This app's main API key seems to be invalid or missing.", { isError: true, isApiKeyError: true });
             setAssistantState('error');
             return;
         }
+        
+        isConnectingRef.current = true;
 
         setWasConnected(true);
         setAssistantState('live');
@@ -577,7 +586,7 @@ export const App = () => {
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
-                    responseModalities: ['AUDIO'],
+                    responseModalities: [Modality.AUDIO],
                     speechConfig: {
                         voiceConfig: { prebuiltVoiceConfig: { voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main } }
                     },
@@ -695,6 +704,8 @@ export const App = () => {
             console.error("Failed to connect live session:", error);
             addMessageToHistory('assistant', error.message, { isError: true, isApiKeyError: error instanceof MainApiKeyError });
             setAssistantState('error');
+        } finally {
+            isConnectingRef.current = false;
         }
     }, [assistantState, lang, gender, femaleVoices.main, maleVoices.main, systemPrompt, emotionTuning, handleFunctionCall, disconnect, speak, addMessageToHistory, t, greetingMessage, setWasConnected, connectionSound]);
     

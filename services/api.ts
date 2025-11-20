@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -497,7 +497,7 @@ export async function generateSpeech(text, voiceName) {
             model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text }] }],
             config: {
-                responseModalities: ['AUDIO'],
+                responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
                         prebuiltVoiceConfig: { voiceName: voiceName },
@@ -548,7 +548,7 @@ export async function generateSong(lyrics, voiceName, tuning) {
             model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text: fullPrompt }] }],
             config: {
-                responseModalities: ['AUDIO'],
+                responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
                         prebuiltVoiceConfig: { voiceName: voiceName },
