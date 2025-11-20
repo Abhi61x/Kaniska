@@ -36,6 +36,8 @@ const SpinnerIcon = ({ className }) => React.createElement('svg', { className: `
 const XIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"}, React.createElement('line', {x1:"18", y1:"6", x2:"6", y2:"18"}), React.createElement('line', {x1:"6", y1:"6", x2:"18", y2:"18"}));
 const WarningIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" }), React.createElement('line', { x1: "12", y1: "9", x2: "12", y2: "13" }), React.createElement('line', { x1: "12", y1: "17", x2: "12.01", y2: "17" }));
 const SendIcon = () => React.createElement('svg', { xmlns:"http://www.w3.org/2000/svg", width:"24", height:"24", viewBox:"0 0 24 24", fill:"none", stroke:"currentColor", strokeWidth:"2", strokeLinecap:"round", strokeLinejoin:"round" }, React.createElement('line',{ x1:"22", y1:"2", x2:"11", y2:"13" }), React.createElement('polygon', { points:"22 2 15 22 11 13 2 9 22 2" }));
+const ArrowLeftIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('line', { x1: "19", y1: "12", x2: "5", y2: "12" }), React.createElement('polyline', { points: "12 19 5 12 12 5" }));
+
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -839,7 +841,7 @@ export const App = () => {
                         React.createElement('path', { d: "M2 9v7 M16 16v7 M30 9v7", stroke: "var(--primary-color)", strokeWidth: "1.5", className: "logo-part-bottom" })
                     )
                 ),
-                React.createElement('h1', { className: "glowing-text text-xl font-bold" }, t('appName'))
+                React.createElement('h1', { className: "glowing-text text-xl font-bold hidden sm:block" }, t('appName'))
             ),
             React.createElement('div', { className: "flex items-center gap-4" },
                 React.createElement('select', {
@@ -1136,6 +1138,7 @@ const Footer = ({ assistantState, onConnect, onDisconnect, onRecognizeSong }) =>
 
 const SettingsModal = ({ isOpen, onClose, settings, t, speak }) => {
     const [activeTab, setActiveTab] = React.useState('persona');
+    const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(true);
     
     if (!isOpen) return null;
     
@@ -1157,14 +1160,26 @@ const SettingsModal = ({ isOpen, onClose, settings, t, speak }) => {
     return React.createElement('div', { className: 'modal-overlay', onClick: onClose, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'settings-title' },
         React.createElement('div', { className: 'modal-content settings-modal-content', onClick: e => e.stopPropagation() },
             React.createElement('div', { className: 'p-4 border-b border-border-color flex justify-between items-center flex-shrink-0' },
-                React.createElement('h2', { id: 'settings-title', className: 'text-xl font-semibold' }, t('settings.title')),
+                React.createElement('div', { className: "flex items-center gap-2" },
+                     !isMobileNavOpen && React.createElement('button', {
+                         onClick: () => setIsMobileNavOpen(true),
+                         className: "md:hidden p-1 rounded-full hover:bg-white/10 mr-1"
+                     }, React.createElement(ArrowLeftIcon, { className: "w-5 h-5" })),
+                     React.createElement('h2', { id: 'settings-title', className: 'text-xl font-semibold' }, t('settings.title'))
+                ),
                 React.createElement('button', { onClick: onClose, className: 'p-1 rounded-full hover:bg-white/10', 'aria-label': 'Close settings' }, React.createElement(XIcon, { className: 'w-6 h-6' }))
             ),
-            React.createElement('div', { className: 'settings-layout' },
-                React.createElement('nav', { className: 'settings-nav', 'aria-label': 'Settings sections' },
+            React.createElement('div', { className: 'settings-layout flex flex-col md:flex-row' },
+                React.createElement('nav', { 
+                    className: `settings-nav w-full md:w-[200px] md:border-r border-border-color ${isMobileNavOpen ? 'block' : 'hidden md:block'}`, 
+                    'aria-label': 'Settings sections' 
+                },
                     tabs.map(tab => React.createElement('button', {
                         key: tab.id,
-                        onClick: () => setActiveTab(tab.id),
+                        onClick: () => { 
+                            setActiveTab(tab.id);
+                            setIsMobileNavOpen(false); 
+                        },
                         className: `settings-nav-button ${activeTab === tab.id ? 'active' : ''}`,
                         role: 'tab',
                         'aria-selected': activeTab === tab.id,
@@ -1173,7 +1188,7 @@ const SettingsModal = ({ isOpen, onClose, settings, t, speak }) => {
                         tab.label
                     ))
                 ),
-                React.createElement('div', { className: 'settings-content', role: 'tabpanel' },
+                React.createElement('div', { className: `settings-content flex-1 ${!isMobileNavOpen ? 'block' : 'hidden md:block'}`, role: 'tabpanel' },
                     content
                 )
             )

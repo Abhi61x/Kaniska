@@ -422,11 +422,6 @@
       .typing-dot:nth-child(2) { animation-delay: 0.2s; }
       .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
-      @keyframes typing-bounce {
-        0%, 80%, 100% { transform: scale(0); }
-        40% { transform: scale(1.0); }
-      }
-
       /* --- Footer Controls --- */
       .footer-button {
         display: flex;
@@ -568,15 +563,15 @@
         height: 80vh;
       }
       .settings-layout {
-        display: flex;
+        /* Layout controlled by Tailwind in App.tsx for responsiveness */
         flex-grow: 1;
         min-height: 0; /* Important for flex child scrolling */
       }
       .settings-nav {
+        /* Width and visibility controlled by Tailwind in App.tsx for responsiveness */
         flex-shrink: 0;
-        width: 200px;
         padding: 16px;
-        border-right: 1px solid var(--border-color);
+        /* border-right: controlled by Tailwind; */
       }
       .settings-nav-button {
         width: 100%;
