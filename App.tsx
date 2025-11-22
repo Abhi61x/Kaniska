@@ -37,6 +37,7 @@ const XIcon = ({ className }) => React.createElement('svg', { className: classNa
 const WarningIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('path', { d: "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" }), React.createElement('line', { x1: "12", y1: "9", x2: "12", y2: "13" }), React.createElement('line', { x1: "12", y1: "17", x2: "12.01", y2: "17" }));
 const SendIcon = () => React.createElement('svg', { xmlns:"http://www.w3.org/2000/svg", width:"24", height:"24", viewBox:"0 0 24 24", fill:"none", stroke:"currentColor", strokeWidth:"2", strokeLinecap:"round", strokeLinejoin:"round" }, React.createElement('line',{ x1:"22", y1:"2", x2:"11", y2:"13" }), React.createElement('polygon', { points:"22 2 15 22 11 13 2 9 22 2" }));
 const ArrowLeftIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('line', { x1: "19", y1: "12", x2: "5", y2: "12" }), React.createElement('polyline', { points: "12 19 5 12 12 5" }));
+const BugIcon = ({ className }) => React.createElement('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, React.createElement('rect', { width: "8", height: "14", x: "8", y: "6", rx: "4" }), React.createElement('path', { d: "m19 7-3 3" }), React.createElement('path', { d: "m5 7 3 3" }), React.createElement('path', { d: "m19 19-3-3" }), React.createElement('path', { d: "m5 19 3-3" }), React.createElement('path', { d: "M2 12h4" }), React.createElement('path', { d: "M18 12h4" }));
 
 
 const getInitialState = (key, defaultValue) => {
@@ -1573,11 +1574,20 @@ const AboutSettings = ({ t }) => (
             title: t('settings.aboutTab.title')
         },
             React.createElement('p', { className: 'text-text-color-muted mb-4' }, t('settings.aboutTab.description')),
-            React.createElement('div', { className: 'text-sm' },
-                React.createElement('span', { className: 'font-semibold' }, `${t('settings.aboutTab.version')}: `),
-                '1.0.0'
-            ),
-             React.createElement('a', { href: '#', className: 'text-sm text-primary-color hover:underline mt-2 inline-block' }, t('settings.aboutTab.privacyPolicy'))
+            React.createElement('div', { className: 'text-sm flex flex-col items-start gap-2' },
+                React.createElement('div', null,
+                    React.createElement('span', { className: 'font-semibold' }, `${t('settings.aboutTab.version')}: `),
+                    '1.0.0'
+                ),
+                 React.createElement('a', { href: '#', className: 'text-primary-color hover:underline' }, t('settings.aboutTab.privacyPolicy')),
+                 React.createElement('a', { 
+                     href: 'mailto:support@kaniska.ai?subject=Bug%20Report%3A%20Kaniska', 
+                     className: 'text-primary-color hover:underline inline-flex items-center gap-2'
+                 }, 
+                    React.createElement(BugIcon, { className: "w-4 h-4" }),
+                    t('settings.aboutTab.reportBug')
+                 )
+            )
         )
     )
 );

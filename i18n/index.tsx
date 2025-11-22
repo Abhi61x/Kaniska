@@ -181,7 +181,8 @@ const en = {
       "title": "About Kaniska",
       "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using the browser's built-in text-to-speech.",
       "version": "Version",
-      "privacyPolicy": "Privacy Policy"
+      "privacyPolicy": "Privacy Policy",
+      "reportBug": "Report Bug"
     },
     "common": {
       "save": "Save",
@@ -383,7 +384,8 @@ const hi = {
       "title": "कनिष्का के बारे में",
       "description": "कनिष्का, एक विज्ञान-कथा से प्रेरित महिला वॉयस असिस्टेंट है जो जेमिनी का उपयोग करके हिंदी में कमांड समझने, यूट्यूब पर खोजने और ब्राउज़र के अंतर्निहित टेक्स्ट-टू-स्पीच का उपयोग करके वॉयस रिप्लाई प्रदान करती है।",
       "version": "संस्करण",
-      "privacyPolicy": "गोपनीयता नीति"
+      "privacyPolicy": "गोपनीयता नीति",
+      "reportBug": "बग रिपोर्ट करें"
     },
     "common": {
       "save": "सहेजें",
