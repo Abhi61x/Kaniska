@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -64,9 +65,10 @@ const usePersistentState = (key, defaultValue) => {
 const DEFAULT_FEMALE_GREETING = "Greetings, user. I am Kaniska. Ready to assist.";
 const DEFAULT_MALE_GREETING = "Greetings, user. I am Kanishk. Ready to assist.";
 
-const DEFAULT_SYSTEM_PROMPT = `You are Kaniska, a sophisticated and friendly female AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
+const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
+You were created by "Abhi" (also known as Abhi trainer). If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
 
-Your capabilities include:
+**Operational Capabilities:**
 1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
 2.  **Responding to queries:** Answer questions conversationally.
 3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
@@ -77,15 +79,14 @@ Your capabilities include:
 8.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
 9.  **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
 
-**Identity & Creator:**
-You were created by "Abhi" (also known as Abhi trainer). If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
-
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
 **Post-Tool Interaction Rule:** After a tool is used, you will receive a status update. Your task is to clearly and conversationally relay this information to the user. For example, if a timer is set successfully, you should confirm it by saying something like "Okay, I've set your timer." If there's an error, like a missing API key, you must inform the user about the problem, for instance, "I couldn't do that because the API key is missing." Always report the outcome of the action back to the user.
-
-When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.
 `;
+
+const DEFAULT_CUSTOM_INSTRUCTIONS = `You are Kaniska, a sophisticated and friendly female AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
+
+When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.`;
 
 const RANDOM_FACTS = [
   "A group of flamingos is called a flamboyance.",
@@ -155,25 +156,224 @@ async function decodeAudioData(
 
 // --- Components ---
 
-const Avatar = ({ state, activity }) => {
-    let expressionClass = 'expression-idle';
-    if (state === 'error') expressionClass = 'expression-error';
-    else if (activity === 'singing') expressionClass = 'expression-singing';
-    else if (state === 'speaking') expressionClass = 'expression-speaking';
-    else if (state === 'listening') expressionClass = 'expression-listening';
-    else if (state === 'recognizing') expressionClass = 'expression-recognizing-song';
-    else if (state === 'thinking') expressionClass = 'expression-thinking';
+// Holographic Cute Girl Avatar Implementation
+const Avatar = ({ state }) => {
+    const wrapRef = React.useRef(null);
+    const avatarRef = React.useRef(null);
+    const svgRef = React.useRef(null);
+    const [sparkles, setSparkles] = React.useState([]);
+
+    // Tilt / Parallax Effect
+    const handlePointerMove = (e) => {
+        if (!wrapRef.current || !avatarRef.current || !svgRef.current) return;
+        const r = wrapRef.current.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const dx = e.clientX - cx;
+        const dy = e.clientY - cy;
+        const maxTilt = 12;
+        const tiltX = (dy / r.height) * maxTilt;
+        const tiltY = -(dx / r.width) * maxTilt;
+        
+        avatarRef.current.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateZ(0)`;
+        svgRef.current.style.transform = `translateZ(48px) rotateZ(${tiltY / 6}deg) scale(1.02)`;
+    };
+
+    const handlePointerLeave = () => {
+        if (avatarRef.current) avatarRef.current.style.transform = '';
+        if (svgRef.current) svgRef.current.style.transform = '';
+    };
+
+    // Sparkles Effect
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            const id = Date.now();
+            const x = 12 + Math.random() * 76;
+            const y = 8 + Math.random() * 64;
+            const delay = Math.random() * 2;
+            const scale = 0.6; // Initial scale matches CSS
+            
+            setSparkles(prev => [...prev, { id, x, y, delay }]);
+            
+            // Cleanup after animation
+            setTimeout(() => {
+                setSparkles(prev => prev.filter(s => s.id !== id));
+            }, 2800); // Match animation duration
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // Determine if mouth should move
+    const isSpeaking = state === 'speaking' || state === 'singing';
 
     return (
-        <div className="hologram-container">
-            <div className="waveform-circle"></div>
-            <div className="waveform-circle"></div>
-            <div className="waveform-circle"></div>
-            <img
-                src="https://storage.googleapis.com/aai-web-samples/kaniska-avatar.png"
-                alt="Kaniska Avatar"
-                className={`avatar ${expressionClass}`}
-            />
+        <div 
+            className="avatar-wrap" 
+            ref={wrapRef}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
+            style={{cursor: 'default'}}
+        >
+            <div className="avatar" ref={avatarRef} onClick={(e) => {
+                // Pulse glow on click
+                const g1 = e.currentTarget.querySelector('.holo-glow');
+                if (g1 && g1.animate) {
+                    g1.animate(
+                        [{filter:'blur(36px)'},{filter:'blur(8px)'},{filter:'blur(36px)'}],
+                        {duration:700, easing:'ease-out'}
+                    );
+                }
+            }}>
+                <div className="holo-glow"></div>
+                <div className="holo-glow-2"></div>
+
+                <div className="canvas">
+                    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="floating" id="svgFace" ref={svgRef} aria-hidden="true">
+                        <defs>
+                            <linearGradient id="gHair" x1="0" x2="1">
+                                <stop offset="0" stopColor="#7B5CFF"/>
+                                <stop offset="1" stopColor="#4DD5FF"/>
+                            </linearGradient>
+                            <radialGradient id="skin" cx="50%" cy="40%">
+                                <stop offset="0" stopColor="#FFD8C6"/>
+                                <stop offset="1" stopColor="#FFC7AD"/>
+                            </radialGradient>
+                        </defs>
+
+                        <circle cx="100" cy="82" r="62" fill="none" stroke="rgba(123,92,255,0.12)" strokeWidth="2"/>
+                        <circle cx="100" cy="82" r="80" fill="none" stroke="rgba(77,213,255,0.06)" strokeWidth="18"/>
+
+                        <path d="M40 92 C36 60,70 28,100 36 C130 28,164 60,160 92 C160 130,120 160,100 156 C80 160,40 130,40 92 Z"
+                              fill="url(#gHair)" opacity="0.95"/>
+                        <ellipse cx="100" cy="98" rx="38" ry="44" fill="url(#skin)"/>
+
+                        <g transform="translate(0,-4)">
+                            <ellipse cx="86" cy="94" rx="6.5" ry="5.5" fill="#071426"/>
+                            <ellipse cx="114" cy="94" rx="6.5" ry="5.5" fill="#071426"/>
+                            <circle cx="83.5" cy="92.5" r="1.4" fill="#fff"/>
+                            <circle cx="111.5" cy="92.5" r="1.4" fill="#fff"/>
+                        </g>
+
+                        <ellipse cx="82" cy="112" rx="6.4" ry="3.8" fill="rgba(255,100,120,0.18)"/>
+                        <ellipse cx="118" cy="112" rx="6.4" ry="3.8" fill="rgba(255,100,120,0.18)"/>
+
+                        {/* Mouth with animation support */}
+                        <path 
+                            d="M92 120 Q100 126 108 120" 
+                            stroke="#7B3A7B" 
+                            strokeWidth="2" 
+                            fill="none" 
+                            strokeLinecap="round"
+                            className={isSpeaking ? "speaking-mouth" : ""}
+                        />
+
+                        <path d="M60 150 C80 138,120 138,140 150 L140 170 L60 170 Z" fill="rgba(255,255,255,0.03)"/>
+                        <path d="M60 150 C80 138,120 138,140 150 L140 170 L60 170 Z" stroke="rgba(77,213,255,0.06)" strokeWidth="1"/>
+
+                        <circle cx="155" cy="50" r="2.6" fill="#fff" opacity="0.9"/>
+                        <circle cx="35" cy="56" r="1.6" fill="#fff" opacity="0.8"/>
+                    </svg>
+                </div>
+
+                <div className="chromatic"></div>
+                <div className="scanlines"></div>
+                <div className="ground"></div>
+                
+                <div className="hint">Hover / move mouse</div>
+
+                {sparkles.map(s => (
+                    <div 
+                        key={s.id} 
+                        className="sparkle" 
+                        style={{
+                            left: `${s.x}%`,
+                            top: `${s.y}%`,
+                            animationDelay: `${s.delay}s`
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Separated component to prevent "Rendered more hooks than during the previous render" error
+const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
+    const [localKeys, setLocalKeys] = React.useState(apiKeys);
+    const [validationStatus, setValidationStatus] = React.useState<any>({});
+    const [isValidating, setIsValidating] = React.useState(false);
+
+    const handleSaveKeys = async () => {
+        setIsValidating(true);
+        setValidationStatus({});
+        const status: any = {};
+        
+        const wRes = await validateWeatherKey(localKeys.weather);
+        status.weather = wRes;
+        
+        const nRes = await validateNewsKey(localKeys.news);
+        status.news = nRes;
+        
+        const yRes = await validateYouTubeKey(localKeys.youtube);
+        status.youtube = yRes;
+
+        const aRes = await validateAuddioKey(localKeys.auddio);
+        status.auddio = aRes;
+
+        setValidationStatus(status);
+        setApiKeys(localKeys);
+        setIsValidating(false);
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="bg-black/20 p-6 rounded-xl border border-gray-800">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-cyan-900/30 rounded-lg">
+                        <ApiKeysIcon className="w-6 h-6 text-cyan-400"/>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-lg text-cyan-400">{t('settings.apiKeysTab.optional.title')}</h3>
+                        <p className="text-xs text-gray-500">{t('settings.apiKeysTab.optional.description')}</p>
+                    </div>
+                </div>
+                
+                <div className="space-y-6 mt-6">
+                    {['weather', 'news', 'youtube', 'auddio'].map(keyType => (
+                            <div key={keyType} className="bg-black/40 p-4 rounded-lg border border-gray-700/50">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs uppercase tracking-wider font-semibold text-gray-400">{t(`settings.apiKeysTab.${keyType}Key`)}</label>
+                                {validationStatus[keyType] && (
+                                    <span className={`text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}`}>
+                                        {validationStatus[keyType].success ? <CheckCircleIcon className="w-3 h-3"/> : <WarningIcon className="w-3 h-3"/>}
+                                        {validationStatus[keyType].success ? 'Valid' : 'Invalid'}
+                                    </span>
+                                )}
+                            </div>
+                            <input 
+                                type="password" 
+                                className="w-full bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600"
+                                value={localKeys[keyType]}
+                                onChange={(e) => setLocalKeys({...localKeys, [keyType]: e.target.value})}
+                                placeholder="Enter your API key here..."
+                            />
+                            {validationStatus[keyType] && !validationStatus[keyType].success && (
+                                <p className="text-xs text-red-400 mt-2 pl-1">{validationStatus[keyType].message}</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                
+                <button 
+                    onClick={handleSaveKeys} 
+                    disabled={isValidating}
+                    className="mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2"
+                >
+                    {isValidating ? <SpinnerIcon className="w-5 h-5"/> : <CheckCircleIcon className="w-5 h-5"/>}
+                    {t('settings.apiKeysTab.save')}
+                </button>
+            </div>
         </div>
     );
 };
@@ -182,13 +382,16 @@ const SettingsModal = ({
     isOpen, onClose, activeTab, setActiveTab, 
     theme, setTheme, gender, setGender, 
     greetingMessage, setGreetingMessage, 
-    systemPrompt, setSystemPrompt, 
+    customInstructions, setCustomInstructions, 
     emotionTuning, setEmotionTuning, 
     apiKeys, setApiKeys, 
     lang, setLang, 
     femaleVoices, setFemaleVoices, 
     maleVoices, setMaleVoices, 
-    ambientVolume, setAmbientVolume 
+    ambientVolume, setAmbientVolume,
+    avatarUrl, setAvatarUrl,
+    subscriptionPlan, setSubscriptionPlan,
+    dailyUsage // Added prop
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -204,11 +407,42 @@ const SettingsModal = ({
         setIsMobileMenuOpen(false);
     };
 
+    const handlePlanSelection = (planId) => {
+        setSubscriptionPlan(planId);
+        // In a real app, this would trigger a payment flow for paid plans.
+    };
+
     const renderTabContent = () => {
         switch (activeTab) {
             case 'persona':
                 return (
                     <div className="space-y-6 animate-fade-in">
+                        {/* Avatar Customization (Maintained for URL input, even if visual is overridden) */}
+                        <div className="bg-black/20 p-5 rounded-xl border border-gray-800">
+                            <h3 className="font-semibold text-lg mb-1 text-cyan-400">{t('settings.personaTab.avatar.title') || "Avatar Customization"}</h3>
+                            <p className="text-xs text-gray-500 mb-4">{t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."}</p>
+                            
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-cyan-500/50 shrink-0 relative">
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-800 flex items-center justify-center text-xs">No Img</div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        className="w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none mb-1"
+                                        value={avatarUrl}
+                                        onChange={(e) => setAvatarUrl(e.target.value)}
+                                        placeholder="https://example.com/avatar.png"
+                                    />
+                                    <p className="text-[10px] text-gray-500">Supported: PNG, JPG, GIF URLs.</p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Appearance & Gender Group */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                              <div className="bg-black/20 p-5 rounded-xl border border-gray-800">
@@ -257,6 +491,37 @@ const SettingsModal = ({
                             />
                         </div>
                         
+                        {/* Custom System Prompt (Editable) */}
+                        <div className="bg-black/20 p-5 rounded-xl border border-gray-800">
+                             <div className="mb-3">
+                                <h3 className="font-semibold text-lg text-cyan-400">{t('settings.personaTab.systemPrompt.title') || "Custom Instructions"}</h3>
+                                <p className="text-xs text-gray-500">{t('settings.personaTab.systemPrompt.description')}</p>
+                            </div>
+                             <textarea
+                                className="w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm font-mono leading-relaxed"
+                                rows={4}
+                                value={customInstructions}
+                                onChange={(e) => setCustomInstructions(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Fixed Identity (Read-Only) */}
+                        <div className="bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden">
+                             <div className="absolute top-0 right-0 p-2">
+                                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50">Read Only</span>
+                             </div>
+                             <div className="mb-3">
+                                <h3 className="font-semibold text-lg text-gray-400">{t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"}</h3>
+                                <p className="text-xs text-gray-500">{t('settings.personaTab.coreIdentity.description') || "These are fixed operational rules and identity definitions set by the creator."}</p>
+                            </div>
+                             <textarea
+                                className="w-full bg-black/20 border border-gray-800 rounded-lg px-4 py-3 text-gray-500 outline-none resize-none text-xs font-mono cursor-not-allowed"
+                                rows={6}
+                                value={FIXED_SYSTEM_INSTRUCTIONS}
+                                disabled
+                            />
+                        </div>
+
                         {/* Ambient Volume */}
                         <div className="bg-black/20 p-5 rounded-xl border border-gray-800">
                              <div className="flex justify-between items-center mb-4">
@@ -294,7 +559,7 @@ const SettingsModal = ({
                                             type="range"
                                             min="0"
                                             max="100"
-                                            value={value as number}
+                                            value={value}
                                             onChange={(e) => setEmotionTuning({ ...emotionTuning, [trait]: parseInt(e.target.value) })}
                                             className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                                         />
@@ -350,82 +615,7 @@ const SettingsModal = ({
                      </div>
                 );
              case 'apiKeys':
-                 const [localKeys, setLocalKeys] = React.useState(apiKeys);
-                 const [validationStatus, setValidationStatus] = React.useState({});
-                 const [isValidating, setIsValidating] = React.useState(false);
-
-                 const handleSaveKeys = async () => {
-                     setIsValidating(true);
-                     setValidationStatus({});
-                     const status: any = {};
-                     
-                     const wRes = await validateWeatherKey(localKeys.weather);
-                     status.weather = wRes;
-                     
-                     const nRes = await validateNewsKey(localKeys.news);
-                     status.news = nRes;
-                     
-                     const yRes = await validateYouTubeKey(localKeys.youtube);
-                     status.youtube = yRes;
-
-                     const aRes = await validateAuddioKey(localKeys.auddio);
-                     status.auddio = aRes;
-
-                     setValidationStatus(status);
-                     setApiKeys(localKeys);
-                     setIsValidating(false);
-                 };
-
-                return (
-                    <div className="space-y-6 animate-fade-in">
-                        <div className="bg-black/20 p-6 rounded-xl border border-gray-800">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 bg-cyan-900/30 rounded-lg">
-                                    <ApiKeysIcon className="w-6 h-6 text-cyan-400"/>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-lg text-cyan-400">{t('settings.apiKeysTab.optional.title')}</h3>
-                                    <p className="text-xs text-gray-500">{t('settings.apiKeysTab.optional.description')}</p>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-6 mt-6">
-                                {['weather', 'news', 'youtube', 'auddio'].map(keyType => (
-                                     <div key={keyType} className="bg-black/40 p-4 rounded-lg border border-gray-700/50">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <label className="text-xs uppercase tracking-wider font-semibold text-gray-400">{t(`settings.apiKeysTab.${keyType}Key`)}</label>
-                                            {validationStatus[keyType] && (
-                                                <span className={`text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {validationStatus[keyType].success ? <CheckCircleIcon className="w-3 h-3"/> : <WarningIcon className="w-3 h-3"/>}
-                                                    {validationStatus[keyType].success ? 'Valid' : 'Invalid'}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <input 
-                                            type="password" 
-                                            className="w-full bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600"
-                                            value={localKeys[keyType]}
-                                            onChange={(e) => setLocalKeys({...localKeys, [keyType]: e.target.value})}
-                                            placeholder="Enter your API key here..."
-                                        />
-                                        {validationStatus[keyType] && !validationStatus[keyType].success && (
-                                            <p className="text-xs text-red-400 mt-2 pl-1">{validationStatus[keyType].message}</p>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            <button 
-                                onClick={handleSaveKeys} 
-                                disabled={isValidating}
-                                className="mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2"
-                            >
-                                {isValidating ? <SpinnerIcon className="w-5 h-5"/> : <CheckCircleIcon className="w-5 h-5"/>}
-                                {t('settings.apiKeysTab.save')}
-                            </button>
-                        </div>
-                    </div>
-                );
+                 return <ApiKeysTab apiKeys={apiKeys} setApiKeys={setApiKeys} t={t} />;
             case 'help':
                  return (
                     <div className="space-y-6 animate-fade-in">
@@ -484,7 +674,14 @@ const SettingsModal = ({
                                 <p className="font-mono mb-4 opacity-70">{t('settings.aboutTab.version')}: 1.0.0 (Beta)</p>
                                 <div className="flex justify-center gap-6">
                                     <a href="#" className="text-gray-500 hover:text-cyan-400 transition-colors">{t('settings.aboutTab.privacyPolicy')}</a>
-                                    <a href="#" className="text-gray-500 hover:text-cyan-400 transition-colors flex items-center gap-1"><BugIcon className="w-3 h-3"/> {t('settings.aboutTab.reportBug')}</a>
+                                    <a 
+                                        href="https://github.com/abhi-trainer/kaniska/issues/new?assignees=&labels=bug&template=bug_report.md&title=[BUG]"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1"
+                                    >
+                                        <BugIcon className="w-3 h-3"/> {t('settings.aboutTab.reportBug')}
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -493,37 +690,88 @@ const SettingsModal = ({
             case 'subscription':
                  return (
                     <div className="space-y-6 animate-fade-in">
-                        <div className="bg-gradient-to-br from-gray-900 to-black p-1 rounded-2xl border border-cyan-900/50 shadow-2xl">
-                            <div className="bg-black/40 rounded-xl p-8 text-center backdrop-blur-sm">
-                                <h3 className="text-cyan-400 font-bold tracking-wider uppercase text-sm mb-2">{t('settings.subscriptionTab.currentPlan')}</h3>
-                                <h2 className="text-3xl font-bold text-white mb-2">{t('settings.subscriptionTab.planName')}</h2>
-                                <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6">
-                                    {t('settings.subscriptionTab.price')}
-                                </div>
-                                
-                                <div className="space-y-3 text-left max-w-xs mx-auto mb-8">
-                                    <p className="text-gray-400 text-sm font-medium border-b border-gray-800 pb-2 mb-4">{t('settings.subscriptionTab.featuresTitle')}</p>
-                                    <div className="flex items-start gap-3 text-sm text-gray-300">
-                                        <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0"/>
-                                        <span>{t('settings.subscriptionTab.feature1')}</span>
-                                    </div>
-                                    <div className="flex items-start gap-3 text-sm text-gray-300">
-                                        <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0"/>
-                                        <span>{t('settings.subscriptionTab.feature2')}</span>
-                                    </div>
-                                    <div className="flex items-start gap-3 text-sm text-gray-300">
-                                        <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0"/>
-                                        <span>{t('settings.subscriptionTab.feature3')}</span>
-                                    </div>
-                                </div>
+                        <div className="text-center mb-8">
+                            <h3 className="text-2xl font-bold text-white mb-2">{t('settings.subscriptionTab.title')}</h3>
+                            <p className="text-gray-400">{t('settings.subscriptionTab.description')}</p>
+                        </div>
 
-                                <div className="flex flex-col gap-3">
-                                    <button className="w-full py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors">
-                                        {t('settings.subscriptionTab.subscribeButton')}
-                                    </button>
-                                    <button className="w-full py-3 bg-transparent border border-gray-700 text-gray-400 font-medium rounded-lg hover:border-gray-500 hover:text-white transition-colors">
-                                        {t('settings.subscriptionTab.cancelButton')}
-                                    </button>
+                        {/* Daily Usage Progress Bar for Free Plan */}
+                        {subscriptionPlan === 'free' && dailyUsage && (
+                            <div className="mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto">
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-300">{t('settings.subscriptionTab.usage')}</span>
+                                    <span className={`font-mono ${dailyUsage.seconds >= 3600 ? 'text-red-400' : 'text-cyan-400'}`}>
+                                        {Math.floor(dailyUsage.seconds / 60)} / 60 min
+                                    </span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full transition-all duration-500 ${dailyUsage.seconds >= 3600 ? 'bg-red-500' : 'bg-cyan-500'}`}
+                                        style={{ width: `${Math.min((dailyUsage.seconds / 3600) * 100, 100)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {['free', 'monthly', 'quarterly', 'halfYearly', 'yearly'].map((planId) => (
+                                <button 
+                                    key={planId} 
+                                    onClick={() => handlePlanSelection(planId)}
+                                    className={`relative p-6 rounded-xl border transition-all text-left group ${
+                                        subscriptionPlan === planId 
+                                        ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
+                                        : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className={`text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}`}>
+                                            {t(`settings.subscriptionTab.plans.${planId}.name`)}
+                                        </h4>
+                                        {subscriptionPlan === planId && (
+                                            <span className="text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40">
+                                                {t('settings.subscriptionTab.active')}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-2xl font-bold text-white">{t(`settings.subscriptionTab.plans.${planId}.price`)}</span>
+                                        <span className="text-xs text-gray-500">{t(`settings.subscriptionTab.plans.${planId}.duration`)}</span>
+                                    </div>
+                                    {planId === 'yearly' && (
+                                        <div className="absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg">
+                                            BEST VALUE
+                                        </div>
+                                    )}
+                                    {subscriptionPlan !== planId && (
+                                        <div className="mt-4 pt-4 border-t border-gray-700/50 text-xs text-center text-cyan-500 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {t('settings.subscriptionTab.upgrade')}
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="bg-black/20 p-6 rounded-xl border border-gray-800 mt-2">
+                            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">
+                                {t('settings.subscriptionTab.featuresTitle')}
+                            </h4>
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 text-sm text-gray-300">
+                                    <CheckCircleIcon className="w-5 h-5 text-gray-400 shrink-0"/>
+                                    <span>{t('settings.subscriptionTab.featureFree')}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-gray-300">
+                                    <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0"/>
+                                    <span>{t('settings.subscriptionTab.feature1')}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-gray-300">
+                                    <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0"/>
+                                    <span>{t('settings.subscriptionTab.feature2')}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-gray-300">
+                                    <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0"/>
+                                    <span>{t('settings.subscriptionTab.feature3')}</span>
                                 </div>
                             </div>
                         </div>
@@ -645,8 +893,8 @@ export const App = () => {
     const [isModelSpeaking, setIsModelSpeaking] = React.useState(false);
     const [chatHistory, setChatHistory] = usePersistentState('kaniska-chatHistory', []);
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-    const [settingsTab, setSettingsTab] = React.useState('persona'); // State lifted to App
-    const [activePanel, setActivePanel] = React.useState('chat'); // chat, youtube, weather, timer, code
+    const [settingsTab, setSettingsTab] = React.useState('persona'); 
+    const [activePanel, setActivePanel] = React.useState('chat'); 
     
     // Panels Data
     const [weatherData, setWeatherData] = React.useState(null);
@@ -660,7 +908,7 @@ export const App = () => {
     const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
     const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
     const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
-    const [systemPrompt, setSystemPrompt] = usePersistentState('kaniska-systemPrompt', DEFAULT_SYSTEM_PROMPT);
+    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-customInstructions', DEFAULT_CUSTOM_INSTRUCTIONS);
     const [temperature, setTemperature] = usePersistentState('kaniska-temperature', 0.5);
     const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotionTuning', {
         happiness: 70, empathy: 80, formality: 20, excitement: 60, sadness: 30, curiosity: 75,
@@ -670,6 +918,9 @@ export const App = () => {
     const [apiKeys, setApiKeys] = usePersistentState('kaniska-apiKeys', { weather: '', news: '', youtube: '', auddio: '' });
     const [wasConnected, setWasConnected] = usePersistentState('kaniska-wasConnected', false);
     const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambientVolume', 0.2);
+    const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatarUrl', 'https://storage.googleapis.com/aai-web-samples/kaniska-avatar.png');
+    const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-subscriptionPlan', 'free');
+    const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-dailyUsage', { date: new Date().toDateString(), seconds: 0 });
 
 
     const [code, setCode] = usePersistentState('kaniska-code', '// Write your code here...');
@@ -677,7 +928,7 @@ export const App = () => {
     const [codeInstruction, setCodeInstruction] = React.useState('');
     const [isCodeLoading, setIsCodeLoading] = React.useState(false);
 
-    // --- Refs for non-state values ---
+    // --- Refs ---
     const playerRef = React.useRef(null);
     const sessionRef = React.useRef(null);
     const inputAudioContextRef = React.useRef(null);
@@ -691,73 +942,24 @@ export const App = () => {
     const ambientAudioRef = React.useRef(null);
     const isConnectingRef = React.useRef(false);
 
-    // --- Effects ---
-    React.useEffect(() => {
-        document.documentElement.setAttribute('data-theme', theme);
-    }, [theme]);
-    
-     React.useEffect(() => {
-        ambientAudioRef.current = document.getElementById('ambient-audio');
-        if (ambientAudioRef.current) {
-            ambientAudioRef.current.volume = ambientVolume;
-        }
-    }, [ambientVolume]);
-    
-    React.useEffect(() => {
-        const autoConnect = async () => {
-            const wasPreviouslyConnected = getInitialState('kaniska-wasConnected', false);
-            if (wasPreviouslyConnected) {
-                try {
-                    if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-                        if (permissionStatus.state === 'granted') {
-                            connect();
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error checking microphone permissions for auto-connect:', error);
-                }
-            }
-        };
+    // --- Functions ---
 
-        autoConnect();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); 
-    
-    const onPlayerStateChange = React.useCallback((event) => {
-        if (event.data === (window as any).YT.PlayerState.ENDED) {
-            if (youtubeQueue.length > 0) {
-                const nextVideo = youtubeQueue[0];
-                setYoutubeQueue(prev => prev.slice(1));
-                setYoutubeVideoDetails(nextVideo);
-                playerRef.current.loadVideoById(nextVideo.videoId);
-                playerRef.current.playVideo();
-            }
-        }
-    }, [youtubeQueue, setYoutubeQueue, setYoutubeVideoDetails]);
+    const disconnect = React.useCallback(() => {
+        try { sessionRef.current?.close(); } catch(e) {}
+        sessionRef.current = null;
+        scriptProcessorRef.current?.disconnect();
+        scriptProcessorRef.current = null;
+        mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+        inputAudioContextRef.current?.close();
+        inputAudioContextRef.current = null;
+        outputAudioContextRef.current?.close();
+        outputAudioContextRef.current = null;
+        setAssistantState('idle');
+        setWasConnected(false);
+        setIsModelSpeaking(false);
+    }, [setWasConnected]);
 
-    React.useEffect(() => {
-        if (!(window as any).YT) {
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            if(firstScriptTag && firstScriptTag.parentNode) {
-              firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-            }
-        }
-
-        (window as any).onYouTubeIframeAPIReady = () => {
-            playerRef.current = new (window as any).YT.Player('youtube-player', {
-                height: '100%',
-                width: '100%',
-                videoId: '',
-                playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
-                events: { 'onError': onPlayerError, 'onStateChange': onPlayerStateChange }
-            });
-        };
-    }, [onPlayerStateChange]);
-    
-    // --- Core Functions ---
     const addMessageToHistory = React.useCallback((sender, text, options = {}) => {
         if (!text || !text.trim()) return;
         setChatHistory((prev) => [...prev, {
@@ -784,7 +986,7 @@ export const App = () => {
             setIsCodeLoading(false);
         }
     }, [code, codeLanguage, codeInstruction, isCodeLoading, addMessageToHistory, setCode]);
-    
+
     const handleFunctionCall = React.useCallback(async (fc) => {
         let result = { success: false, detail: "Unknown command" };
         try {
@@ -888,13 +1090,21 @@ export const App = () => {
         return result;
     }, [addMessageToHistory, apiKeys, gender, femaleVoices, maleVoices, setYoutubeQueue, setYoutubeVideoDetails, setActivePanel, setWeatherData, setTimerData, setRecentYouTubeSearches, setActivityState, setIsModelSpeaking, emotionTuning, youtubeQueue, timerData]);
 
-    const onPlayerError = React.useCallback((event) => {
-        console.warn("YouTube Player Error:", event.data);
-        addMessageToHistory('system', 'An error occurred with the video player.', { isError: true });
-    }, [addMessageToHistory]);
-
     const connect = React.useCallback(async () => {
         if (isConnectingRef.current) return;
+
+        // Check Free Plan Limit before connecting
+        if (subscriptionPlan === 'free') {
+            const today = new Date().toDateString();
+            // If we are on the same day and limit reached, block connection
+            if (dailyUsage.date === today && dailyUsage.seconds >= 3600) { // 3600 seconds = 1 hour
+                 addMessageToHistory('system', t('errors.dailyLimit'), { isError: true });
+                 setSettingsTab('subscription');
+                 setIsSettingsOpen(true);
+                 return;
+            }
+        }
+
         isConnectingRef.current = true;
         setAssistantState('live');
         setWasConnected(true);
@@ -915,6 +1125,9 @@ export const App = () => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaStreamRef.current = stream;
 
+            // Combine custom instructions with fixed identity protocols
+            const systemInstruction = `${customInstructions}\n\n${FIXED_SYSTEM_INSTRUCTIONS}`;
+
             const config = {
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
@@ -922,7 +1135,7 @@ export const App = () => {
                     speechConfig: {
                         voiceConfig: { prebuiltVoiceConfig: { voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main } }
                     },
-                    systemInstruction: systemPrompt,
+                    systemInstruction: systemInstruction,
                     tools: [{ googleSearch: {} }, { functionDeclarations: [
                         { name: 'YOUTUBE_SEARCH', description: 'Search and play a video on YouTube.', parameters: { type: Type.OBJECT, properties: { youtubeQuery: { type: Type.STRING } }, required: ['youtubeQuery'] } },
                         { name: 'GET_WEATHER', description: 'Get weather.', parameters: { type: Type.OBJECT, properties: { location: { type: Type.STRING } }, required: ['location'] } },
@@ -1014,28 +1227,138 @@ export const App = () => {
         } catch (error) {
             console.error(error);
             setAssistantState('error');
-            addMessageToHistory('system', "Connection failed: " + error.message, { isError: true });
+            
+            let errorMessage = error.message || t('main.status.error');
+            let isApiError = error instanceof ApiKeyError || error instanceof MainApiKeyError;
+            let keyType = error instanceof ApiKeyError ? error.keyType : undefined;
+
+            // Refined error feedback
+            const lowerMsg = errorMessage.toLowerCase();
+            if (lowerMsg.includes('403') || lowerMsg.includes('api key') || lowerMsg.includes('unauthenticated')) {
+                 errorMessage = t('errors.apiKeyInvalid') || "API Key invalid or missing.";
+                 isApiError = true;
+            } else if (lowerMsg.includes('429') || lowerMsg.includes('quota') || lowerMsg.includes('rate limit')) {
+                 errorMessage = t('errors.rateLimit') || "Rate limit exceeded. Please try again later.";
+            } else if (lowerMsg.includes('network') || lowerMsg.includes('fetch') || lowerMsg.includes('failed to fetch')) {
+                 errorMessage = t('errors.network') || "Network error. Please check your connection.";
+            } else if (lowerMsg.includes('503') || lowerMsg.includes('service unavailable')) {
+                 errorMessage = t('errors.serviceUnavailable') || "Service temporarily unavailable.";
+            }
+
+            addMessageToHistory('system', errorMessage, { isError: true, isApiKeyError: isApiError, keyType });
         } finally {
             isConnectingRef.current = false;
         }
-    }, [gender, femaleVoices, maleVoices, systemPrompt, handleFunctionCall, addMessageToHistory, setWasConnected, apiKeys]);
+    }, [gender, femaleVoices, maleVoices, customInstructions, handleFunctionCall, addMessageToHistory, setWasConnected, apiKeys, subscriptionPlan, dailyUsage, t]);
 
-    const disconnect = React.useCallback(() => {
-        try { sessionRef.current?.close(); } catch(e) {}
-        sessionRef.current = null;
-        scriptProcessorRef.current?.disconnect();
-        scriptProcessorRef.current = null;
-        mediaStreamRef.current?.getTracks().forEach(track => track.stop());
-        mediaStreamRef.current = null;
-        inputAudioContextRef.current?.close();
-        inputAudioContextRef.current = null;
-        outputAudioContextRef.current?.close();
-        outputAudioContextRef.current = null;
-        setAssistantState('idle');
-        setWasConnected(false);
-        setIsModelSpeaking(false);
-    }, [setWasConnected]);
+    const onPlayerError = React.useCallback((event) => {
+        console.warn("YouTube Player Error:", event.data);
+        addMessageToHistory('system', 'An error occurred with the video player.', { isError: true });
+    }, [addMessageToHistory]);
+
+    const onPlayerStateChange = React.useCallback((event) => {
+        if (event.data === (window as any).YT.PlayerState.ENDED) {
+            if (youtubeQueue.length > 0) {
+                const nextVideo = youtubeQueue[0];
+                setYoutubeQueue(prev => prev.slice(1));
+                setYoutubeVideoDetails(nextVideo);
+                playerRef.current.loadVideoById(nextVideo.videoId);
+                playerRef.current.playVideo();
+            }
+        }
+    }, [youtubeQueue, setYoutubeQueue, setYoutubeVideoDetails]);
+
+    // --- Effects ---
+    React.useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+    }, [theme]);
     
+     React.useEffect(() => {
+        ambientAudioRef.current = document.getElementById('ambient-audio');
+        if (ambientAudioRef.current) {
+            ambientAudioRef.current.volume = ambientVolume;
+        }
+    }, [ambientVolume]);
+
+    // Usage Tracking Effect
+    React.useEffect(() => {
+        let interval;
+        // Track usage if connected and on free plan. We consider 'live', 'speaking', 'listening', 'thinking', 'recognizing' as connected states.
+        const isConnected = ['live', 'speaking', 'listening', 'thinking', 'recognizing'].includes(assistantState);
+        
+        if (isConnected && subscriptionPlan === 'free') {
+            interval = setInterval(() => {
+                setDailyUsage(prev => {
+                    const today = new Date().toDateString();
+                    if (prev.date !== today) {
+                        return { date: today, seconds: 1 }; // Reset on new day
+                    }
+                    // If limit reached, we don't stop tracking here, but the separate effect below will handle disconnect.
+                    return { ...prev, seconds: prev.seconds + 1 };
+                });
+            }, 1000);
+        }
+        
+        return () => clearInterval(interval);
+    }, [assistantState, subscriptionPlan, setDailyUsage]);
+
+    // Effect to enforce daily limit
+    React.useEffect(() => {
+        if (subscriptionPlan === 'free' && dailyUsage.seconds >= 3600) { // 3600 seconds = 1 hour
+            const today = new Date().toDateString();
+            const isConnected = ['live', 'speaking', 'listening', 'thinking', 'recognizing'].includes(assistantState);
+            
+            if (dailyUsage.date === today && isConnected) {
+                 disconnect();
+                 addMessageToHistory('system', t('errors.dailyLimit'), { isError: true });
+                 setSettingsTab('subscription');
+                 setIsSettingsOpen(true);
+            }
+        }
+    }, [dailyUsage, subscriptionPlan, assistantState, disconnect, addMessageToHistory, t, setSettingsTab, setIsSettingsOpen]);
+
+    React.useEffect(() => {
+        if (!(window as any).YT) {
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            if(firstScriptTag && firstScriptTag.parentNode) {
+              firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+        }
+
+        (window as any).onYouTubeIframeAPIReady = () => {
+            playerRef.current = new (window as any).YT.Player('youtube-player', {
+                height: '100%',
+                width: '100%',
+                videoId: '',
+                playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
+                events: { 'onError': onPlayerError, 'onStateChange': onPlayerStateChange }
+            });
+        };
+    }, [onPlayerStateChange, onPlayerError]);
+
+    React.useEffect(() => {
+        const autoConnect = async () => {
+            const wasPreviouslyConnected = getInitialState('kaniska-wasConnected', false);
+            if (wasPreviouslyConnected) {
+                try {
+                    if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+                        if (permissionStatus.state === 'granted') {
+                            connect();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error checking microphone permissions for auto-connect:', error);
+                }
+            }
+        };
+
+        autoConnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run once
+
     // Helper for the setup instruction click
     const handleSetupClick = () => {
         setSettingsTab('help');
@@ -1060,7 +1383,7 @@ export const App = () => {
             <main className="flex-grow flex flex-col items-center justify-center relative p-4 z-10">
                 {/* Avatar - Centered Background Element */}
                  <div className={`transition-all duration-700 ease-in-out transform ${activePanel !== 'chat' && activePanel !== 'idle' ? 'scale-75 opacity-60 blur-sm translate-y-[-10%]' : 'scale-100 opacity-100'}`}>
-                    <Avatar state={isModelSpeaking ? 'speaking' : assistantState} activity={activityState} />
+                    <Avatar state={isModelSpeaking ? 'speaking' : assistantState} />
                 </div>
 
                 {/* Chat Panel - Overlay */}
@@ -1312,13 +1635,16 @@ export const App = () => {
                 theme={theme} setTheme={setTheme}
                 gender={gender} setGender={setGender}
                 greetingMessage={greetingMessage} setGreetingMessage={setGreetingMessage}
-                systemPrompt={systemPrompt} setSystemPrompt={setSystemPrompt}
+                customInstructions={customInstructions} setCustomInstructions={setCustomInstructions}
                 emotionTuning={emotionTuning} setEmotionTuning={setEmotionTuning}
                 apiKeys={apiKeys} setApiKeys={setApiKeys}
                 lang={lang} setLang={setLang}
                 femaleVoices={femaleVoices} setFemaleVoices={setFemaleVoices}
                 maleVoices={maleVoices} setMaleVoices={setMaleVoices}
                 ambientVolume={ambientVolume} setAmbientVolume={setAmbientVolume}
+                avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
+                subscriptionPlan={subscriptionPlan} setSubscriptionPlan={setSubscriptionPlan}
+                dailyUsage={dailyUsage}
             />
         </div>
     );

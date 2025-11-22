@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const en = {
@@ -44,7 +45,10 @@ const en = {
   "youtubePanel": {
     "title": "YouTube Player",
     "recentSearches": "Recent Searches",
-    "views": "{{count}} views"
+    "views": "{{count}} views",
+    "upNext": "Up Next",
+    "clearQueue": "Clear Queue",
+    "searchPlaceholder": "Search for a video to begin."
   },
   "settings": {
     "title": "Settings",
@@ -141,19 +145,31 @@ const en = {
       "newsKey": "GNews API Key",
       "youtubeKey": "Google Cloud API Key (for YouTube)",
       "auddioKey": "Audd.io API Key",
-      "save": "Save & Validate Keys"
+      "save": "Save & Validate Keys",
+      "validation": {
+        "valid": "Key is valid.",
+        "invalid": "Invalid key.",
+        "noKey": "No key provided. Feature will be disabled."
+      }
     },
     "subscriptionTab": {
       "title": "Subscription",
-      "description": "Manage your Kaniska Pro subscription.",
+      "description": "Choose the plan that suits you best. Usage is limited on the Free plan.",
       "currentPlan": "Current Plan",
-      "planName": "Kaniska Pro",
-      "price": "₹100 / month",
-      "subscribeButton": "Subscribe Now",
-      "cancelButton": "Cancel Subscription",
-      "statusActive": "Active",
-      "featuresTitle": "Pro Features included:",
-      "feature1": "Higher priority access during peak times",
+      "upgrade": "Upgrade",
+      "active": "Active",
+      "usage": "Daily Usage",
+      "plans": {
+        "free": { "name": "Free", "price": "₹0", "duration": "/ day" },
+        "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" },
+        "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" },
+        "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" },
+        "yearly": { "name": "Yearly", "price": "₹500", "duration": "/ year" }
+      },
+      "subscribeButton": "Select Plan",
+      "featuresTitle": "Plan Features:",
+      "featureFree": "1 hour of usage per day",
+      "feature1": "Unlimited access & higher priority",
       "feature2": "Access to advanced and experimental voice models",
       "feature3": "Exclusive avatar packs and visual customizations"
     },
@@ -198,7 +214,12 @@ const en = {
       "connection": "Live connection failed. Please check your internet and try again. The service might be temporarily unavailable.",
       "youtubePlayback": "I'm sorry, but there was an error playing that video. It might be private, deleted, or restricted from being embedded. Please try a different search.",
       "auddioKeyMissing": "Please set your Audd.io API key in the settings to use song recognition.",
-      "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again."
+      "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again.",
+      "dailyLimit": "You have reached your daily usage limit of 1 hour on the Free plan. Please upgrade your subscription to continue.",
+      "apiKeyInvalid": "Connection refused. Please check your API Key.",
+      "rateLimit": "Service is busy (Rate Limit Exceeded). Please try again later.",
+      "network": "Network error. Please check your connection.",
+      "serviceUnavailable": "Service temporarily unavailable. Please try again."
     }
   }
 };
@@ -252,7 +273,7 @@ const hi = {
   "settings": {
     "title": "सेटिंग्स",
     "tabs": {
-      "persona": "व्यक्तित्व",
+      "persona": " व्यक्तित्व",
       "voice": "आवाज़",
       "apiKeys": "एपीआई कुंजी",
       "subscription": "सदस्यता",
@@ -344,21 +365,33 @@ const hi = {
       "newsKey": "जीन्यूज एपीआई कुंजी",
       "youtubeKey": "गूगल क्लाउड एपीआई कुंजी (यूट्यूब के लिए)",
       "auddioKey": "Audd.io API कुंजी",
-      "save": "कुंजी सहेजें और मान्य करें"
+      "save": "कुंजी सहेजें और मान्य करें",
+      "validation": {
+        "valid": "कुंजी मान्य है।",
+        "invalid": "अमान्य कुंजी।",
+        "noKey": "कोई कुंजी प्रदान नहीं की गई। सुविधा अक्षम हो जाएगी।"
+      }
     },
-     "subscriptionTab": {
+    "subscriptionTab": {
       "title": "सदस्यता",
-      "description": "अपनी कनिष्का प्रो सदस्यता प्रबंधित करें।",
+      "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो। नि:शुल्क योजना पर उपयोग सीमित है।",
       "currentPlan": "वर्तमान योजना",
-      "planName": "कनिष्का प्रो",
-      "price": "₹100 / महीना",
-      "subscribeButton": "अभी सदस्यता लें",
-      "cancelButton": "सदस्यता रद्द करें",
-      "statusActive": "सक्रिय",
-      "featuresTitle": "प्रो सुविधाओं में शामिल हैं:",
-      "feature1": "व्यस्त समय के दौरान उच्च प्राथमिकता वाली पहुंच।",
-      "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच।",
-      "feature3": "विशेष अवतार पैक और दृश्य अनुकूलन।"
+      "upgrade": "अपग्रेड करें",
+      "active": "सक्रिय",
+      "usage": "दैनिक उपयोग",
+      "plans": {
+        "free": { "name": "नि:शुल्क", "price": "₹0", "duration": "/ दिन" },
+        "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" },
+        "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" },
+        "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" },
+        "yearly": { "name": "वार्षिक", "price": "₹500", "duration": "/ वर्ष" }
+      },
+      "subscribeButton": "योजना चुनें",
+      "featuresTitle": "योजना विशेषताएं:",
+      "featureFree": "प्रति दिन 1 घंटे का उपयोग",
+      "feature1": "असीमित पहुंच और उच्च प्राथमिकता",
+      "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच",
+      "feature3": "विशेष अवतार पैक और दृश्य अनुकूलन"
     },
     "helpTab": {
       "faqTitle": "अक्सर पूछे जाने वाले प्रश्न",
@@ -401,7 +434,12 @@ const hi = {
       "connection": "लाइव कनेक्शन विफल हो गया। कृपया अपना इंटरनेट जांचें और फिर से प्रयास करें। सेवा अस्थायी रूप से अनुपलब्ध हो सकती है।",
       "youtubePlayback": "मुझे खेद है, लेकिन उस वीडियो को चलाने में एक त्रुटि हुई। यह निजी, हटा दिया गया, या एम्बेड करने से प्रतिबंधित हो सकता है। कृपया एक अलग खोज का प्रयास करें।",
       "auddioKeyMissing": "गाना पहचानने की सुविधा का उपयोग करने के लिए कृपया सेटिंग्स में अपनी Audd.io API कुंजी सेट करें।",
-      "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।"
+      "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।",
+      "dailyLimit": "नि:शुल्क योजना पर आप 1 घंटे की दैनिक उपयोग सीमा तक पहुँच गए हैं। जारी रखने के लिए कृपया अपनी सदस्यता अपग्रेड करें।",
+      "apiKeyInvalid": "कनेक्शन अस्वीकृत। कृपया अपनी एपीआई कुंजी की जाँच करें।",
+      "rateLimit": "सेवा व्यस्त है (दर सीमा पार हो गई)। कृपया बाद में पुनः प्रयास करें।",
+      "network": "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें।",
+      "serviceUnavailable": "सेवा अस्थायी रूप से अनुपलब्ध है। कृपया पुन: प्रयास करें।"
     }
   }
 };
@@ -458,3 +496,4 @@ export const availableLanguages = [
     { code: 'en', name: 'English (India)', bcp47: 'en-IN' },
     { code: 'hi', name: 'हिंदी (Hindi)', bcp47: 'hi-IN' },
 ];
+    

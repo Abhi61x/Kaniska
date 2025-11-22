@@ -91,9 +91,13 @@
         "remove": "Remove"
       },
       "systemPrompt": {
-        "title": "Custom System Prompt",
-        "description": "Define the core personality and instructions. A restart is needed for changes to take full effect.",
+        "title": "Custom Instructions",
+        "description": "Define the persona and behavioral instructions. This acts as the variable part of the system prompt.",
         "save": "Save Prompt"
+      },
+      "coreIdentity": {
+        "title": "Core Identity & Protocols",
+        "description": "These are fixed operational rules and identity definitions set by the creator."
       },
        "gender": {
         "title": "Gender Persona",
@@ -151,14 +155,15 @@
     },
     "subscriptionTab": {
       "title": "Subscription",
-      "description": "Manage your Kaniska Pro subscription.",
-      "currentPlan": "Current Plan",
-      "planName": "Kaniska Pro",
-      "price": "₹100 / month",
+      "description": "Choose the plan that suits you best.",
+      "plans": {
+        "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" },
+        "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" },
+        "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" },
+        "yearly": { "name": "Yearly", "price": "₹500", "duration": "/ year" }
+      },
       "subscribeButton": "Subscribe Now",
-      "cancelButton": "Cancel Subscription",
-      "statusActive": "Active",
-      "featuresTitle": "Pro Features included:",
+      "featuresTitle": "All plans include:",
       "feature1": "Higher priority access during peak times",
       "feature2": "Access to advanced and experimental voice models",
       "feature3": "Exclusive avatar packs and visual customizations"
@@ -191,7 +196,8 @@
       "title": "About Kaniska",
       "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using the browser's built-in text-to-speech.",
       "version": "Version",
-      "privacyPolicy": "Privacy Policy"
+      "privacyPolicy": "Privacy Policy",
+      "reportBug": "Report Bug"
     },
     "common": {
       "save": "Save",
