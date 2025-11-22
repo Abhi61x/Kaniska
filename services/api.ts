@@ -2,9 +2,11 @@ import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
-  constructor(message) {
+  keyType: string;
+  constructor(message, keyType) {
     super(message);
     this.name = 'ApiKeyError';
+    this.keyType = keyType;
   }
 }
 
@@ -248,7 +250,7 @@ The programming language is: "${language}".`;
 
 export async function fetchWeatherSummary(location, apiKey) {
     if (!apiKey) {
-      throw new ApiKeyError("To enable weather forecasts, please go to Settings > API Keys and enter your Visual Crossing API key.");
+      throw new ApiKeyError("To enable weather forecasts, please go to Settings > API Keys and enter your Visual Crossing API key.", 'weather');
     }
 
     const encodedLocation = encodeURIComponent(location);
@@ -262,7 +264,7 @@ export async function fetchWeatherSummary(location, apiKey) {
                 case 400:
                     throw new Error(`I couldn't get weather for "${location}". Please check if the location is valid.`);
                 case 401:
-                    throw new ApiKeyError("The Visual Crossing API key appears to be invalid. Please go to Settings > API Keys to check or update it.");
+                    throw new ApiKeyError("The Visual Crossing API key appears to be invalid. Please go to Settings > API Keys to check or update it.", 'weather');
                 case 429:
                     throw new RateLimitError("The Visual Crossing service has exceeded its request limit. Please check your account or try again later.");
                 default:
@@ -379,7 +381,7 @@ export async function validateAuddioKey(apiKey) {
 
 export async function fetchNews(apiKey, query) {
     if (!apiKey) {
-        throw new ApiKeyError("To get news updates, please go to Settings > API Keys and enter your GNews API key.");
+        throw new ApiKeyError("To get news updates, please go to Settings > API Keys and enter your GNews API key.", 'news');
     }
     const encodedQuery = encodeURIComponent(query);
     const url = `https://gnews.io/api/v4/search?q=${encodedQuery}&lang=en&max=5&apikey=${apiKey}`;
@@ -390,9 +392,9 @@ export async function fetchNews(apiKey, query) {
              const apiMessage = data.errors?.[0] || 'The service returned an unspecified error.';
              switch (response.status) {
                 case 401:
-                    throw new ApiKeyError("The GNews API key appears to be invalid. Please go to Settings > API Keys to check or update it.");
+                    throw new ApiKeyError("The GNews API key appears to be invalid. Please go to Settings > API Keys to check or update it.", 'news');
                 case 403:
-                    throw new ApiKeyError("Access to the GNews service was denied. This could be due to an issue with the API key or your account permissions.");
+                    throw new ApiKeyError("Access to the GNews service was denied. This could be due to an issue with the API key or your account permissions.", 'news');
                 case 429:
                     throw new RateLimitError("The GNews API key has exceeded its quota. Please check your GNews account or try again later.");
                 default:
@@ -424,7 +426,7 @@ export async function fetchNews(apiKey, query) {
 
 export async function searchYouTube(apiKey, query) {
     if (!apiKey) {
-        throw new ApiKeyError("To search YouTube, please go to Settings > API Keys and enter your Google Cloud API key.");
+        throw new ApiKeyError("To search YouTube, please go to Settings > API Keys and enter your Google Cloud API key.", 'youtube');
     }
     const encodedQuery = encodeURIComponent(query);
     const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodedQuery}&type=video&maxResults=1&key=${apiKey}`;
@@ -438,7 +440,7 @@ export async function searchYouTube(apiKey, query) {
             const reason = error?.errors?.[0]?.reason;
             switch (reason) {
                 case 'keyInvalid':
-                    throw new ApiKeyError("The YouTube API key is invalid. Please go to Settings > API Keys to check or update it.");
+                    throw new ApiKeyError("The YouTube API key is invalid. Please go to Settings > API Keys to check or update it.", 'youtube');
                 case 'quotaExceeded':
                     throw new RateLimitError("The YouTube API key has exceeded its daily quota. Please check your Google Cloud project or try again tomorrow.");
                 default:
@@ -568,7 +570,7 @@ export async function generateSong(lyrics, voiceName, tuning) {
 
 export async function recognizeSong(apiKey, audioBlob) {
     if (!apiKey) {
-        throw new ApiKeyError("To use song recognition, please go to Settings > API Keys and enter your Audd.io API key.");
+        throw new ApiKeyError("To use song recognition, please go to Settings > API Keys and enter your Audd.io API key.", 'auddio');
     }
 
     const formData = new FormData();
@@ -589,7 +591,7 @@ export async function recognizeSong(apiKey, audioBlob) {
             const errorMessage = data.error?.error_message || 'The service returned an unspecified error.';
             switch (errorCode) {
                 case 300: // Invalid API Token
-                     throw new ApiKeyError("The Audd.io API key is invalid. Please go to Settings > API Keys to check or update it.");
+                     throw new ApiKeyError("The Audd.io API key is invalid. Please go to Settings > API Keys to check or update it.", 'auddio');
                 case 500: // Rate limit exceeded
                      throw new RateLimitError("The Audd.io API key has exceeded its rate limit. Please wait a moment before trying again.");
                 case 800: // Endpoint error
