@@ -35,8 +35,9 @@ if (isKeyValid) {
         try {
             auth = getAuth(app);
         } catch (authError) {
-            console.error("Firebase Auth initialization failed.", authError);
-            // Retry logic or explicit error reporting can go here if needed
+            console.error("Firebase Auth initialization failed:", authError);
+            // In case of component not registered error, it might be an import timing issue.
+            // But with correct imports, this should work.
         }
 
         // Initialize Firestore

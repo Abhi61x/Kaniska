@@ -309,7 +309,8 @@ export async function fetchWeatherSummary(location, apiKey) {
             throw error;
         }
         if (error instanceof TypeError) { // Likely a network error
-            throw new Error("I'm unable to connect to the weather service. Please check your internet connection.");
+             // Improve network error feedback
+             throw new Error("I'm unable to connect to the weather service. Please check your internet connection.");
         }
         console.error("Error fetching weather data:", error);
         throw new Error(error.message || "An unknown error occurred while fetching weather data.");
@@ -354,7 +355,7 @@ export async function validateNewsKey(apiKey) {
     } catch (e) {
         // GNews API often returns 403 Forbidden without CORS headers if the key is invalid,
         // causing a browser Network Error instead of a readable response.
-        return { success: false, message: "Validation failed. This often means the API key is invalid or restricted." };
+        return { success: false, message: "Validation failed. This often means the API key is invalid or restricted. Please check your key." };
     }
 }
 
@@ -371,7 +372,7 @@ export async function validateYouTubeKey(apiKey) {
         const data = await response.json();
         return { success: false, message: data.error?.message || "Invalid API key." };
     } catch (e) {
-        return { success: false, message: "Network error during validation." };
+        return { success: false, message: "Network error during validation. Check your connection or key." };
     }
 }
 
@@ -440,7 +441,7 @@ export async function fetchNews(apiKey, query) {
             // If we are here, it could be a CORS error caused by a 403 from GNews (invalid key).
             // We can't know for sure, but we can give a hint.
             if (error.message === 'Failed to fetch') {
-                throw new Error("I couldn't connect to the news service. This might be due to a network issue, or the API Key might be invalid (causing a restricted response).");
+                throw new ApiKeyError("I couldn't connect to the news service. This usually means the GNews API Key is invalid or restricted, causing the browser to block the request. Please check your key in Settings.", 'news');
             }
             throw new Error("I'm unable to connect to the news service. Please check your internet connection.");
         }
