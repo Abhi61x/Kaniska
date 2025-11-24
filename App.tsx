@@ -11,6 +11,9 @@ import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
+import { auth, db } from './firebase.ts';
+import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
@@ -40,6 +43,7 @@ const SendIcon = ({ className }) => h('svg', { className, xmlns:"http://www.w3.o
 const ArrowLeftIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('line', { x1: "19", y1: "12", x2: "5", y2: "12" }), h('polyline', { points: "12 19 5 12 12 5" }));
 const BugIcon = ({ className }) => h('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { width: "8", height: "14", x: "8", y: "6", rx: "4" }), h('path', { d: "m19 7-3 3" }), h('path', { d: "m5 7 3 3" }), h('path', { d: "m19 19-3-3" }), h('path', { d: "m5 19 3-3" }), h('path', { d: "M2 12h4" }), h('path', { d: "M18 12h4" }));
 const MenuIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('line', { x1: "4", y1: "12", x2: "20", y2: "12" }), h('line', { x1: "4", y1: "6", x2: "20", y2: "6" }), h('line', { x1: "4", y1: "18", x2: "20", y2: "18" }));
+const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), h('circle', { cx: "12", cy: "7", r: "4" }));
 
 
 const getInitialState = (key, defaultValue) => {
@@ -337,7 +341,10 @@ const SettingsModal = ({
     ambientVolume, setAmbientVolume,
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
-    dailyUsage // Added prop
+    dailyUsage,
+    user,
+    handleLogin,
+    handleLogout
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -381,9 +388,9 @@ const SettingsModal = ({
         try {
             // Using dummy customer details for the demo setup. 
             // In a real app, you would ask the user for these or pull from their profile.
-            const customerId = "kaniska_user_" + Date.now();
+            const customerId = user ? `user_${user.uid}` : "kaniska_user_" + Date.now();
             const phone = "9999999999";
-            const email = "user@example.com";
+            const email = user ? user.email : "user@example.com";
 
             const sessionId = await createCashfreeOrder(planId, prices[planId], customerId, phone, email);
             
@@ -401,7 +408,7 @@ const SettingsModal = ({
             console.error("Payment initiation failed", e);
             const msg = e.message || "Unknown error";
             if (msg.includes("Failed to fetch")) {
-                alert("Payment Error: Browser security prevented the connection to Cashfree. In a real deployment, this app requires a backend server to process payments securely.");
+                alert("Payment Error: Unable to reach payment gateway. Please check your connection.");
             } else {
                 alert(`Payment Error: ${msg}`);
             }
@@ -412,6 +419,37 @@ const SettingsModal = ({
 
     const renderTabContent = () => {
         switch (activeTab) {
+            case 'account':
+                return h('div', { className: "space-y-6 animate-fade-in" },
+                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 flex flex-col items-center justify-center text-center min-h-[300px]" },
+                        user ? h(React.Fragment, null,
+                            h('div', { className: "w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-lg" },
+                                user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full rounded-full" }) : user.email ? user.email[0].toUpperCase() : 'U'
+                            ),
+                            h('h3', { className: "text-xl font-bold text-white mb-1" }, user.displayName || "User"),
+                            h('p', { className: "text-gray-400 text-sm mb-6" }, user.email),
+                            h('div', { className: "flex gap-3" },
+                                h('button', {
+                                    onClick: handleLogout,
+                                    className: "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-6 py-2 rounded-lg font-medium transition-colors"
+                                }, "Sign Out")
+                            )
+                        ) : h(React.Fragment, null,
+                            h('div', { className: "p-4 bg-cyan-900/20 rounded-full mb-4" },
+                                h(UserIcon, { className: "w-8 h-8 text-cyan-400" })
+                            ),
+                            h('h3', { className: "text-xl font-bold text-white mb-2" }, "Sign In to Kaniska"),
+                            h('p', { className: "text-gray-400 text-sm mb-8 max-w-xs" }, "Sync your settings, manage your subscription, and access your profile across devices."),
+                            h('button', {
+                                onClick: handleLogin,
+                                className: "bg-white text-gray-900 hover:bg-gray-100 px-6 py-3 rounded-lg font-bold flex items-center gap-3 transition-colors shadow-lg"
+                            },
+                                h('img', { src: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg", alt: "Google", className: "w-5 h-5" }),
+                                "Sign in with Google"
+                            )
+                        )
+                     )
+                );
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
@@ -739,7 +777,7 @@ const SettingsModal = ({
             className: "bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
             onClick: e => e.stopPropagation()
         },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-panel-bg md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-panel-bg md:bg-black/20 md:border-r border-border-color h-full md:relative z-20` },
                 h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
                     h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
                         h(SettingsIcon, { className: "w-6 h-6" }),
@@ -751,6 +789,7 @@ const SettingsModal = ({
                 ),
                 h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
                     [
+                        { id: 'account', icon: UserIcon, label: "Account" },
                         { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
                         { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
                         { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
@@ -796,7 +835,7 @@ const SettingsModal = ({
                         h(ArrowLeftIcon, { className: "w-5 h-5" }),
                         h('span', { className: "text-sm font-medium" }, "Back")
                     ),
-                    h('h3', { className: "font-semibold text-white capitalize" }, t(`settings.tabs.${activeTab}`)),
+                    h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)),
                     h('button', { onClick: onClose, className: "p-2 text-gray-400" },
                         h(XIcon, { className: "w-5 h-5" })
                     )
@@ -807,7 +846,7 @@ const SettingsModal = ({
                 h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
                     h('div', { className: "max-w-3xl mx-auto" },
                         h('div', { className: "hidden md:block mb-8 pb-4 border-b border-border-color" },
-                            h('h2', { className: "text-2xl font-bold text-white" }, t(`settings.tabs.${activeTab}`))
+                            h('h2', { className: "text-2xl font-bold text-white" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`))
                         ),
                         renderTabContent()
                     )
@@ -828,8 +867,9 @@ export const App = () => {
     const [isModelSpeaking, setIsModelSpeaking] = React.useState(false);
     const [chatHistory, setChatHistory] = usePersistentState('kaniska-chatHistory', []);
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-    const [settingsTab, setSettingsTab] = React.useState('persona'); 
+    const [settingsTab, setSettingsTab] = React.useState('account'); 
     const [activePanel, setActivePanel] = React.useState('chat'); 
+    const [user, setUser] = React.useState(null);
     
     // Panels Data
     const [weatherData, setWeatherData] = React.useState(null);
@@ -878,6 +918,83 @@ export const App = () => {
     });
     const ambientAudioRef = React.useRef(null);
     const isConnectingRef = React.useRef(false);
+
+    // --- Auth Listener & Sync ---
+    React.useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
+            if (currentUser) {
+                // Load settings from Firestore
+                try {
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        if (data.subscriptionPlan) setSubscriptionPlan(data.subscriptionPlan);
+                        if (data.theme) setTheme(data.theme);
+                        if (data.gender) setGender(data.gender);
+                        if (data.greetingMessage) setGreetingMessage(data.greetingMessage);
+                        if (data.customInstructions) setCustomInstructions(data.customInstructions);
+                        if (data.emotionTuning) setEmotionTuning(data.emotionTuning);
+                        if (data.femaleVoices) setFemaleVoices(data.femaleVoices);
+                        if (data.maleVoices) setMaleVoices(data.maleVoices);
+                        if (data.ambientVolume !== undefined) setAmbientVolume(data.ambientVolume);
+                        if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+                        // apiKeys are usually not synced for security, but can be if requested.
+                        // We'll skip apiKeys to keep them local-only for now, safer.
+                    } else {
+                        // Create user doc
+                        await setDoc(doc(db, "users", currentUser.uid), {
+                            email: currentUser.email,
+                            createdAt: new Date(),
+                            subscriptionPlan: subscriptionPlan
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error syncing with Firestore:", e);
+                }
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Sync settings to Firestore
+    React.useEffect(() => {
+        if (user) {
+            const userRef = doc(db, "users", user.uid);
+            const settingsToSync = {
+                theme,
+                gender,
+                greetingMessage,
+                customInstructions,
+                emotionTuning,
+                femaleVoices,
+                maleVoices,
+                ambientVolume,
+                avatarUrl,
+                subscriptionPlan
+            };
+            setDoc(userRef, settingsToSync, { merge: true }).catch(e => console.error("Sync error:", e));
+        }
+    }, [user, theme, gender, greetingMessage, customInstructions, emotionTuning, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan]);
+
+    const handleLogin = async () => {
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error("Login failed:", error);
+            alert("Login failed: " + error.message);
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            setUser(null);
+        } catch (error) {
+            console.error("Logout failed:", error);
+        }
+    };
 
     // --- Functions ---
     
@@ -1609,7 +1726,10 @@ export const App = () => {
             ambientVolume: ambientVolume, setAmbientVolume: setAmbientVolume,
             avatarUrl: avatarUrl, setAvatarUrl: setAvatarUrl,
             subscriptionPlan: subscriptionPlan, setSubscriptionPlan: setSubscriptionPlan,
-            dailyUsage: dailyUsage
+            dailyUsage: dailyUsage,
+            user: user,
+            handleLogin: handleLogin,
+            handleLogout: handleLogout
         })
     );
 };

@@ -645,11 +645,11 @@ export async function recognizeSong(apiKey, audioBlob) {
 export async function createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail) {
     const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
-    // Switch to corsproxy.io to avoid CORS issues.
+    // Switch to thingproxy as corsproxy.io is encountering fetch errors
     // In production, this MUST happen on a secure backend server.
     const targetUrl = "https://api.cashfree.com/pg/orders"; 
-    // Note: corsproxy.io usage: https://corsproxy.io/?<url>
-    const url = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    // Using thingproxy which appends the URL at the end of its path
+    const url = `https://thingproxy.freeboard.io/fetch/${targetUrl}`;
 
     const options = {
         method: 'POST',
