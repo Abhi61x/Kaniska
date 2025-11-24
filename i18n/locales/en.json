@@ -213,7 +213,8 @@
       "connection": "The live connection to my core services failed. Please check your internet connection. If the problem persists, the service may be temporarily down.",
       "youtubePlayback": "I'm sorry, but there was an error playing that video. It might be private, deleted, or restricted from being embedded. Please try a different search.",
       "auddioKeyMissing": "Please set your Audd.io API key in the settings to use song recognition.",
-      "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again."
+      "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again.",
+      "dailyLimit": "To continue, you need to subscribe. Please upgrade your plan."
     }
   }
 }

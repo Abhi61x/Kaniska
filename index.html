@@ -18,6 +18,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kaniska | AI Voice Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Color+Emoji&display=swap" rel="stylesheet">
@@ -32,12 +33,20 @@
         --text-color-muted: #8b949e;
         --assistant-bubble-bg: #21262d;
 
-        /* Avatar specific vars */
-        --avatar-size: 360px;
-        --avatar-bg: linear-gradient(180deg,#041025 0%, #07132a 100%);
-        --holo1: rgba(123, 92, 255, 0.9);
-        --holo2: rgba(77, 213, 255, 0.85);
-        --accent: rgba(255,255,255,0.9);
+        /* Avatar specific vars - Fluid Sizing */
+        --avatar-size: clamp(280px, 35vmin, 450px);
+        --avatar-bg: radial-gradient(circle at center, #0f2e4e 0%, #020615 100%);
+        --holo-primary: rgba(34, 211, 238, 0.8);
+        --holo-secondary: rgba(123, 92, 255, 0.8);
+      }
+      
+      /* Responsive Avatar Sizing */
+      @media (orientation: portrait) {
+        :root { --avatar-size: clamp(250px, 50vw, 400px); }
+      }
+      
+      @media (orientation: landscape) and (max-height: 600px) {
+        :root { --avatar-size: clamp(200px, 45vh, 300px); }
       }
       
       html[data-theme='light'] {
@@ -55,6 +64,7 @@
         background-color: transparent; /* Let video show through */
         color: var(--text-color);
         transition: color 0.3s ease-in-out;
+        overflow: hidden;
       }
       
       /* Smooth transitions for theme switching */
@@ -81,7 +91,6 @@
 
       .glowing-text {
         color: var(--primary-color);
-        /* Enhanced glow effect for a more stylish, advanced look */
         text-shadow: 0 0 5px rgba(34, 211, 238, 0.4), 0 0 12px rgba(34, 211, 238, 0.6), 0 0 22px rgba(34, 211, 238, 0.8), 0 0 35px rgba(34, 211, 238, 0.6);
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         letter-spacing: 0.15em;
@@ -123,24 +132,6 @@
         }
       }
 
-      .logo-part-top, .logo-part-bottom {
-        animation: logo-lines-fade 6s infinite alternate ease-in-out;
-      }
-
-      .logo-part-bottom {
-        animation-delay: -3s; /* Offset animation */
-      }
-
-      @keyframes logo-lines-fade {
-        0%, 100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.5;
-        }
-      }
-
-
        /* --- Custom scrollbar --- */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
@@ -148,7 +139,7 @@
       ::-webkit-scrollbar-thumb:hover { background-color: var(--primary-color); }
       
 
-      /* --- Hologram Avatar Styles (Updated) --- */
+      /* --- Real Girl Hologram Avatar Styles --- */
       .avatar-wrap {
         width: var(--avatar-size);
         height: var(--avatar-size);
@@ -156,116 +147,330 @@
         place-items: center;
         perspective: 1000px;
         user-select: none;
-      }
-      @media (max-width:420px){
-        .avatar-wrap { --avatar-size: 260px; }
-      }
-
-      .avatar {
-        width: 86%;
-        height: 86%;
-        border-radius: 18px;
-        background: var(--avatar-bg);
         position: relative;
-        overflow: visible;
-        transform-style: preserve-3d;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
-        border: 1px solid rgba(255,255,255,0.04);
-        transition: transform .18s ease-out;
-      }
-
-      /* holographic gradient overlay */
-      .avatar::before{
-        content:"";
-        position:absolute; inset:0; pointer-events:none; mix-blend-mode:screen;
-        background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.02) 20%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 80%, transparent 100%);
-        opacity:1;
-        z-index:5;
-      }
-
-      /* main svg container */
-      .canvas{
-        position:absolute; inset:10px; border-radius:14px; overflow:hidden; z-index:2;
-        display:flex;align-items:center;justify-content:center;
-      }
-
-      /* hologram glow layers */
-      .holo-glow, .holo-glow-2{
-        position:absolute; left:50%; top:25%; transform:translateX(-50%);
-        width:120%; height:120%; filter:blur(36px); pointer-events:none; mix-blend-mode:screen; opacity:0.9; z-index:1;
-        border-radius:50%;
-      }
-      .holo-glow{ background: radial-gradient(circle at 30% 20%, var(--holo1) 0%, transparent 40%); }
-      .holo-glow-2{ background: radial-gradient(circle at 70% 80%, var(--holo2) 0%, transparent 45%); filter: blur(48px); opacity:0.7; }
-
-      /* scanline & static */
-      .scanlines{
-        position:absolute; inset:0; z-index:6; pointer-events:none;
-        background-image: linear-gradient(transparent 92%, rgba(255,255,255,0.02) 100%);
-        background-size:100% 6px;
-        mix-blend-mode:overlay; opacity:0.85;
-        animation:scan 6s linear infinite;
-      }
-      @keyframes scan{ from{background-position-y:0} to{background-position-y:36px} }
-
-      /* chromatic edges using pseudo elements */
-      .avatar .chromatic{
-        position:absolute; inset:8px; border-radius:12px; pointer-events:none; z-index:4;
-        background:transparent;
-        mix-blend-mode:screen;
-      }
-      .chromatic::before, .chromatic::after{
-        content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-        background:linear-gradient(90deg, rgba(123,92,255,0.18), transparent 25%, transparent 75%, rgba(77,213,255,0.12));
-        filter:blur(6px);
-      }
-      .chromatic::after{ transform:translateX(6px) scaleX(1.02); opacity:0.9; }
-
-      /* svg styling */
-      .canvas svg{ width:72%; height:auto; display:block; transform:translateZ(40px) scale(1); transition:transform .25s ease-out; }
-
-      /* floating animation */
-      @keyframes floaty{
-        0%{ transform: translateY(0) }
-        50%{ transform: translateY(-6px) }
-        100%{ transform: translateY(0) }
-      }
-      .floating{ animation: floaty 4.6s ease-in-out infinite; }
-
-      /* cute soft shadow under avatar */
-      .ground{
-        position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); width:60%; height:8px;
-        background: radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.08) 60%, transparent 100%);
-        filter:blur(6px); z-index:0; opacity:0.8;
-      }
-
-      /* small sparkle particles */
-      .sparkle{
-        position:absolute; width:6px; height:6px; border-radius:50%; z-index:7; pointer-events:none;
-        background:linear-gradient(180deg,var(--accent), rgba(255,255,255,0.6));
-        box-shadow:0 0 12px rgba(255,255,255,0.6), 0 0 24px rgba(123,92,255,0.25);
-        opacity:0.95;
-        transform:scale(.6);
-        animation:twinkle 2.8s linear infinite;
-      }
-      @keyframes twinkle{ 0%{transform:scale(.6);opacity:.6}50%{transform:scale(1.2);opacity:1}100%{transform:scale(.6);opacity:.6} }
-
-      .hint{
-        position:absolute; right:10px; bottom:8px; font-size:12px; color:rgba(255,255,255,0.6); z-index:9;
-        background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:8px; backdrop-filter: blur(4px);
+        touch-action: none; /* Prevents scroll interference on touch devices during interaction */
+        margin: 0 auto;
+        transition: transform 0.3s ease;
       }
       
-      /* Speaking Animation override for the SVG Mouth */
-      @keyframes mouth-speak {
-        0%, 100% { transform: scaleY(1); }
-        50% { transform: scaleY(1.5); }
+      /* Interactive Hover State - Scale Up and Pulse */
+      .avatar-wrap:hover .avatar-container {
+        transform: scale(1.05);
+        box-shadow: 0 0 60px rgba(34, 211, 238, 0.6), inset 0 0 20px rgba(0,0,0,0.5);
+        border-color: rgba(34, 211, 238, 0.9);
       }
-      .speaking-mouth {
-        transform-origin: center;
-        animation: mouth-speak 0.3s infinite ease-in-out;
+      
+      .avatar-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        border-radius: 50%; /* Circular frame for realism */
+        background: var(--avatar-bg); /* Ensure visible background even without image */
+        box-shadow: 
+            0 0 30px rgba(34, 211, 238, 0.3),
+            inset 0 0 40px rgba(0,0,0,0.8);
+        transform-style: preserve-3d;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        border: 2px solid rgba(34, 211, 238, 0.3);
+      }
+      
+      /* Interactive Hover State - Image Clarity */
+      .avatar-wrap:hover .avatar-image {
+        filter: 
+            contrast(1.25) 
+            brightness(1.2)
+            saturate(1.3)
+            sepia(0.2) hue-rotate(180deg) saturate(2)
+            drop-shadow(0 0 25px var(--holo-primary));
+        opacity: 1;
+      }
+
+      /* The 3D Cartoon Image Stylized as Hologram */
+      .avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center 20%;
+        /* Holographic Filter Chain - Tuned for Holographic Look */
+        filter: 
+            contrast(1.2) 
+            brightness(1.1)
+            sepia(0.5) hue-rotate(180deg) saturate(1.8)
+            drop-shadow(0 0 10px var(--holo-primary));
+        opacity: 0.9;
+        mix-blend-mode: normal; 
+        transform: scale(1);
+        transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      
+      /* Emotion States - Modify the filter and border color based on mood */
+      
+      /* Happy/Excited: Warmer, more gold/orange tint */
+      .avatar-mood-happy .avatar-image {
+         filter: 
+            contrast(1.2) 
+            brightness(1.2) 
+            sepia(10%)
+            hue-rotate(-10deg) 
+            saturate(1.4) 
+            drop-shadow(0 0 20px rgba(255, 200, 100, 0.5));
+      }
+      .avatar-mood-happy .avatar-container {
+         border-color: rgba(255, 200, 100, 0.6);
+         box-shadow: 0 0 40px rgba(255, 200, 100, 0.3), inset 0 0 30px rgba(50, 20, 0, 0.5);
+      }
+
+      .avatar-mood-excited .avatar-image {
+         filter: 
+            contrast(1.3) 
+            brightness(1.3) 
+            saturate(1.6) 
+            hue-rotate(320deg)
+            drop-shadow(0 0 25px rgba(255, 100, 200, 0.6));
+         animation: excited-bounce 2s infinite ease-in-out;
+      }
+      .avatar-mood-excited .avatar-container {
+         border-color: rgba(255, 100, 200, 0.6);
+         box-shadow: 0 0 50px rgba(255, 100, 200, 0.4);
+      }
+      @keyframes excited-bounce {
+          0%, 100% { transform: scale(0.98); }
+          50% { transform: scale(1.02); }
+      }
+
+      /* Sad: Cooler, desaturated blue/grey */
+      .avatar-mood-sad .avatar-image {
+         filter: 
+            contrast(0.9) 
+            brightness(0.9) 
+            sepia(20%) 
+            hue-rotate(180deg) 
+            saturate(0.6) 
+            drop-shadow(0 0 5px rgba(100, 150, 200, 0.4));
+      }
+      .avatar-mood-sad .avatar-container {
+         border-color: rgba(100, 150, 200, 0.3);
+         box-shadow: 0 0 20px rgba(100, 150, 200, 0.2);
+      }
+
+      /* Empathetic/Calm: Soft teal/green */
+      .avatar-mood-empathetic .avatar-image {
+         filter: 
+            contrast(1.1) 
+            brightness(1.1) 
+            hue-rotate(90deg) 
+            saturate(1.1) 
+            drop-shadow(0 0 15px rgba(100, 255, 200, 0.4));
+      }
+      .avatar-mood-empathetic .avatar-container {
+         border-color: rgba(100, 255, 200, 0.4);
+         box-shadow: 0 0 30px rgba(100, 255, 200, 0.2);
       }
 
 
+      /* Holographic Overlay Effects */
+      .holo-overlay {
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent 0px,
+          transparent 2px,
+          rgba(34, 211, 238, 0.1) 3px,
+          rgba(34, 211, 238, 0.1) 4px
+        );
+        background-size: 100% 4px;
+        pointer-events: none;
+        z-index: 10;
+        opacity: 0.3;
+        mix-blend-mode: overlay;
+        animation: scanlines 8s linear infinite;
+      }
+
+      .glitch-layer {
+        position: absolute;
+        inset: 0;
+        background: transparent;
+        mix-blend-mode: color-dodge;
+        z-index: 11;
+        opacity: 0;
+      }
+
+      /* Animations & States */
+
+      /* IDLE: Breathing & Floating - Subtle */
+      .avatar-state-idle .avatar-container {
+        animation: breath-idle-container 6s ease-in-out infinite;
+      }
+      .avatar-state-idle .avatar-image {
+        animation: breath-image 5s ease-in-out infinite;
+      }
+      @keyframes breath-idle-container {
+        0%, 100% { 
+            transform: translateY(0);
+            box-shadow: 0 0 30px rgba(34, 211, 238, 0.3); 
+            border-color: rgba(34, 211, 238, 0.4);
+        }
+        50% { 
+            transform: translateY(-8px);
+            box-shadow: 0 0 50px rgba(34, 211, 238, 0.5); 
+            border-color: rgba(34, 211, 238, 0.6);
+        }
+      }
+      @keyframes breath-image {
+         0%, 100% { transform: scale(1); opacity: 0.9; }
+         50% { transform: scale(1.03); opacity: 0.95; }
+      }
+
+      /* LISTENING: Alert, Pulsing Focus */
+      .avatar-state-listening .avatar-container {
+        border-color: var(--primary-color);
+        animation: listen-pulse 1.5s infinite ease-in-out;
+      }
+      .avatar-state-listening .avatar-image {
+        transform: scale(1.05);
+        filter: contrast(1.2) brightness(1.2) saturate(1.3);
+      }
+      @keyframes listen-pulse {
+        0% { box-shadow: 0 0 20px var(--holo-primary); border-width: 2px; }
+        50% { box-shadow: 0 0 60px var(--holo-primary), inset 0 0 25px var(--holo-primary); border-width: 4px; }
+        100% { box-shadow: 0 0 20px var(--holo-primary); border-width: 2px; }
+      }
+
+      /* THINKING: Processing Ring, Color Shift */
+      .avatar-state-thinking .avatar-container {
+        border-color: #d946ef; /* Fuchsia-500 */
+      }
+      .avatar-state-thinking .avatar-image {
+        /* Shift hue to purple */
+        filter: contrast(1.1) brightness(1.1) hue-rotate(240deg) saturate(1.2);
+        opacity: 0.8;
+      }
+      .thinking-ring {
+        position: absolute;
+        inset: -15px;
+        border: 2px dashed #d946ef;
+        border-radius: 50%;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .avatar-state-thinking .thinking-ring {
+        opacity: 0.8;
+        animation: spin 3s linear infinite;
+      }
+
+      /* SPEAKING: Vibration, Brightness Modulation */
+      .avatar-state-speaking .avatar-container {
+         animation: speak-glow 0.6s infinite alternate;
+      }
+      .avatar-state-speaking .avatar-image {
+         animation: speak-animate 0.4s infinite ease-in-out;
+         filter: contrast(1.3) brightness(1.3) sepia(0.2) hue-rotate(180deg) saturate(2);
+      }
+      @keyframes speak-glow {
+        from { box-shadow: 0 0 30px var(--holo-primary); border-color: rgba(34,211,238, 0.7); }
+        to { box-shadow: 0 0 80px var(--holo-primary), inset 0 0 30px var(--holo-primary); border-color: rgba(34,211,238, 1); }
+      }
+      @keyframes speak-animate {
+        0% { transform: scale(1) translateY(0); filter: brightness(1.2) sepia(0.5) hue-rotate(180deg) saturate(1.8); }
+        50% { transform: scale(1.03) translateY(-3px); filter: brightness(1.5) sepia(0.5) hue-rotate(180deg) saturate(2); }
+        100% { transform: scale(1) translateY(0); filter: brightness(1.2) sepia(0.5) hue-rotate(180deg) saturate(1.8); }
+      }
+
+      /* SINGING: Multi-color energetic */
+      .avatar-state-singing .avatar-container {
+        animation: sing-rainbow 3s infinite linear;
+      }
+      @keyframes sing-rainbow {
+        0% { filter: hue-rotate(0deg); }
+        100% { filter: hue-rotate(360deg); }
+      }
+
+      /* RECOGNIZING: Music Scanning */
+      .avatar-state-recognizing .avatar-container {
+         border-color: var(--primary-color);
+         box-shadow: 0 0 50px var(--holo-primary), inset 0 0 30px var(--holo-primary);
+         animation: recognize-pulse 2s infinite ease-in-out;
+      }
+      .avatar-state-recognizing .avatar-image {
+         filter: contrast(1.3) brightness(1.2) hue-rotate(300deg) saturate(1.5);
+         opacity: 0.8;
+         transform: scale(1.02);
+         transition: all 0.5s ease;
+      }
+      @keyframes recognize-pulse {
+        0% { box-shadow: 0 0 20px var(--holo-primary); border-width: 2px; }
+        50% { box-shadow: 0 0 70px var(--holo-primary), inset 0 0 35px var(--holo-primary); border-width: 4px; }
+        100% { box-shadow: 0 0 20px var(--holo-primary); border-width: 2px; }
+      }
+
+      .music-note-overlay {
+          position: absolute;
+          z-index: 20;
+          color: var(--primary-color);
+          filter: drop-shadow(0 0 10px var(--primary-color));
+          animation: music-bounce 1s infinite alternate ease-in-out;
+          width: 25%;
+          height: 25%;
+          left: 37.5%;
+          top: 37.5%;
+      }
+      
+      .recognize-ripple {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          border: 2px solid var(--primary-color);
+          opacity: 0;
+          animation: ripple-effect 2s infinite linear;
+          pointer-events: none;
+      }
+
+      @keyframes music-bounce {
+          from { transform: translateY(0) scale(1); opacity: 0.8; }
+          to { transform: translateY(-10px) scale(1.1); opacity: 1; }
+      }
+
+      @keyframes ripple-effect {
+          0% { width: 90%; height: 90%; opacity: 0.8; border-width: 3px; }
+          100% { width: 140%; height: 140%; opacity: 0; border-width: 0px; }
+      }
+
+      @keyframes scanlines {
+        from { background-position: 0 0; }
+        to { background-position: 0 100%; }
+      }
+
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      .ground {
+        position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); width:70%; height:10px;
+        background: radial-gradient(ellipse at center, rgba(34,211,238,0.4) 0%, rgba(0,0,0,0) 70%);
+        filter:blur(8px); z-index:0;
+        animation: ground-pulse 4s ease-in-out infinite;
+      }
+      @keyframes ground-pulse {
+          0%, 100% { opacity: 0.5; transform: translateX(-50%) scaleX(1); }
+          50% { opacity: 0.8; transform: translateX(-50%) scaleX(1.2); }
+      }
+
+      .hint{
+        position:absolute; right:10px; bottom:8px; font-size:12px; color:rgba(255,255,255,0.6); z-index:20;
+        background:rgba(0,0,0,0.6); padding:6px 10px; border-radius:20px; backdrop-filter: blur(4px);
+        border: 1px solid rgba(255,255,255,0.1);
+        pointer-events: none;
+      }
+      
       /* --- Footer Controls --- */
       .footer-button {
         display: flex;
@@ -508,11 +713,11 @@
 
       /* Chat bubble animation */
       @keyframes chat-bubble-in {
-          from { opacity: 0; transform: translateY(10px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
+          0% { opacity: 0; transform: translateY(15px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
       }
       .chat-bubble-animation {
-          animation: chat-bubble-in 0.3s ease-out forwards;
+          animation: chat-bubble-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
       }
       
       @keyframes panel-enter {

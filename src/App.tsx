@@ -9,7 +9,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 
 // Helper for React.createElement to keep code readable
@@ -341,17 +341,9 @@ const SettingsModal = ({
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
-    const [processingPlanId, setProcessingPlanId] = React.useState(null);
 
     React.useEffect(() => {
         if (isOpen) setIsMobileMenuOpen(true);
-    }, [isOpen]);
-
-    // Initialize Cashfree when the modal is open
-    React.useEffect(() => {
-        if (isOpen && (window as any).Cashfree) {
-            // Just ensuring it's loaded, actual instantiation happens on click
-        }
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -361,53 +353,8 @@ const SettingsModal = ({
         setIsMobileMenuOpen(false);
     };
 
-    const handlePlanSelection = async (planId) => {
-        if (planId === 'free') {
-            setSubscriptionPlan('free');
-            return;
-        }
-        
-        if (processingPlanId) return; // Prevent double clicks
-
-        const prices = {
-            monthly: 100,
-            quarterly: 200,
-            halfYearly: 350,
-            yearly: 500
-        };
-
-        setProcessingPlanId(planId);
-
-        try {
-            // Using dummy customer details for the demo setup. 
-            // In a real app, you would ask the user for these or pull from their profile.
-            const customerId = "kaniska_user_" + Date.now();
-            const phone = "9999999999";
-            const email = "user@example.com";
-
-            const sessionId = await createCashfreeOrder(planId, prices[planId], customerId, phone, email);
-            
-            if ((window as any).Cashfree) {
-                const cashfree = new (window as any).Cashfree({ mode: "production" });
-                cashfree.checkout({
-                    paymentSessionId: sessionId,
-                    returnUrl: window.location.href
-                });
-            } else {
-                alert("Cashfree SDK not loaded. Please check your internet connection.");
-            }
-
-        } catch (e) {
-            console.error("Payment initiation failed", e);
-            const msg = e.message || "Unknown error";
-            if (msg.includes("Failed to fetch")) {
-                alert("Payment Error: Browser security prevented the connection to Cashfree. In a real deployment, this app requires a backend server to process payments securely.");
-            } else {
-                alert(`Payment Error: ${msg}`);
-            }
-        } finally {
-            setProcessingPlanId(null);
-        }
+    const handlePlanSelection = (planId) => {
+        setSubscriptionPlan(planId);
     };
 
     const renderTabContent = () => {
@@ -675,12 +622,11 @@ const SettingsModal = ({
                             h('button', {
                                 key: planId,
                                 onClick: () => handlePlanSelection(planId),
-                                disabled: processingPlanId !== null,
                                 className: `relative p-6 rounded-xl border transition-all text-left group ${
                                     subscriptionPlan === planId 
                                     ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
                                     : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
-                                } ${processingPlanId && processingPlanId !== planId ? 'opacity-50 cursor-not-allowed' : ''}`
+                                }`
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
@@ -691,15 +637,7 @@ const SettingsModal = ({
                                     h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))
                                 ),
                                 planId === 'yearly' && h('div', { className: "absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg" }, "BEST VALUE"),
-                                subscriptionPlan !== planId && h('div', { 
-                                    className: `mt-4 pt-4 border-t border-gray-700/50 text-xs text-center font-bold uppercase tracking-wider transition-opacity flex items-center justify-center gap-2 ${
-                                        processingPlanId === planId ? 'text-cyan-300 opacity-100' : 'text-cyan-500 opacity-0 group-hover:opacity-100'
-                                    }`
-                                }, 
-                                    processingPlanId === planId 
-                                        ? h(React.Fragment, null, h(SpinnerIcon, { className: "w-4 h-4" }), "Processing...") 
-                                        : t('settings.subscriptionTab.upgrade')
-                                )
+                                subscriptionPlan !== planId && h('div', { className: "mt-4 pt-4 border-t border-gray-700/50 text-xs text-center text-cyan-500 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity" }, t('settings.subscriptionTab.upgrade'))
                             )
                         )
                     ),

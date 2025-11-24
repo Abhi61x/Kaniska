@@ -1,42 +1,53 @@
+
+
 import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
   keyType: string;
-  constructor(message, keyType) {
+
+  constructor(message: string, keyType: string) {
     super(message);
     this.name = 'ApiKeyError';
     this.keyType = keyType;
+    Object.setPrototypeOf(this, ApiKeyError.prototype);
   }
 }
 
 // A custom error for the main, environment-set API key which the user cannot fix.
 export class MainApiKeyError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'MainApiKeyError';
+    Object.setPrototypeOf(this, MainApiKeyError.prototype);
   }
 }
 
 // A custom error class for rate limit/quota issues.
 export class RateLimitError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'RateLimitError';
+    Object.setPrototypeOf(this, RateLimitError.prototype);
   }
 }
 
 // A custom error class for general service-side issues (e.g., 5xx errors).
 export class ServiceError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'ServiceError';
+    Object.setPrototypeOf(this, ServiceError.prototype);
   }
 }
 
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const VALID_EMOTIONS = ['neutral', 'happy', 'sad', 'excited', 'empathetic', 'singing', 'formal', 'chirpy', 'surprised', 'curious', 'thoughtful', 'joking'];
+
+// --- Cashfree Configuration ---
+const CASHFREE_APP_ID = "1101869ed2c0377169521b1819d9681011";
+const CASHFREE_SECRET_KEY = "cfsk_ma_prod_2385fe07d4c1aab3e55ebc75d8e9fe76_de8436d3";
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
 function handleGeminiError(error, context = 'processing your request') {
@@ -172,6 +183,13 @@ The app's features include:
 - Singing songs (requires Gemini to find lyrics).
 - Recognizing songs playing nearby (requires an Audd.io API key).
 - A code editor for writing and modifying code with AI assistance.
+
+**Subscription Plans:**
+- **Free Plan:** 1 hour of usage per day. (Price: ₹0)
+- **Monthly Plan:** Unlimited usage, high priority. (Price: ₹100/month)
+- **Quarterly Plan:** Unlimited usage, high priority. (Price: ₹200/3 months)
+- **Half-Yearly Plan:** Unlimited usage, high priority. (Price: ₹350/6 months)
+- **Yearly Plan:** Unlimited usage, high priority, best value. (Price: ₹500/year)
 
 Users can configure:
 - Persona: Gender (male/female), greeting message, and emotional tuning.
@@ -620,5 +638,61 @@ export async function recognizeSong(apiKey, audioBlob) {
         }
         console.error("Error recognizing song:", error);
         throw new Error(error.message || "An unknown error occurred while recognizing the song.");
+    }
+}
+
+// --- Cashfree Payment Integration ---
+export async function createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail) {
+    const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    
+    // Switch to corsproxy.io to avoid CORS issues.
+    // In production, this MUST happen on a secure backend server.
+    const targetUrl = "https://api.cashfree.com/pg/orders"; 
+    // Note: corsproxy.io usage: https://corsproxy.io/?<url>
+    const url = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+
+    const options = {
+        method: 'POST',
+        headers: {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+            'x-api-version': '2023-08-01',
+            'x-client-id': CASHFREE_APP_ID,
+            'x-client-secret': CASHFREE_SECRET_KEY
+        },
+        body: JSON.stringify({
+            customer_details: {
+                customer_id: customerId,
+                customer_phone: customerPhone,
+                customer_email: customerEmail,
+                customer_name: "Kaniska User"
+            },
+            order_meta: {
+               return_url: window.location.href
+            },
+            order_id: orderId,
+            order_amount: amount,
+            order_currency: "INR"
+        })
+    };
+
+    try {
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API Error ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        if (data.payment_session_id) {
+            return data.payment_session_id;
+        } else {
+            console.error("Cashfree API Error Response:", data);
+            throw new Error(data.message || "Failed to create order");
+        }
+    } catch (err) {
+        console.error("Cashfree Order Creation Error:", err);
+        throw err;
     }
 }
