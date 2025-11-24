@@ -23,7 +23,6 @@ const isKeyValid = !!firebaseConfig.apiKey;
 if (isKeyValid) {
   try {
     // Check if firebase app is already initialized to avoid errors during hot reload
-    // This pattern is crucial for React environments with HMR (Hot Module Replacement)
     if (getApps().length > 0) {
         app = getApp();
     } else {
@@ -31,15 +30,16 @@ if (isKeyValid) {
     }
     
     // Initialize services
-    // Explicitly passing 'app' ensures we use the correct instance.
-    // Wrapping in try-catch to prevent one failure from blocking the other
     if (app) {
+        // Initialize Auth
         try {
             auth = getAuth(app);
         } catch (authError) {
-            console.error("Firebase Auth initialization failed:", authError);
+            console.error("Firebase Auth initialization failed.", authError);
+            // Retry logic or explicit error reporting can go here if needed
         }
 
+        // Initialize Firestore
         try {
             db = getFirestore(app);
         } catch (dbError) {

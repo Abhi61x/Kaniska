@@ -349,10 +349,12 @@ export async function validateNewsKey(apiKey) {
         if (response.ok) {
             return { success: true, message: "News key is valid." };
         }
-        const data = await response.json();
-        return { success: false, message: data.errors?.[0] || "Invalid API key." };
+        const data = await response.json().catch(() => ({}));
+        return { success: false, message: data.errors?.[0] || `Invalid API key (Status: ${response.status}).` };
     } catch (e) {
-        return { success: false, message: "Network error during validation." };
+        // GNews API often returns 403 Forbidden without CORS headers if the key is invalid,
+        // causing a browser Network Error instead of a readable response.
+        return { success: false, message: "Validation failed. This often means the API key is invalid or restricted." };
     }
 }
 
@@ -409,9 +411,9 @@ export async function fetchNews(apiKey, query) {
              const apiMessage = data.errors?.[0] || 'The service returned an unspecified error.';
              switch (response.status) {
                 case 401:
-                    throw new ApiKeyError("The GNews API key appears to be invalid. Please go to Settings > API Keys to check or update it.", 'news');
                 case 403:
-                    throw new ApiKeyError("Access to the GNews service was denied. This could be due to an issue with the API key or your account permissions.", 'news');
+                    // Treat 403 Forbidden as an API key issue as well for GNews
+                    throw new ApiKeyError("The GNews API key appears to be invalid or expired. Please go to Settings > API Keys to check or update it.", 'news');
                 case 429:
                     throw new RateLimitError("The GNews API key has exceeded its quota. Please check your GNews account or try again later.");
                 default:
@@ -433,8 +435,14 @@ export async function fetchNews(apiKey, query) {
         if (error instanceof ApiKeyError || error instanceof RateLimitError || error instanceof ServiceError) {
             throw error;
         }
-        if (error instanceof TypeError) { // Likely a network error
-            throw new Error("I couldn't connect to the news service. Please check your internet connection.");
+        // Check for specific TypeError messages that indicate network issues/CORS which might be invalid key disguised
+        if (error instanceof TypeError) { 
+            // If we are here, it could be a CORS error caused by a 403 from GNews (invalid key).
+            // We can't know for sure, but we can give a hint.
+            if (error.message === 'Failed to fetch') {
+                throw new Error("I couldn't connect to the news service. This might be due to a network issue, or the API Key might be invalid (causing a restricted response).");
+            }
+            throw new Error("I'm unable to connect to the news service. Please check your internet connection.");
         }
         console.error("Error fetching news:", error);
         throw new Error(error.message || "An unknown error occurred while fetching news.");
@@ -457,7 +465,8 @@ export async function searchYouTube(apiKey, query) {
             const reason = error?.errors?.[0]?.reason;
             switch (reason) {
                 case 'keyInvalid':
-                    throw new ApiKeyError("The YouTube API key is invalid. Please go to Settings > API Keys to check or update it.", 'youtube');
+                case 'forbidden':
+                    throw new ApiKeyError("The YouTube API key is invalid or does not have the YouTube Data API v3 enabled. Please go to Settings > API Keys to check it.", 'youtube');
                 case 'quotaExceeded':
                     throw new RateLimitError("The YouTube API key has exceeded its daily quota. Please check your Google Cloud project or try again tomorrow.");
                 default:
