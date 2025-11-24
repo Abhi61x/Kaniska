@@ -7,7 +7,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 import { auth, db } from './firebase.ts';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -42,6 +42,7 @@ const ArrowLeftIcon = ({ className }) => h('svg', { className, xmlns: "http://ww
 const BugIcon = ({ className }) => h('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { width: "8", height: "14", x: "8", y: "6", rx: "4" }), h('path', { d: "m19 7-3 3" }), h('path', { d: "m5 7 3 3" }), h('path', { d: "m19 19-3-3" }), h('path', { d: "m5 19 3-3" }), h('path', { d: "M2 12h4" }), h('path', { d: "M18 12h4" }));
 const MenuIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('line', { x1: "4", y1: "12", x2: "20", y2: "12" }), h('line', { x1: "4", y1: "6", x2: "20", y2: "6" }), h('line', { x1: "4", y1: "18", x2: "20", y2: "18" }));
 const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), h('circle', { cx: "12", cy: "7", r: "4" }));
+const ImageIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }), h('circle', { cx: "8.5", cy: "8.5", r: "1.5" }), h('polyline', { points: "21 15 16 10 5 21" }));
 
 
 const getInitialState = (key, defaultValue) => {
@@ -84,6 +85,7 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 7.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
 8.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
 9.  **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
+10. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks you to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -228,6 +230,7 @@ const Avatar = ({ state, mood = 'neutral' }) => {
         h('div', { className: "avatar-container", ref: containerRef },
             h('img', { src: imageUrl, alt: "Kaniska Avatar", className: "avatar-image" }),
             h('div', { className: "holo-overlay" }),
+            h('div', { className: "holo-scanline" }),
             h('div', { className: "thinking-ring" }),
             h('div', { className: "speaking-ring" }), // New speaking ring 1
             h('div', { className: "speaking-ring delay-ring" }), // New speaking ring 2
@@ -715,7 +718,7 @@ const SettingsModal = ({
             className: "bg-black md:bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
             onClick: e => e.stopPropagation()
         },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-zinc-950 md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
                 h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
                     h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
                         h(SettingsIcon, { className: "w-6 h-6" }),
@@ -759,7 +762,7 @@ const SettingsModal = ({
                             h('button', {
                                 key: l.code,
                                 onClick: () => setLang(l.code),
-                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-2 ${
+                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
                                     lang === l.code ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-border-color text-gray-500 hover:border-gray-600'
                                 }`
                             }, l.name)
@@ -970,8 +973,8 @@ export const App = () => {
         setIsModelSpeaking(false);
     }, [setWasConnected]);
 
-    const addMessageToHistory = React.useCallback((sender, text, options = {}) => {
-        if (!text || !text.trim()) return;
+    const addMessageToHistory = React.useCallback((sender, text, options: any = {}) => {
+        if (!text && !options.image) return;
         setChatHistory((prev) => [...prev, {
             id: Date.now(),
             sender,
@@ -1085,6 +1088,19 @@ export const App = () => {
                 case 'OPEN_CODE_EDITOR':
                     setActivePanel('code');
                     result = { success: true, detail: "Opened code editor." };
+                    break;
+                case 'GENERATE_IMAGE':
+                    setActivityState('thinking');
+                    try {
+                        const imageData = await generateImage(fc.args.imagePrompt);
+                        addMessageToHistory('assistant', 'Here is the image you requested.', { image: imageData });
+                        result = { success: true, detail: "I have generated the image and displayed it in the chat." };
+                    } catch (e) {
+                         result = { success: false, detail: "Failed to generate image: " + e.message };
+                         addMessageToHistory('system', 'Image generation failed.', { isError: true });
+                    } finally {
+                        setActivityState('idle');
+                    }
                     break;
                 case 'RANDOM_FACT':
                     const randomFact = RANDOM_FACTS[Math.floor(Math.random() * RANDOM_FACTS.length)];
@@ -1226,6 +1242,7 @@ export const App = () => {
                         { name: 'SET_TIMER', description: 'Set timer.', parameters: { type: Type.OBJECT, properties: { timerDurationSeconds: { type: Type.NUMBER } }, required: ['timerDurationSeconds'] } },
                         { name: 'SING_SONG', description: 'Sing a song.', parameters: { type: Type.OBJECT, properties: { songTitle: { type: Type.STRING }, songArtist: { type: Type.STRING } }, required: ['songTitle', 'songArtist'] } },
                         { name: 'OPEN_CODE_EDITOR', description: 'Open code editor.', parameters: { type: Type.OBJECT, properties: {} } },
+                        { name: 'GENERATE_IMAGE', description: 'Generate an image.', parameters: { type: Type.OBJECT, properties: { imagePrompt: { type: Type.STRING, description: "Detailed prompt for the image." } }, required: ['imagePrompt'] } },
                         { name: 'RANDOM_FACT', description: 'Random fact.', parameters: { type: Type.OBJECT, properties: {} } }
                     ]}],
                 }
@@ -1302,6 +1319,25 @@ export const App = () => {
                     onerror: (err) => {
                         console.error(err);
                         setAssistantState('error');
+                        
+                        let errorMessage = (err as any).message || t('main.status.error');
+                        let isApiError = err instanceof ApiKeyError || err instanceof MainApiKeyError;
+                        let keyType = err instanceof ApiKeyError ? (err as ApiKeyError).keyType : undefined;
+
+                        // Refined error feedback
+                        const lowerMsg = errorMessage.toLowerCase();
+                        if (lowerMsg.includes('403') || lowerMsg.includes('api key') || lowerMsg.includes('unauthenticated')) {
+                             errorMessage = t('errors.apiKeyInvalid') || "API Key invalid or missing.";
+                             isApiError = true;
+                        } else if (lowerMsg.includes('429') || lowerMsg.includes('quota') || lowerMsg.includes('rate limit')) {
+                             errorMessage = t('errors.rateLimit') || "Rate limit exceeded. Please try again later.";
+                        } else if (lowerMsg.includes('network') || lowerMsg.includes('fetch') || lowerMsg.includes('failed to fetch')) {
+                             errorMessage = t('errors.network') || "Network error. Please check your connection.";
+                        } else if (lowerMsg.includes('503') || lowerMsg.includes('service unavailable')) {
+                             errorMessage = t('errors.serviceUnavailable') || "Service temporarily unavailable.";
+                        }
+
+                        addMessageToHistory('system', errorMessage, { isError: true, isApiKeyError: isApiError, keyType });
                     }
                 }
             });
@@ -1314,19 +1350,6 @@ export const App = () => {
             let errorMessage = error.message || t('main.status.error');
             let isApiError = error instanceof ApiKeyError || error instanceof MainApiKeyError;
             let keyType = error instanceof ApiKeyError ? error.keyType : undefined;
-
-            // Refined error feedback
-            const lowerMsg = errorMessage.toLowerCase();
-            if (lowerMsg.includes('403') || lowerMsg.includes('api key') || lowerMsg.includes('unauthenticated')) {
-                 errorMessage = t('errors.apiKeyInvalid') || "API Key invalid or missing.";
-                 isApiError = true;
-            } else if (lowerMsg.includes('429') || lowerMsg.includes('quota') || lowerMsg.includes('rate limit')) {
-                 errorMessage = t('errors.rateLimit') || "Rate limit exceeded. Please try again later.";
-            } else if (lowerMsg.includes('network') || lowerMsg.includes('fetch') || lowerMsg.includes('failed to fetch')) {
-                 errorMessage = t('errors.network') || "Network error. Please check your connection.";
-            } else if (lowerMsg.includes('503') || lowerMsg.includes('service unavailable')) {
-                 errorMessage = t('errors.serviceUnavailable') || "Service temporarily unavailable.";
-            }
 
             addMessageToHistory('system', errorMessage, { isError: true, isApiKeyError: isApiError, keyType });
         } finally {
@@ -1465,7 +1488,8 @@ export const App = () => {
         ),
 
         h('main', { className: "flex-grow flex flex-col items-center justify-center relative p-4 z-10" },
-            h('div', { className: `transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') || isSettingsOpen ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
+            // Only show Avatar if settings are CLOSED to prevent overlap
+            !isSettingsOpen && h('div', { className: `transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
                 h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: mood })
             ),
 
@@ -1474,17 +1498,27 @@ export const App = () => {
                     chatHistory.length === 0 && h('div', { className: "text-center text-gray-400 text-sm opacity-0 animate-fade-in pb-4" }, t('chat.placeholder.title')),
                     chatHistory.map(msg => 
                         h('div', { key: msg.id, className: `flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation` },
-                            h('div', { className: `max-w-[80%] px-5 py-3 rounded-2xl backdrop-blur-md border ${
+                            h('div', { className: `max-w-[80%] rounded-2xl backdrop-blur-md border overflow-hidden ${
                                 msg.sender === 'user' 
-                                    ? 'bg-cyan-900/50 border-cyan-500/30 text-cyan-50 rounded-tr-none' 
+                                    ? 'bg-cyan-900/50 border-cyan-500/30 text-cyan-50 rounded-tr-none px-5 py-3' 
                                     : msg.isError 
-                                        ? 'error-bubble rounded-tl-none'
+                                        ? 'error-bubble rounded-tl-none px-5 py-3'
                                         : 'bg-assistant-bubble-bg border-border-color text-text-color rounded-tl-none shadow-lg'
                             }` },
-                                h('p', { className: "leading-relaxed whitespace-pre-wrap" }, msg.text),
+                                // Render text content if available
+                                msg.text && h('p', { className: `leading-relaxed whitespace-pre-wrap ${msg.sender !== 'user' && !msg.isError ? 'px-5 py-3' : ''}` }, msg.text),
+                                
+                                // Render image content if available
+                                msg.image && h('div', { className: "relative group" },
+                                    h('img', { src: msg.image, alt: "Generated content", className: "w-full h-auto max-h-[300px] object-cover rounded-b-xl" }),
+                                    h('a', { href: msg.image, download: "generated-image.png", className: "absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity" },
+                                        h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }), h('polyline', { points: "7 10 12 15 17 10" }), h('line', { x1: "12", y1: "15", x2: "12", y2: "3" }))
+                                    )
+                                ),
+
                                 msg.isApiKeyError && msg.keyType && h('button', { 
                                     onClick: handleSetupClick,
-                                    className: "mt-2 text-xs font-bold uppercase tracking-wide underline decoration-dotted hover:text-white transition-colors flex items-center gap-1"
+                                    className: "mt-2 text-xs font-bold uppercase tracking-wide underline decoration-dotted hover:text-white transition-colors flex items-center gap-1 px-5 pb-3"
                                 },
                                     h(HelpIcon, { className: "w-3 h-3" }), t('chat.setupInstructions') || 'View Setup Instructions'
                                 )

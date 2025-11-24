@@ -17,8 +17,8 @@ let app;
 let auth = null;
 let db = null;
 
-// Helper to check if key is valid (not the known broken one)
-const isKeyValid = firebaseConfig.apiKey && firebaseConfig.apiKey !== "AIzaSyC2a8qp-FMXLydF89nhB0cXTJTFt_kegPg";
+// Enable Firebase if an API key is present.
+const isKeyValid = !!firebaseConfig.apiKey;
 
 if (isKeyValid) {
   try {
@@ -29,7 +29,7 @@ if (isKeyValid) {
     console.error("Firebase initialization failed:", error);
   }
 } else {
-  console.warn("Firebase API key is missing or invalid. Auth and DB services are disabled.");
+  console.warn("Firebase API key is missing. Auth and DB services are disabled.");
 }
 
 export { auth, db };

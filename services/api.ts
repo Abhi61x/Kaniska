@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
@@ -183,6 +181,7 @@ The app's features include:
 - Singing songs (requires Gemini to find lyrics).
 - Recognizing songs playing nearby (requires an Audd.io API key).
 - A code editor for writing and modifying code with AI assistance.
+- Generating images and visualizing concepts (holographic display).
 
 **Subscription Plans:**
 - **Free Plan:** 1 hour of usage per day. (Price: ₹0)
@@ -638,6 +637,30 @@ export async function recognizeSong(apiKey, audioBlob) {
         }
         console.error("Error recognizing song:", error);
         throw new Error(error.message || "An unknown error occurred while recognizing the song.");
+    }
+}
+
+export async function generateImage(prompt) {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: {
+                 // No responseMimeType or responseSchema for this model as per instructions
+            }
+        });
+        
+        // Iterate to find image part
+        for (const candidate of response.candidates || []) {
+            for (const part of candidate.content?.parts || []) {
+                if (part.inlineData) {
+                    return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                }
+            }
+        }
+        throw new Error("No image generated.");
+    } catch (error) {
+        throw handleGeminiError(error, 'generating image');
     }
 }
 
