@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -9,7 +7,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 import { auth, db } from './firebase.ts';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -231,6 +229,8 @@ const Avatar = ({ state, mood = 'neutral' }) => {
             h('img', { src: imageUrl, alt: "Kaniska Avatar", className: "avatar-image" }),
             h('div', { className: "holo-overlay" }),
             h('div', { className: "thinking-ring" }),
+            h('div', { className: "speaking-ring" }), // New speaking ring 1
+            h('div', { className: "speaking-ring delay-ring" }), // New speaking ring 2
             glitches.map(g => h('div', { 
                 key: g.id,
                 className: "glitch-layer",
@@ -348,17 +348,9 @@ const SettingsModal = ({
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
-    const [processingPlanId, setProcessingPlanId] = React.useState(null);
 
     React.useEffect(() => {
         if (isOpen) setIsMobileMenuOpen(true);
-    }, [isOpen]);
-
-    // Initialize Cashfree when the modal is open
-    React.useEffect(() => {
-        if (isOpen && (window as any).Cashfree) {
-            // Just ensuring it's loaded, actual instantiation happens on click
-        }
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -368,53 +360,8 @@ const SettingsModal = ({
         setIsMobileMenuOpen(false);
     };
 
-    const handlePlanSelection = async (planId) => {
-        if (planId === 'free') {
-            setSubscriptionPlan('free');
-            return;
-        }
-        
-        if (processingPlanId) return; // Prevent double clicks
-
-        const prices = {
-            monthly: 100,
-            quarterly: 200,
-            halfYearly: 350,
-            yearly: 500
-        };
-
-        setProcessingPlanId(planId);
-
-        try {
-            // Using dummy customer details for the demo setup. 
-            // In a real app, you would ask the user for these or pull from their profile.
-            const customerId = user ? `user_${user.uid}` : "kaniska_user_" + Date.now();
-            const phone = "9999999999";
-            const email = user ? user.email : "user@example.com";
-
-            const sessionId = await createCashfreeOrder(planId, prices[planId], customerId, phone, email);
-            
-            if ((window as any).Cashfree) {
-                const cashfree = new (window as any).Cashfree({ mode: "production" });
-                cashfree.checkout({
-                    paymentSessionId: sessionId,
-                    returnUrl: window.location.href
-                });
-            } else {
-                alert("Cashfree SDK not loaded. Please check your internet connection.");
-            }
-
-        } catch (e) {
-            console.error("Payment initiation failed", e);
-            const msg = e.message || "Unknown error";
-            if (msg.includes("Failed to fetch")) {
-                alert("Payment Error: Unable to reach payment gateway. Please check your connection.");
-            } else {
-                alert(`Payment Error: ${msg}`);
-            }
-        } finally {
-            setProcessingPlanId(null);
-        }
+    const handlePlanSelection = (planId) => {
+        setSubscriptionPlan(planId);
     };
 
     const renderTabContent = () => {
@@ -713,12 +660,11 @@ const SettingsModal = ({
                             h('button', {
                                 key: planId,
                                 onClick: () => handlePlanSelection(planId),
-                                disabled: processingPlanId !== null,
                                 className: `relative p-6 rounded-xl border transition-all text-left group ${
                                     subscriptionPlan === planId 
                                     ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
                                     : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
-                                } ${processingPlanId && processingPlanId !== planId ? 'opacity-50 cursor-not-allowed' : ''}`
+                                }`
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
@@ -729,15 +675,7 @@ const SettingsModal = ({
                                     h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))
                                 ),
                                 planId === 'yearly' && h('div', { className: "absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg" }, "BEST VALUE"),
-                                subscriptionPlan !== planId && h('div', { 
-                                    className: `mt-4 pt-4 border-t border-gray-700/50 text-xs text-center font-bold uppercase tracking-wider transition-opacity flex items-center justify-center gap-2 ${
-                                        processingPlanId === planId ? 'text-cyan-300 opacity-100' : 'text-cyan-500 opacity-0 group-hover:opacity-100'
-                                    }`
-                                }, 
-                                    processingPlanId === planId 
-                                        ? h(React.Fragment, null, h(SpinnerIcon, { className: "w-4 h-4" }), "Processing...") 
-                                        : t('settings.subscriptionTab.upgrade')
-                                )
+                                subscriptionPlan !== planId && h('div', { className: "mt-4 pt-4 border-t border-gray-700/50 text-xs text-center text-cyan-500 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity" }, t('settings.subscriptionTab.upgrade'))
                             )
                         )
                     ),
@@ -774,10 +712,10 @@ const SettingsModal = ({
         onClick: onClose 
     },
         h('div', {
-            className: "bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
+            className: "bg-black md:bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
             onClick: e => e.stopPropagation()
         },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-panel-bg md:bg-black/20 md:border-r border-border-color h-full md:relative z-20` },
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-zinc-950 md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
                 h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
                     h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
                         h(SettingsIcon, { className: "w-6 h-6" }),
@@ -814,14 +752,14 @@ const SettingsModal = ({
                         )
                     )
                 ),
-                h('div', { className: "p-4 border-t border-border-color bg-black/10" },
+                h('div', { className: "p-4 border-t border-border-color bg-gray-900" },
                     h('label', { className: "text-xs text-gray-500 uppercase font-semibold mb-2 block px-1" }, "Language"),
                     h('div', { className: "flex gap-2" },
                         availableLanguages.map(l => 
                             h('button', {
                                 key: l.code,
                                 onClick: () => setLang(l.code),
-                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-2 ${
                                     lang === l.code ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-border-color text-gray-500 hover:border-gray-600'
                                 }`
                             }, l.name)
@@ -829,7 +767,7 @@ const SettingsModal = ({
                     )
                 )
             ),
-            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col h-full overflow-hidden bg-panel-bg relative` },
+            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col h-full overflow-hidden bg-black md:bg-panel-bg relative` },
                 h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-border-color" },
                     h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" },
                         h(ArrowLeftIcon, { className: "w-5 h-5" }),
@@ -867,7 +805,7 @@ export const App = () => {
     const [isModelSpeaking, setIsModelSpeaking] = React.useState(false);
     const [chatHistory, setChatHistory] = usePersistentState('kaniska-chatHistory', []);
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-    const [settingsTab, setSettingsTab] = React.useState('account'); 
+    const [settingsTab, setSettingsTab] = React.useState('persona'); 
     const [activePanel, setActivePanel] = React.useState('chat'); 
     const [user, setUser] = React.useState(null);
     
@@ -921,9 +859,10 @@ export const App = () => {
 
     // --- Auth Listener & Sync ---
     React.useEffect(() => {
+        if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
+            if (currentUser && db) {
                 // Load settings from Firestore
                 try {
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -939,8 +878,6 @@ export const App = () => {
                         if (data.maleVoices) setMaleVoices(data.maleVoices);
                         if (data.ambientVolume !== undefined) setAmbientVolume(data.ambientVolume);
                         if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
-                        // apiKeys are usually not synced for security, but can be if requested.
-                        // We'll skip apiKeys to keep them local-only for now, safer.
                     } else {
                         // Create user doc
                         await setDoc(doc(db, "users", currentUser.uid), {
@@ -959,7 +896,7 @@ export const App = () => {
 
     // Sync settings to Firestore
     React.useEffect(() => {
-        if (user) {
+        if (user && db) {
             const userRef = doc(db, "users", user.uid);
             const settingsToSync = {
                 theme,
@@ -978,16 +915,25 @@ export const App = () => {
     }, [user, theme, gender, greetingMessage, customInstructions, emotionTuning, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan]);
 
     const handleLogin = async () => {
+        if (!auth) {
+            alert("Login disabled: Firebase API Key is missing or invalid.");
+            return;
+        }
         const provider = new GoogleAuthProvider();
         try {
             await signInWithPopup(auth, provider);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Login failed:", error);
-            alert("Login failed: " + error.message);
+            if (error.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
+                 alert("Login failed: The Firebase API Key is invalid. Please check your configuration.");
+            } else {
+                 alert("Login failed: " + error.message);
+            }
         }
     };
 
     const handleLogout = async () => {
+        if (!auth) return;
         try {
             await signOut(auth);
             setUser(null);
@@ -1253,8 +1199,8 @@ export const App = () => {
 
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
-            const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            const inputCtx = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 16000 });
+            const outputCtx = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 24000 });
             
             inputAudioContextRef.current = inputCtx;
             outputAudioContextRef.current = outputCtx;
@@ -1394,7 +1340,7 @@ export const App = () => {
     }, [addMessageToHistory]);
 
     const onPlayerStateChange = React.useCallback((event) => {
-        if (event.data === (window as any).YT.PlayerState.ENDED) {
+        if (event.data === window['YT'].PlayerState.ENDED) {
             if (youtubeQueue.length > 0) {
                 const nextVideo = youtubeQueue[0];
                 setYoutubeQueue(prev => prev.slice(1));
@@ -1452,7 +1398,7 @@ export const App = () => {
     }, [dailyUsage, subscriptionPlan, isConnected, disconnect, addMessageToHistory, t, setSettingsTab, setIsSettingsOpen]);
 
     React.useEffect(() => {
-        if (!(window as any).YT) {
+        if (!window['YT']) {
             const tag = document.createElement('script');
             tag.src = "https://www.youtube.com/iframe_api";
             const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -1461,8 +1407,8 @@ export const App = () => {
             }
         }
 
-        (window as any).onYouTubeIframeAPIReady = () => {
-            playerRef.current = new (window as any).YT.Player('youtube-player', {
+        window['onYouTubeIframeAPIReady'] = () => {
+            playerRef.current = new window['YT'].Player('youtube-player', {
                 height: '100%',
                 width: '100%',
                 videoId: '',
@@ -1478,7 +1424,8 @@ export const App = () => {
             if (wasPreviouslyConnected) {
                 try {
                     if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+                        // FIX: Cast 'microphone' to any to avoid PermissionName type error
+                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as any });
                         if (permissionStatus.state === 'granted') {
                             connect();
                         }
@@ -1501,7 +1448,7 @@ export const App = () => {
 
     return h('div', { 
             className: "relative flex flex-col h-screen w-screen overflow-hidden font-sans text-white selection:bg-cyan-500/30 selection:text-cyan-100", 
-            style: { backgroundColor: 'transparent' } 
+            style: { backgroundColor: '#000000' } 
         },
         h('header', { className: "flex-shrink-0 h-16 flex items-center justify-between px-6 bg-gradient-to-b from-black/80 to-transparent z-20" },
             h('div', { className: "flex items-center gap-3" },
@@ -1518,7 +1465,7 @@ export const App = () => {
         ),
 
         h('main', { className: "flex-grow flex flex-col items-center justify-center relative p-4 z-10" },
-            h('div', { className: `transition-all duration-700 ease-in-out transform ${activePanel !== 'chat' && activePanel !== 'idle' ? 'scale-75 opacity-60 blur-sm translate-y-[-10%]' : 'scale-100 opacity-100'}` },
+            h('div', { className: `transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') || isSettingsOpen ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
                 h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: mood })
             ),
 
@@ -1670,7 +1617,7 @@ export const App = () => {
                             h(Editor, {
                                 value: code,
                                 onValueChange: setCode,
-                                highlight: code => (window as any).Prism.highlight(code, (window as any).Prism.languages[codeLanguage] || (window as any).Prism.languages.javascript, codeLanguage),
+                                highlight: code => window['Prism'].highlight(code, window['Prism'].languages[codeLanguage] || window['Prism'].languages.javascript, codeLanguage),
                                 padding: 20,
                                 style: { fontFamily: '"Fira Code", "Fira Mono", monospace', fontSize: 14, backgroundColor: 'transparent', minHeight: '100%' },
                                 textareaClassName: "focus:outline-none"
