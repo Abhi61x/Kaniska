@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -22,7 +22,12 @@ const isKeyValid = !!firebaseConfig.apiKey;
 
 if (isKeyValid) {
   try {
-    app = initializeApp(firebaseConfig);
+    // Check if firebase app is already initialized to avoid errors during hot reload
+    if (getApps().length > 0) {
+        app = getApp();
+    } else {
+        app = initializeApp(firebaseConfig);
+    }
     auth = getAuth(app);
     db = getFirestore(app);
   } catch (error) {
