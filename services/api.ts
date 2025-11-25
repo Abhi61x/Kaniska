@@ -2,8 +2,10 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
+// FIX: Added public property 'keyType' and typed constructor parameters.
 export class ApiKeyError extends Error {
-  constructor(message, keyType) {
+  public keyType: string;
+  constructor(message: string, keyType: string) {
     super(message);
     this.name = 'ApiKeyError';
     this.keyType = keyType;
@@ -12,8 +14,9 @@ export class ApiKeyError extends Error {
 }
 
 // A custom error for the main, environment-set API key which the user cannot fix.
+// FIX: Typed constructor parameter.
 export class MainApiKeyError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'MainApiKeyError';
     Object.setPrototypeOf(this, MainApiKeyError.prototype);
@@ -21,8 +24,9 @@ export class MainApiKeyError extends Error {
 }
 
 // A custom error class for rate limit/quota issues.
+// FIX: Typed constructor parameter.
 export class RateLimitError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'RateLimitError';
     Object.setPrototypeOf(this, RateLimitError.prototype);
@@ -30,8 +34,9 @@ export class RateLimitError extends Error {
 }
 
 // A custom error class for general service-side issues (e.g., 5xx errors).
+// FIX: Typed constructor parameter.
 export class ServiceError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'ServiceError';
     Object.setPrototypeOf(this, ServiceError.prototype);
@@ -238,7 +243,7 @@ The programming language is: "${language}".`;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro', // Use a more powerful model for coding
+            model: 'gemini-3-pro-preview', // Use a more powerful model for coding
             contents: [{ role: 'user', parts: [{ text: `Current code:\n\`\`\`${language}\n${code}\n\`\`\`` }] }],
             config: {
                 systemInstruction: systemInstruction,
@@ -637,7 +642,7 @@ export async function recognizeSong(apiKey, audioBlob) {
                 album: data.result.album,
             };
         } else {
-            // This means success status but no result found.
+            // This means success but no result found.
             return null;
         }
     } catch (error) {
@@ -682,7 +687,7 @@ export async function createCashfreeOrder(planId, amount, customerId, customerPh
     
     // Use corsproxy.io which is more reliable for production APIs in frontend demos
     const targetUrl = "https://api.cashfree.com/pg/orders"; 
-    const url = `https://corsproxy.io/?${targetUrl}`;
+    const url = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
     const options = {
         method: 'POST',

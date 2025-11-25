@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -8,9 +7,9 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
-import { useTranslation, availableLanguages } from './i18n/index.tsx';
-import { auth, db } from './firebase.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
+import { useTranslation, availableLanguages } from './i18n/index';
+import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -243,7 +242,7 @@ const Avatar = ({ state, mood = 'neutral' }) => {
                     height: `${g.height}%`,
                     left: `${g.left}px`,
                     width: '100%',
-                    backgroundColor: 'rgba(34, 211, 238, 0.5)',
+                    backgroundColor: 'rgba(var(--avatar-rgb), 0.5)', // Use CSS variable
                     opacity: 0.5,
                     transform: `translateX(${Math.random() > 0.5 ? 5 : -5}px)`
                 }
@@ -262,7 +261,9 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     const handleSaveKeys = async () => {
         setIsValidating(true);
         setValidationStatus({});
-        const status = {};
+        // FIX: Added 'any' type to the status object to allow dynamic assignment of properties,
+        // which resolves the TypeScript errors about properties not existing on type '{}'.
+        const status: any = {};
         
         const wRes = await validateWeatherKey(localKeys.weather);
         status.weather = wRes;
