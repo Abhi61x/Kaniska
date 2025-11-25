@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -256,7 +257,8 @@ const Avatar = ({ state, mood = 'neutral' }) => {
 // Separated component to prevent "Rendered more hooks than during the previous render" error
 const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
-    const [validationStatus, setValidationStatus] = React.useState({});
+    // FIX: Typed validationStatus to avoid 'Property does not exist on type {}' error
+    const [validationStatus, setValidationStatus] = React.useState<Record<string, { success: boolean; message: string }>>({});
     const [isValidating, setIsValidating] = React.useState(false);
 
     const handleSaveKeys = async () => {
@@ -1087,9 +1089,10 @@ export const App = () => {
         setIsModelSpeaking(false);
     }, [setWasConnected]);
 
-    const addMessageToHistory = React.useCallback((sender, text, options = {}) => {
+    // FIX: Typed options parameter to avoid 'Property image does not exist' error
+    const addMessageToHistory = React.useCallback((sender: string, text: string, options: { image?: string; isError?: boolean; isApiKeyError?: boolean; keyType?: string } = {}) => {
         if (!text && !options.image) return;
-        setChatHistory((prev) => [...prev, {
+        setChatHistory((prev: any[]) => [...prev, {
             id: Date.now(),
             sender,
             text,
@@ -1570,7 +1573,7 @@ export const App = () => {
                 try {
                     if (navigator.permissions && typeof navigator.permissions.query === 'function') {
                         // FIX: Cast 'microphone' to any to avoid PermissionName type error
-                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as any });
                         if (permissionStatus.state === 'granted') {
                             connect();
                         }
