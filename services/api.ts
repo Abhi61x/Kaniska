@@ -355,7 +355,10 @@ export async function validateNewsKey(apiKey) {
     } catch (e) {
         // GNews API often returns 403 Forbidden without CORS headers if the key is invalid,
         // causing a browser Network Error instead of a readable response.
-        return { success: false, message: "Validation failed. This often means the API key is invalid or restricted. Please check your key." };
+        if (e instanceof TypeError && e.message === 'Failed to fetch') {
+             return { success: false, message: "Validation failed. The GNews API rejected the request. This usually means the API Key is invalid." };
+        }
+        return { success: false, message: "Network error during validation. Please check your internet connection." };
     }
 }
 

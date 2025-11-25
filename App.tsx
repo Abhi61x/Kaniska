@@ -351,10 +351,16 @@ const SettingsModal = ({
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
+    const [previewingVoice, setPreviewingVoice] = React.useState(null);
 
     React.useEffect(() => {
         if (isOpen) setIsMobileMenuOpen(true);
     }, [isOpen]);
+
+    // Cleanup preview on unmount or tab change
+    React.useEffect(() => {
+        setPreviewingVoice(null);
+    }, [activeTab, isOpen]);
 
     if (!isOpen) return null;
 
@@ -365,6 +371,37 @@ const SettingsModal = ({
 
     const handlePlanSelection = (planId) => {
         setSubscriptionPlan(planId);
+    };
+
+    const playVoicePreview = async (voiceName) => {
+        if (previewingVoice) return;
+        setPreviewingVoice(voiceName);
+        try {
+            const text = t('settings.voiceTab.testVoiceSample') || `This is a preview of the voice ${voiceName}.`;
+            const stream = await generateSpeech(text, voiceName);
+            
+            const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
+            let nextTime = audioCtx.currentTime;
+            
+            for await (const chunk of stream) {
+                const base64 = chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (base64) {
+                     const bytes = decode(base64);
+                     const buffer = await decodeAudioData(bytes, audioCtx, 24000, 1);
+                     const source = audioCtx.createBufferSource();
+                     source.buffer = buffer;
+                     source.connect(audioCtx.destination);
+                     source.start(nextTime);
+                     nextTime += buffer.duration;
+                }
+            }
+            
+            // Allow replay after a short delay
+            setTimeout(() => setPreviewingVoice(null), 2000);
+        } catch (e) {
+            console.error("Preview failed", e);
+            setPreviewingVoice(null);
+        }
     };
 
     const renderTabContent = () => {
@@ -475,7 +512,7 @@ const SettingsModal = ({
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
                         h('div', { className: "absolute top-0 right-0 p-2" },
-                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
+                            h('span', { className: "text-xs font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
                         ),
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-gray-400" }, t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"),
@@ -534,7 +571,11 @@ const SettingsModal = ({
             case 'voice':
                  const currentVoices = gender === 'female' ? femaleVoices : maleVoices;
                  const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
-                 const voicesList = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Aoede'];
+                 
+                 const categories = {
+                    "Female Persona": ['Kore', 'Aoede', 'Zephyr'],
+                    "Male Persona": ['Fenrir', 'Charon', 'Puck']
+                 };
 
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
@@ -542,28 +583,69 @@ const SettingsModal = ({
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, gender === 'female' ? t('settings.voiceTab.female.title') : t('settings.voiceTab.male.title')),
                             h('p', { className: "text-xs text-gray-500" }, t('settings.voiceTab.description'))
                         ),
-                        h('div', { className: "grid grid-cols-1 gap-8" },
+                        h('div', { className: "space-y-8" },
+                            // Main Voice Section
                             h('div', null,
-                                h('label', { className: "block text-sm font-medium text-gray-300 mb-3" }, t('settings.voiceTab.mainVoiceLabel')),
-                                h('div', { className: "flex gap-3 flex-wrap" },
-                                    voicesList.map(v => 
-                                        h('button', {
-                                            key: v,
-                                            onClick: () => setVoices({...currentVoices, main: v}),
-                                            className: `px-4 py-2 rounded-lg text-sm font-medium transition-all border ${currentVoices.main === v ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow' : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'}`
-                                        }, v)
+                                h('h4', { className: "text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider border-b border-gray-700 pb-2" }, t('settings.voiceTab.mainVoiceLabel')),
+                                Object.entries(categories).map(([category, voices]) => 
+                                    h('div', { key: category, className: "mb-4" },
+                                        h('h5', { className: "text-xs text-gray-500 mb-2 font-medium" }, category),
+                                        h('div', { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" },
+                                            voices.map(v => 
+                                                h('div', { 
+                                                    key: v, 
+                                                    onClick: () => setVoices({...currentVoices, main: v}),
+                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${currentVoices.main === v ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
+                                                },
+                                                    h('div', { className: "flex items-center gap-3" },
+                                                        h('div', { className: `w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentVoices.main === v ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
+                                                            h(VoiceIcon, { className: "w-4 h-4" })
+                                                        ),
+                                                        h('span', { className: `font-medium text-sm ${currentVoices.main === v ? 'text-cyan-400' : 'text-gray-300'}` }, v)
+                                                    ),
+                                                    h('button', {
+                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v); },
+                                                        disabled: previewingVoice === v,
+                                                        className: "p-2 rounded-full hover:bg-white/10 text-cyan-400 transition-colors"
+                                                    },
+                                                        previewingVoice === v ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
+                                                    )
+                                                )
+                                            )
+                                        )
                                     )
                                 )
                             ),
+                            
+                            // Greeting Voice Section
                             h('div', null,
-                                h('label', { className: "block text-sm font-medium text-gray-300 mb-3" }, t('settings.voiceTab.greetingVoiceLabel')),
-                                h('div', { className: "flex gap-3 flex-wrap" },
-                                    voicesList.map(v => 
-                                        h('button', {
-                                            key: v,
-                                            onClick: () => setVoices({...currentVoices, greeting: v}),
-                                            className: `px-4 py-2 rounded-lg text-sm font-medium transition-all border ${currentVoices.greeting === v ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow' : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'}`
-                                        }, v)
+                                h('h4', { className: "text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider border-b border-gray-700 pb-2" }, t('settings.voiceTab.greetingVoiceLabel')),
+                                Object.entries(categories).map(([category, voices]) => 
+                                    h('div', { key: category, className: "mb-4" },
+                                        h('h5', { className: "text-xs text-gray-500 mb-2 font-medium" }, category),
+                                        h('div', { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" },
+                                            voices.map(v => 
+                                                h('div', { 
+                                                    key: v, 
+                                                    onClick: () => setVoices({...currentVoices, greeting: v}),
+                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${currentVoices.greeting === v ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
+                                                },
+                                                    h('div', { className: "flex items-center gap-3" },
+                                                        h('div', { className: `w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentVoices.greeting === v ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
+                                                            h(VoiceIcon, { className: "w-4 h-4" })
+                                                        ),
+                                                        h('span', { className: `font-medium text-sm ${currentVoices.greeting === v ? 'text-cyan-400' : 'text-gray-300'}` }, v)
+                                                    ),
+                                                    h('button', {
+                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v); },
+                                                        disabled: previewingVoice === v,
+                                                        className: "p-2 rounded-full hover:bg-white/10 text-cyan-400 transition-colors"
+                                                    },
+                                                        previewingVoice === v ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
+                                                    )
+                                                )
+                                            )
+                                        )
                                     )
                                 )
                             )

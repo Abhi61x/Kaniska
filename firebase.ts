@@ -18,7 +18,8 @@ let auth = null;
 let db = null;
 
 // Enable Firebase if an API key is present.
-const isKeyValid = !!firebaseConfig.apiKey;
+// Basic validation to prevent crashing if the key is obviously placeholder or empty
+const isKeyValid = firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10;
 
 if (isKeyValid) {
   try {
@@ -36,8 +37,6 @@ if (isKeyValid) {
             auth = getAuth(app);
         } catch (authError) {
             console.error("Firebase Auth initialization failed:", authError);
-            // In case of component not registered error, it might be an import timing issue.
-            // But with correct imports, this should work.
         }
 
         // Initialize Firestore
@@ -52,7 +51,7 @@ if (isKeyValid) {
     console.error("Firebase initialization failed:", error);
   }
 } else {
-  console.warn("Firebase API key is missing. Auth and DB services are disabled.");
+  console.warn("Firebase API key is missing or invalid. Auth and DB services are disabled.");
 }
 
 export { auth, db, app };
