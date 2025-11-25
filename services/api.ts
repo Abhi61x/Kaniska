@@ -1,10 +1,11 @@
+
+
 import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
   keyType: string;
-
-  constructor(message: string, keyType: string) {
+  constructor(message, keyType) {
     super(message);
     this.name = 'ApiKeyError';
     this.keyType = keyType;
@@ -14,7 +15,7 @@ export class ApiKeyError extends Error {
 
 // A custom error for the main, environment-set API key which the user cannot fix.
 export class MainApiKeyError extends Error {
-  constructor(message: string) {
+  constructor(message) {
     super(message);
     this.name = 'MainApiKeyError';
     Object.setPrototypeOf(this, MainApiKeyError.prototype);
@@ -23,7 +24,7 @@ export class MainApiKeyError extends Error {
 
 // A custom error class for rate limit/quota issues.
 export class RateLimitError extends Error {
-  constructor(message: string) {
+  constructor(message) {
     super(message);
     this.name = 'RateLimitError';
     Object.setPrototypeOf(this, RateLimitError.prototype);
@@ -32,7 +33,7 @@ export class RateLimitError extends Error {
 
 // A custom error class for general service-side issues (e.g., 5xx errors).
 export class ServiceError extends Error {
-  constructor(message: string) {
+  constructor(message) {
     super(message);
     this.name = 'ServiceError';
     Object.setPrototypeOf(this, ServiceError.prototype);
@@ -681,11 +682,9 @@ export async function generateImage(prompt) {
 export async function createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail) {
     const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
-    // Switch to thingproxy as corsproxy.io is encountering fetch errors
-    // In production, this MUST happen on a secure backend server.
+    // Use corsproxy.io which is more reliable for production APIs in frontend demos
     const targetUrl = "https://api.cashfree.com/pg/orders"; 
-    // Using thingproxy which appends the URL at the end of its path
-    const url = `https://thingproxy.freeboard.io/fetch/${targetUrl}`;
+    const url = `https://corsproxy.io/?${targetUrl}`;
 
     const options = {
         method: 'POST',
@@ -729,6 +728,6 @@ export async function createCashfreeOrder(planId, amount, customerId, customerPh
         }
     } catch (err) {
         console.error("Cashfree Order Creation Error:", err);
-        throw err;
+        throw new Error("Payment initiation failed. Please ensure you are online and try again.");
     }
 }

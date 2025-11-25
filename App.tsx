@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -7,7 +8,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 import { auth, db } from './firebase.ts';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -247,8 +248,7 @@ const Avatar = ({ state, mood = 'neutral' }) => {
                     transform: `translateX(${Math.random() > 0.5 ? 5 : -5}px)`
                 }
             })),
-            h('div', { className: "ground" }),
-            h('div', { className: "hint" }, "AI Holographic Interface")
+            h('div', { className: "ground" })
         )
     );
 };
@@ -256,13 +256,13 @@ const Avatar = ({ state, mood = 'neutral' }) => {
 // Separated component to prevent "Rendered more hooks than during the previous render" error
 const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
-    const [validationStatus, setValidationStatus] = React.useState<any>({});
+    const [validationStatus, setValidationStatus] = React.useState({});
     const [isValidating, setIsValidating] = React.useState(false);
 
     const handleSaveKeys = async () => {
         setIsValidating(true);
         setValidationStatus({});
-        const status: any = {};
+        const status = {};
         
         const wRes = await validateWeatherKey(localKeys.weather);
         status.weather = wRes;
@@ -369,8 +369,40 @@ const SettingsModal = ({
         setIsMobileMenuOpen(false);
     };
 
-    const handlePlanSelection = (planId) => {
-        setSubscriptionPlan(planId);
+    const handlePlanSelection = async (planId) => {
+        if (planId === 'free') {
+            setSubscriptionPlan('free');
+            return;
+        }
+
+        const prices = {
+            monthly: 100,
+            quarterly: 200,
+            halfYearly: 350,
+            yearly: 500
+        };
+
+        const amount = prices[planId];
+        if (!amount) return;
+
+        try {
+            // Use existing auth info if available, else placeholders
+            const customerId = user ? user.uid : `guest_${Date.now()}`;
+            const customerPhone = "9999999999"; 
+            const customerEmail = user ? user.email : "guest@example.com";
+
+            const paymentSessionId = await createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail);
+            
+            const cashfree = new window['Cashfree']({ mode: "production" });
+            cashfree.checkout({
+                paymentSessionId: paymentSessionId,
+                redirectTarget: "_self",
+                returnUrl: window.location.href
+            });
+        } catch (error) {
+            console.error("Payment Error", error);
+            alert("Payment initiation failed: " + error.message);
+        }
     };
 
     const playVoicePreview = async (voiceName) => {
@@ -512,7 +544,7 @@ const SettingsModal = ({
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
                         h('div', { className: "absolute top-0 right-0 p-2" },
-                            h('span', { className: "text-xs font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
+                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
                         ),
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-gray-400" }, t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"),
@@ -1007,7 +1039,7 @@ export const App = () => {
         const provider = new GoogleAuthProvider();
         try {
             await signInWithPopup(auth, provider);
-        } catch (error: any) {
+        } catch (error) {
             console.error("Login failed:", error);
             if (error.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
                  alert("Login failed: The Firebase API Key is invalid. Please check your configuration.");
@@ -1055,7 +1087,7 @@ export const App = () => {
         setIsModelSpeaking(false);
     }, [setWasConnected]);
 
-    const addMessageToHistory = React.useCallback((sender, text, options: any = {}) => {
+    const addMessageToHistory = React.useCallback((sender, text, options = {}) => {
         if (!text && !options.image) return;
         setChatHistory((prev) => [...prev, {
             id: Date.now(),
@@ -1064,6 +1096,14 @@ export const App = () => {
             ...options
         }]);
     }, [setChatHistory]);
+
+    // Scroll to bottom of chat
+    React.useEffect(() => {
+        const chatEnd = document.getElementById('chat-end');
+        if (chatEnd) {
+            chatEnd.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [chatHistory, activePanel]);
 
     const handleCodeCommand = React.useCallback(async () => {
         if (!codeInstruction.trim() || isCodeLoading) return;
@@ -1530,7 +1570,7 @@ export const App = () => {
                 try {
                     if (navigator.permissions && typeof navigator.permissions.query === 'function') {
                         // FIX: Cast 'microphone' to any to avoid PermissionName type error
-                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as any });
+                        const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
                         if (permissionStatus.state === 'granted') {
                             connect();
                         }
@@ -1577,7 +1617,7 @@ export const App = () => {
 
             activePanel === 'chat' && h('div', { className: "absolute bottom-24 left-0 right-0 mx-auto w-full max-w-3xl h-[40vh] flex flex-col justify-end pointer-events-none px-4" },
                 h('div', { className: "chat-container overflow-y-auto space-y-3 pointer-events-auto px-2 pb-2 mask-image-gradient scrollbar-hide" },
-                    chatHistory.length === 0 && h('div', { className: "text-center text-gray-400 text-sm opacity-0 animate-fade-in pb-4" }, t('chat.placeholder.title')),
+                    
                     chatHistory.map(msg => 
                         h('div', { key: msg.id, className: `flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation` },
                             h('div', { className: `max-w-[80%] rounded-2xl backdrop-blur-md border overflow-hidden ${
