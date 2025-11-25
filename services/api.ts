@@ -1,10 +1,7 @@
-
-
 import { GoogleGenAI, Modality } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
-  keyType: string;
   constructor(message, keyType) {
     super(message);
     this.name = 'ApiKeyError';
