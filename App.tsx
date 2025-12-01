@@ -283,20 +283,20 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     };
 
     return h('div', { className: "space-y-6 animate-fade-in" },
-        h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
+        h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm" },
             h('div', { className: "flex items-center gap-3 mb-4" },
                 h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" },
                     h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })
                 ),
                 h('div', null,
                     h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.apiKeysTab.optional.title')),
-                    h('p', { className: "text-xs text-gray-500" }, t('settings.apiKeysTab.optional.description'))
+                    h('p', { className: "text-xs text-gray-400" }, t('settings.apiKeysTab.optional.description'))
                 )
             ),
             
             h('div', { className: "space-y-6 mt-6" },
                 ['weather', 'news', 'youtube', 'auddio'].map(keyType => 
-                    h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-gray-700/50" },
+                    h('div', { key: keyType, className: "bg-black/30 p-4 rounded-lg border border-white/5" },
                         h('div', { className: "flex justify-between items-center mb-2" },
                             h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, t(`settings.apiKeysTab.${keyType}Key`)),
                             validationStatus[keyType] && (
@@ -308,7 +308,7 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
                         ),
                         h('input', {
                             type: "password",
-                            className: "w-full bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600",
+                            className: "w-full bg-gray-950/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600",
                             value: localKeys[keyType],
                             onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
                             placeholder: "Enter your API key here..."
@@ -438,17 +438,17 @@ const SettingsModal = ({
         switch (activeTab) {
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.avatar.title') || "Avatar Customization"),
-                        h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."),
+                        h('p', { className: "text-xs text-gray-400 mb-4" }, t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."),
                         h('div', { className: "flex items-center gap-4" },
-                            h('div', { className: "w-16 h-16 rounded-full overflow-hidden border-2 border-cyan-500/50 shrink-0 relative" },
+                            h('div', { className: "w-16 h-16 rounded-full overflow-hidden border-2 border-cyan-500/50 shrink-0 relative shadow-[0_0_15px_rgba(34,211,238,0.3)]" },
                                 avatarUrl ? h('img', { src: avatarUrl, alt: "Avatar Preview", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full bg-gray-800 flex items-center justify-center text-xs" }, "No Img")
                             ),
                             h('div', { className: "flex-1" },
                                 h('input', {
                                     type: "text",
-                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none mb-1",
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none mb-1 transition-all",
                                     value: avatarUrl,
                                     onChange: (e) => setAvatarUrl(e.target.value),
                                     placeholder: "https://example.com/avatar.png"
@@ -458,9 +458,9 @@ const SettingsModal = ({
                         )
                     ),
                     h('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
-                        h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                             h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.appearance.title')),
-                            h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.appearance.description')),
+                            h('p', { className: "text-xs text-gray-400 mb-4" }, t('settings.personaTab.appearance.description')),
                             h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
                                 ['light', 'dark'].map((mode) => 
                                     h('button', {
@@ -471,9 +471,9 @@ const SettingsModal = ({
                                 )
                             )
                         ),
-                        h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                             h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.gender.title')),
-                            h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.gender.description')),
+                            h('p', { className: "text-xs text-gray-400 mb-4" }, t('settings.personaTab.gender.description')),
                             h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
                                 ['female', 'male'].map((g) => 
                                     h('button', {
@@ -485,10 +485,10 @@ const SettingsModal = ({
                             )
                         )
                     ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.greeting.title')),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.greeting.description'))
+                            h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.greeting.description'))
                         ),
                         h('textarea', {
                             className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm",
@@ -497,10 +497,10 @@ const SettingsModal = ({
                             onChange: (e) => setGreetingMessage(e.target.value)
                         })
                     ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.systemPrompt.title') || "Custom Instructions"),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.systemPrompt.description'))
+                            h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.systemPrompt.description'))
                         ),
                         h('textarea', {
                             className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm font-mono leading-relaxed",
@@ -509,9 +509,9 @@ const SettingsModal = ({
                             onChange: (e) => setCustomInstructions(e.target.value)
                         })
                     ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
+                    h('div', { className: "bg-gray-900/20 p-5 rounded-xl border border-white/5 backdrop-blur-sm opacity-80 relative overflow-hidden" },
                         h('div', { className: "absolute top-0 right-0 p-2" },
-                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
+                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-500 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
                         ),
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-gray-400" }, t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"),
@@ -524,11 +524,11 @@ const SettingsModal = ({
                             disabled: true
                         })
                     ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('div', { className: "flex justify-between items-center mb-4" },
                             h('div', null,
                                 h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.ambient.title')),
-                                h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.ambient.description'))
+                                h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.ambient.description'))
                             ),
                             h('span', { className: "text-sm font-mono bg-cyan-900/30 text-cyan-400 px-2 py-1 rounded border border-cyan-900/50" }, `${Math.round(ambientVolume * 100)}%`)
                         ),
@@ -542,10 +542,10 @@ const SettingsModal = ({
                             className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                         })
                     ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.tuning.title')),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.tuning.description'))
+                            h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.tuning.description'))
                         ),
                         h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6" },
                             Object.entries(emotionTuning).map(([trait, value]) => 
@@ -577,10 +577,10 @@ const SettingsModal = ({
                  };
 
                 return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, gender === 'female' ? t('settings.voiceTab.female.title') : t('settings.voiceTab.male.title')),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.voiceTab.description'))
+                            h('p', { className: "text-xs text-gray-400" }, t('settings.voiceTab.description'))
                         ),
                         h('div', { className: "space-y-8" },
                             // Main Voice Section
@@ -655,7 +655,7 @@ const SettingsModal = ({
                  return h(ApiKeysTab, { apiKeys, setApiKeys, t });
             case 'help':
                  return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
+                    h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm" },
                         h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
                         h('div', { className: "space-y-4" },
                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
@@ -696,7 +696,7 @@ const SettingsModal = ({
                 );
              case 'about':
                 return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in py-10" },
-                    h('div', { className: "bg-black/20 p-8 rounded-2xl border border-gray-800 max-w-md w-full text-center relative overflow-hidden" },
+                    h('div', { className: "bg-gray-900/60 p-8 rounded-2xl border border-white/5 max-w-md w-full text-center relative overflow-hidden backdrop-blur-xl shadow-2xl" },
                         h('div', { className: "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-blue-500" }),
                         h('div', { className: "w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-full mx-auto mb-6 flex items-center justify-center border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.1)]" },
                             h('span', { className: "text-4xl filter drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" }, "🤖")
@@ -744,13 +744,14 @@ const SettingsModal = ({
                             h('button', {
                                 key: planId,
                                 onClick: () => handlePlanSelection(planId),
-                                className: `relative p-6 rounded-xl border transition-all text-left group ${
+                                className: `relative p-6 rounded-xl border transition-all text-left group overflow-hidden ${
                                     subscriptionPlan === planId 
                                     ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
                                     : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
                                 }`
                             },
-                                h('div', { className: "flex justify-between items-start mb-2" },
+                                subscriptionPlan === planId && h('div', { className: "absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_10px_#22d3ee]" }),
+                                h('div', { className: "flex justify-between items-start mb-2 mt-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
                                     subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
@@ -764,7 +765,7 @@ const SettingsModal = ({
                         )
                     ),
 
-                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 mt-2" },
+                    h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm mt-2" },
                         h('h4', { className: "text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2" }, t('settings.subscriptionTab.featuresTitle')),
                         h('div', { className: "space-y-3" },
                             h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
@@ -796,78 +797,82 @@ const SettingsModal = ({
         onClick: onClose 
     },
         h('div', {
-            className: "bg-black md:bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
+            className: "bg-gray-950 md:bg-gray-900/95 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter backdrop-blur-2xl",
             onClick: e => e.stopPropagation()
         },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
-                h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
-                    h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
+            // Improved Sidebar
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black/40 border-r border-white/5 h-full absolute md:relative z-20 backdrop-blur-md` },
+                h('div', { className: "p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-b from-white/5 to-transparent" },
+                    h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400 tracking-wide" },
                         h(SettingsIcon, { className: "w-6 h-6" }),
                         t('settings.title')
                     ),
-                    h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white" },
+                    h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white transition-colors" },
                         h(XIcon, { className: "w-6 h-6" })
                     )
                 ),
-                h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
+                h('div', { className: "flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar" },
                     [
-                        { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
-                        { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
-                        { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
-                        { id: 'subscription', icon: null, label: t('settings.tabs.subscription') },
-                        { id: 'help', icon: HelpIcon, label: t('settings.tabs.help') },
-                        { id: 'about', icon: AboutIcon, label: t('settings.tabs.about') },
+                        { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona'), desc: 'Identity & Behavior' },
+                        { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice'), desc: 'Speech Settings' },
+                        { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys'), desc: 'External Services' },
+                        { id: 'subscription', icon: null, label: t('settings.tabs.subscription'), desc: 'Plans & Usage' },
+                        { id: 'help', icon: HelpIcon, label: t('settings.tabs.help'), desc: 'FAQ & Support' },
+                        { id: 'about', icon: AboutIcon, label: t('settings.tabs.about'), desc: 'App Info' },
                     ].map(tab => 
                         h('button', {
                             key: tab.id,
                             onClick: () => handleTabChange(tab.id),
-                            className: `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                            className: `w-full flex items-center gap-4 px-6 py-4 border-l-2 transition-all duration-200 group text-left ${
                                 activeTab === tab.id 
-                                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm' 
-                                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent'
+                                ? 'border-cyan-500 bg-gradient-to-r from-cyan-500/10 to-transparent text-cyan-400' 
+                                : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-gray-200'
                             }`
                         },
-                            tab.icon ? h(tab.icon, { className: "w-5 h-5" }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold" }, "$"),
-                            h('span', null, tab.label),
-                            h('span', { className: "ml-auto md:hidden text-gray-600" },
-                                h('svg', { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M9 18l6-6-6-6" }))
+                            tab.icon ? h(tab.icon, { className: `w-5 h-5 transition-colors ${activeTab === tab.id ? 'text-cyan-400' : 'text-gray-500 group-hover:text-gray-300'}` }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold text-lg leading-none" }, "⚡"),
+                            h('div', null,
+                                h('div', { className: "font-medium text-sm" }, tab.label),
+                                h('div', { className: `text-[10px] font-normal transition-colors ${activeTab === tab.id ? 'text-cyan-500/70' : 'text-gray-600 group-hover:text-gray-500'}` }, tab.desc)
                             )
                         )
                     )
                 ),
-                h('div', { className: "p-4 border-t border-border-color bg-gray-900" },
-                    h('label', { className: "text-xs text-gray-500 uppercase font-semibold mb-2 block px-1" }, "Language"),
-                    h('div', { className: "flex gap-2" },
+                h('div', { className: "p-6 border-t border-white/5 bg-black/20" },
+                    h('label', { className: "text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block" }, "Language"),
+                    h('div', { className: "grid grid-cols-2 gap-2" },
                         availableLanguages.map(l => 
                             h('button', {
                                 key: l.code,
                                 onClick: () => setLang(l.code),
-                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                                    lang === l.code ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-border-color text-gray-500 hover:border-gray-600'
+                                className: `py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                                    lang === l.code ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-black/40 border-gray-800 text-gray-500 hover:border-gray-600 hover:text-gray-300'
                                 }`
-                            }, l.name)
+                            }, l.name.split(' ')[0])
                         )
                     )
                 )
             ),
-            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-panel-bg relative` },
-                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-border-color" },
+            
+            // Content Area
+            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col h-full overflow-hidden bg-transparent relative` },
+                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-gray-900" },
                     h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" },
                         h(ArrowLeftIcon, { className: "w-5 h-5" }),
                         h('span', { className: "text-sm font-medium" }, "Back")
                     ),
-                    h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)),
+                    h('h3', { className: "font-semibold text-white capitalize" }, t(`settings.tabs.${activeTab}`)),
                     h('button', { onClick: onClose, className: "p-2 text-gray-400" },
                         h(XIcon, { className: "w-5 h-5" })
                     )
                 ),
-                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" },
+                h('button', { onClick: onClose, className: "hidden md:block absolute top-6 right-6 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" },
                     h(XIcon, { className: "w-6 h-6" })
                 ),
-                h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
-                    h('div', { className: "max-w-3xl mx-auto" },
-                        h('div', { className: "hidden md:block mb-8 pb-4 border-b border-border-color" },
-                            h('h2', { className: "text-2xl font-bold text-white" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`))
+                h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10" },
+                    h('div', { className: "max-w-4xl mx-auto" },
+                        h('div', { className: "hidden md:block mb-10 pb-4 border-b border-white/5" },
+                            h('h2', { className: "text-3xl font-bold text-white tracking-tight" }, t(`settings.tabs.${activeTab}`)),
+                            h('p', { className: "text-sm text-gray-500 mt-2" }, "Configure your assistant preferences and settings.")
                         ),
                         renderTabContent()
                     )
@@ -1338,48 +1343,6 @@ export const App = () => {
                 )
             ),
 
-            activePanel === 'weather' && weatherData && h('div', { className: "absolute top-1/4 right-8 z-20 animate-panel-enter" },
-                h('div', { className: "glass-panel bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-72 shadow-2xl" },
-                    h('div', { className: "flex justify-between items-start mb-4" },
-                        h('div', null,
-                            h('h2', { className: "text-2xl font-bold" }, weatherData.location.split(',')[0]),
-                            h('p', { className: "text-gray-400 text-sm" }, new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'}))
-                        ),
-                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
-                    ),
-                    h('div', { className: "flex-1 flex-col justify-end" },
-                        h('div', { className: "flex items-center gap-4 mb-6" },
-                            h('div', { className: "text-5xl font-thin" }, `${weatherData.temp}°`),
-                            h('div', { className: "text-right flex-1" },
-                                h(WeatherIcon, { className: "w-8 h-8 text-yellow-400 mb-1 ml-auto weather-icon-glow" }),
-                                h('p', { className: "text-sm font-medium" }, weatherData.conditions)
-                            )
-                        ),
-                        h('p', { className: "text-sm text-gray-300 border-t border-white/10 pt-4 leading-relaxed" }, weatherData.summary)
-                    )
-                )
-            ),
-            
-            activePanel === 'timer' && h('div', { className: "absolute top-24 left-8 z-20 animate-panel-enter" },
-                h('div', { className: "glass-panel bg-black/40 backdrop-blur-xl border border-white/10 rounded-full w-32 h-32 flex items-center justify-center relative shadow-2xl" },
-                    h('svg', { className: "absolute inset-0 w-full h-full -rotate-90", viewBox: "0 0 100 100" },
-                        h('circle', { className: "timer-circle-bg", cx: "50", cy: "50", r: "45", fill: "none", strokeWidth: "4" }),
-                        h('circle', { 
-                            className: "timer-circle-progress", 
-                            cx: "50", cy: "50", r: "45", 
-                            fill: "none", 
-                            strokeWidth: "4", 
-                            strokeDasharray: "283",
-                            strokeDashoffset: 283 - (283 * timerData.remaining / (timerData.duration || 1))
-                        })
-                    ),
-                    h('div', { className: "text-center" },
-                        h('span', { className: "text-2xl font-mono font-bold block" }, `${Math.floor(timerData.remaining / 60)}:${(timerData.remaining % 60).toString().padStart(2, '0')}`),
-                        timerData.remaining === 0 && h('button', { onClick: () => setActivePanel('chat'), className: "text-xs uppercase text-gray-400 hover:text-white mt-1" }, "Dismiss")
-                    )
-                )
-            ),
-            
             activePanel === 'code' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-panel-enter p-8" },
                 h('div', { className: "w-full max-w-6xl h-[85vh] bg-[#0d1117] rounded-xl border border-border-color shadow-2xl flex flex-col code-editor-container" },
                     h('div', { className: "editor-controls-pane" },
