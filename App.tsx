@@ -283,20 +283,20 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     };
 
     return h('div', { className: "space-y-6 animate-fade-in" },
-        h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm" },
+        h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
             h('div', { className: "flex items-center gap-3 mb-4" },
                 h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" },
                     h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })
                 ),
                 h('div', null,
                     h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.apiKeysTab.optional.title')),
-                    h('p', { className: "text-xs text-gray-400" }, t('settings.apiKeysTab.optional.description'))
+                    h('p', { className: "text-xs text-gray-500" }, t('settings.apiKeysTab.optional.description'))
                 )
             ),
             
             h('div', { className: "space-y-6 mt-6" },
                 ['weather', 'news', 'youtube', 'auddio'].map(keyType => 
-                    h('div', { key: keyType, className: "bg-black/30 p-4 rounded-lg border border-white/5" },
+                    h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-gray-700/50" },
                         h('div', { className: "flex justify-between items-center mb-2" },
                             h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, t(`settings.apiKeysTab.${keyType}Key`)),
                             validationStatus[keyType] && (
@@ -308,7 +308,7 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
                         ),
                         h('input', {
                             type: "password",
-                            className: "w-full bg-gray-950/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600",
+                            className: "w-full bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600",
                             value: localKeys[keyType],
                             onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
                             placeholder: "Enter your API key here..."
@@ -438,17 +438,17 @@ const SettingsModal = ({
         switch (activeTab) {
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.avatar.title') || "Avatar Customization"),
-                        h('p', { className: "text-xs text-gray-400 mb-4" }, t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."),
+                        h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."),
                         h('div', { className: "flex items-center gap-4" },
-                            h('div', { className: "w-16 h-16 rounded-full overflow-hidden border-2 border-cyan-500/50 shrink-0 relative shadow-[0_0_15px_rgba(34,211,238,0.3)]" },
+                            h('div', { className: "w-16 h-16 rounded-full overflow-hidden border-2 border-cyan-500/50 shrink-0 relative" },
                                 avatarUrl ? h('img', { src: avatarUrl, alt: "Avatar Preview", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full bg-gray-800 flex items-center justify-center text-xs" }, "No Img")
                             ),
                             h('div', { className: "flex-1" },
                                 h('input', {
                                     type: "text",
-                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none mb-1 transition-all",
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none mb-1",
                                     value: avatarUrl,
                                     onChange: (e) => setAvatarUrl(e.target.value),
                                     placeholder: "https://example.com/avatar.png"
@@ -458,9 +458,9 @@ const SettingsModal = ({
                         )
                     ),
                     h('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
-                        h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                        h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                             h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.appearance.title')),
-                            h('p', { className: "text-xs text-gray-400 mb-4" }, t('settings.personaTab.appearance.description')),
+                            h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.appearance.description')),
                             h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
                                 ['light', 'dark'].map((mode) => 
                                     h('button', {
@@ -471,9 +471,9 @@ const SettingsModal = ({
                                 )
                             )
                         ),
-                        h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                        h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                             h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.gender.title')),
-                            h('p', { className: "text-xs text-gray-400 mb-4" }, t('settings.personaTab.gender.description')),
+                            h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.gender.description')),
                             h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
                                 ['female', 'male'].map((g) => 
                                     h('button', {
@@ -485,10 +485,10 @@ const SettingsModal = ({
                             )
                         )
                     ),
-                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.greeting.title')),
-                            h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.greeting.description'))
+                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.greeting.description'))
                         ),
                         h('textarea', {
                             className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm",
@@ -497,10 +497,10 @@ const SettingsModal = ({
                             onChange: (e) => setGreetingMessage(e.target.value)
                         })
                     ),
-                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.systemPrompt.title') || "Custom Instructions"),
-                            h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.systemPrompt.description'))
+                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.systemPrompt.description'))
                         ),
                         h('textarea', {
                             className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm font-mono leading-relaxed",
@@ -509,9 +509,9 @@ const SettingsModal = ({
                             onChange: (e) => setCustomInstructions(e.target.value)
                         })
                     ),
-                    h('div', { className: "bg-gray-900/20 p-5 rounded-xl border border-white/5 backdrop-blur-sm opacity-80 relative overflow-hidden" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
                         h('div', { className: "absolute top-0 right-0 p-2" },
-                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-500 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
+                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
                         ),
                         h('div', { className: "mb-3" },
                             h('h3', { className: "font-semibold text-lg text-gray-400" }, t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"),
@@ -524,11 +524,11 @@ const SettingsModal = ({
                             disabled: true
                         })
                     ),
-                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "flex justify-between items-center mb-4" },
                             h('div', null,
                                 h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.ambient.title')),
-                                h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.ambient.description'))
+                                h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.ambient.description'))
                             ),
                             h('span', { className: "text-sm font-mono bg-cyan-900/30 text-cyan-400 px-2 py-1 rounded border border-cyan-900/50" }, `${Math.round(ambientVolume * 100)}%`)
                         ),
@@ -542,10 +542,10 @@ const SettingsModal = ({
                             className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                         })
                     ),
-                    h('div', { className: "bg-gray-900/40 p-5 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.tuning.title')),
-                            h('p', { className: "text-xs text-gray-400" }, t('settings.personaTab.tuning.description'))
+                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.tuning.description'))
                         ),
                         h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6" },
                             Object.entries(emotionTuning).map(([trait, value]) => 
@@ -577,10 +577,10 @@ const SettingsModal = ({
                  };
 
                 return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, gender === 'female' ? t('settings.voiceTab.female.title') : t('settings.voiceTab.male.title')),
-                            h('p', { className: "text-xs text-gray-400" }, t('settings.voiceTab.description'))
+                            h('p', { className: "text-xs text-gray-500" }, t('settings.voiceTab.description'))
                         ),
                         h('div', { className: "space-y-8" },
                             // Main Voice Section
@@ -655,7 +655,7 @@ const SettingsModal = ({
                  return h(ApiKeysTab, { apiKeys, setApiKeys, t });
             case 'help':
                  return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm" },
+                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
                         h('div', { className: "space-y-4" },
                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
@@ -696,7 +696,7 @@ const SettingsModal = ({
                 );
              case 'about':
                 return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in py-10" },
-                    h('div', { className: "bg-gray-900/60 p-8 rounded-2xl border border-white/5 max-w-md w-full text-center relative overflow-hidden backdrop-blur-xl shadow-2xl" },
+                    h('div', { className: "bg-black/20 p-8 rounded-2xl border border-gray-800 max-w-md w-full text-center relative overflow-hidden" },
                         h('div', { className: "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-blue-500" }),
                         h('div', { className: "w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-full mx-auto mb-6 flex items-center justify-center border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.1)]" },
                             h('span', { className: "text-4xl filter drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" }, "🤖")
@@ -744,14 +744,13 @@ const SettingsModal = ({
                             h('button', {
                                 key: planId,
                                 onClick: () => handlePlanSelection(planId),
-                                className: `relative p-6 rounded-xl border transition-all text-left group overflow-hidden ${
+                                className: `relative p-6 rounded-xl border transition-all text-left group ${
                                     subscriptionPlan === planId 
                                     ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
                                     : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
                                 }`
                             },
-                                subscriptionPlan === planId && h('div', { className: "absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_10px_#22d3ee]" }),
-                                h('div', { className: "flex justify-between items-start mb-2 mt-2" },
+                                h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
                                     subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
@@ -765,7 +764,7 @@ const SettingsModal = ({
                         )
                     ),
 
-                    h('div', { className: "bg-gray-900/40 p-6 rounded-xl border border-white/5 backdrop-blur-sm mt-2" },
+                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 mt-2" },
                         h('h4', { className: "text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2" }, t('settings.subscriptionTab.featuresTitle')),
                         h('div', { className: "space-y-3" },
                             h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
@@ -797,82 +796,78 @@ const SettingsModal = ({
         onClick: onClose 
     },
         h('div', {
-            className: "bg-gray-950 md:bg-gray-900/95 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter backdrop-blur-2xl",
+            className: "bg-black md:bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
             onClick: e => e.stopPropagation()
         },
-            // Improved Sidebar
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black/40 border-r border-white/5 h-full absolute md:relative z-20 backdrop-blur-md` },
-                h('div', { className: "p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-b from-white/5 to-transparent" },
-                    h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400 tracking-wide" },
-                        h(SettingsIcon, { className: "w-6 h-6" }),
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
+                h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
+                    h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
+                        h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }),
                         t('settings.title')
                     ),
-                    h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white transition-colors" },
+                    h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white" },
                         h(XIcon, { className: "w-6 h-6" })
                     )
                 ),
-                h('div', { className: "flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar" },
+                h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
                     [
-                        { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona'), desc: 'Identity & Behavior' },
-                        { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice'), desc: 'Speech Settings' },
-                        { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys'), desc: 'External Services' },
-                        { id: 'subscription', icon: null, label: t('settings.tabs.subscription'), desc: 'Plans & Usage' },
-                        { id: 'help', icon: HelpIcon, label: t('settings.tabs.help'), desc: 'FAQ & Support' },
-                        { id: 'about', icon: AboutIcon, label: t('settings.tabs.about'), desc: 'App Info' },
+                        { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
+                        { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
+                        { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
+                        { id: 'subscription', icon: null, label: t('settings.tabs.subscription') },
+                        { id: 'help', icon: HelpIcon, label: t('settings.tabs.help') },
+                        { id: 'about', icon: AboutIcon, label: t('settings.tabs.about') },
                     ].map(tab => 
                         h('button', {
                             key: tab.id,
                             onClick: () => handleTabChange(tab.id),
-                            className: `w-full flex items-center gap-4 px-6 py-4 border-l-2 transition-all duration-200 group text-left ${
+                            className: `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                                 activeTab === tab.id 
-                                ? 'border-cyan-500 bg-gradient-to-r from-cyan-500/10 to-transparent text-cyan-400' 
-                                : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm' 
+                                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent'
                             }`
                         },
-                            tab.icon ? h(tab.icon, { className: `w-5 h-5 transition-colors ${activeTab === tab.id ? 'text-cyan-400' : 'text-gray-500 group-hover:text-gray-300'}` }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold text-lg leading-none" }, "⚡"),
-                            h('div', null,
-                                h('div', { className: "font-medium text-sm" }, tab.label),
-                                h('div', { className: `text-[10px] font-normal transition-colors ${activeTab === tab.id ? 'text-cyan-500/70' : 'text-gray-600 group-hover:text-gray-500'}` }, tab.desc)
+                            tab.icon ? h(tab.icon, { className: "w-5 h-5" }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold" }, "$"),
+                            h('span', null, tab.label),
+                            h('span', { className: "ml-auto md:hidden text-gray-600" },
+                                h('svg', { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M9 18l6-6-6-6" }))
                             )
                         )
                     )
                 ),
-                h('div', { className: "p-6 border-t border-white/5 bg-black/20" },
-                    h('label', { className: "text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block" }, "Language"),
-                    h('div', { className: "grid grid-cols-2 gap-2" },
+                h('div', { className: "p-4 border-t border-border-color bg-gray-900" },
+                    h('label', { className: "text-xs text-gray-500 uppercase font-semibold mb-2 block px-1" }, "Language"),
+                    h('div', { className: "flex gap-2" },
                         availableLanguages.map(l => 
                             h('button', {
                                 key: l.code,
                                 onClick: () => setLang(l.code),
-                                className: `py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
-                                    lang === l.code ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-black/40 border-gray-800 text-gray-500 hover:border-gray-600 hover:text-gray-300'
+                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                                    lang === l.code ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-border-color text-gray-500 hover:border-gray-600'
                                 }`
-                            }, l.name.split(' ')[0])
+                            }, l.name)
                         )
                     )
                 )
             ),
-            
-            // Content Area
-            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col h-full overflow-hidden bg-transparent relative` },
-                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-gray-900" },
+            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-panel-bg relative` },
+                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-border-color" },
                     h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" },
                         h(ArrowLeftIcon, { className: "w-5 h-5" }),
                         h('span', { className: "text-sm font-medium" }, "Back")
                     ),
-                    h('h3', { className: "font-semibold text-white capitalize" }, t(`settings.tabs.${activeTab}`)),
+                    h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)),
                     h('button', { onClick: onClose, className: "p-2 text-gray-400" },
                         h(XIcon, { className: "w-5 h-5" })
                     )
                 ),
-                h('button', { onClick: onClose, className: "hidden md:block absolute top-6 right-6 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" },
+                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" },
                     h(XIcon, { className: "w-6 h-6" })
                 ),
-                h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10" },
-                    h('div', { className: "max-w-4xl mx-auto" },
-                        h('div', { className: "hidden md:block mb-10 pb-4 border-b border-white/5" },
-                            h('h2', { className: "text-3xl font-bold text-white tracking-tight" }, t(`settings.tabs.${activeTab}`)),
-                            h('p', { className: "text-sm text-gray-500 mt-2" }, "Configure your assistant preferences and settings.")
+                h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
+                    h('div', { className: "max-w-3xl mx-auto" },
+                        h('div', { className: "hidden md:block mb-8 pb-4 border-b border-border-color" },
+                            h('h2', { className: "text-2xl font-bold text-white" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`))
                         ),
                         renderTabContent()
                     )
@@ -928,6 +923,10 @@ export const App = () => {
     const [codeInstruction, setCodeInstruction] = React.useState('');
     const [isCodeLoading, setIsCodeLoading] = React.useState(false);
     
+    // Manual YouTube Search State
+    const [manualYoutubeQuery, setManualYoutubeQuery] = React.useState('');
+    const [isSearchingYoutube, setIsSearchingYoutube] = React.useState(false);
+
     // Fixed: Track daily usage with persistence and date reset
     const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-daily-usage', { date: new Date().toDateString(), seconds: 0 });
 
@@ -1027,6 +1026,26 @@ export const App = () => {
             console.error(e);
             setAssistantState('idle');
             alert(t('errors.auddioRecording'));
+        }
+    };
+    
+    const handleManualYoutubeSearch = async () => {
+        if (!manualYoutubeQuery.trim()) return;
+        setIsSearchingYoutube(true);
+        try {
+            const video = await searchYouTube(apiKeys.youtube, manualYoutubeQuery);
+            if (video) {
+                setYoutubeQueue(prev => [video, ...prev]);
+                setYoutubeVideoDetails(video);
+            } else {
+                alert("No video found.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert(e.message);
+        } finally {
+            setIsSearchingYoutube(false);
+            setManualYoutubeQuery('');
         }
     };
 
@@ -1295,16 +1314,15 @@ export const App = () => {
             ),
             
             activePanel === 'youtube' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md animate-panel-enter p-6" },
-                h('div', { className: "w-full max-w-4xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[80vh]" },
-                    h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/20" },
-                        h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-5 h-5 text-red-500" }), t('youtubePanel.title')),
-                        h('button', { onClick: () => { setActivePanel('chat'); playerRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full" }, h(XIcon, { className: "w-5 h-5" }))
+                h('div', { className: "w-full max-w-5xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[85vh]" },
+                    h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/40" },
+                        h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-6 h-6 text-red-500" }), t('youtubePanel.title')),
+                        h('button', { onClick: () => { setActivePanel('chat'); playerRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full transition-colors" }, h(XIcon, { className: "w-6 h-6 text-gray-400 hover:text-white" }))
                     ),
-                    h('div', { className: "flex-1 flex flex-col lg:flex-row" },
-                        h('div', { className: "flex-1 bg-black relative" },
-                            h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" },
-                                // Fallback for YouTube embed
-                                youtubeVideoDetails && h('iframe', {
+                    h('div', { className: "flex-1 flex flex-col lg:flex-row overflow-hidden" },
+                        h('div', { className: "flex-1 bg-black relative flex items-center justify-center" },
+                            youtubeVideoDetails ? h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" },
+                                h('iframe', {
                                     width: "100%",
                                     height: "100%",
                                     src: `https://www.youtube.com/embed/${youtubeVideoDetails.videoId}?autoplay=1`,
@@ -1313,36 +1331,101 @@ export const App = () => {
                                     allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
                                     allowFullScreen: true
                                 })
+                            ) : h('div', { className: "text-center p-8 text-gray-500 flex flex-col items-center" },
+                                h(YouTubeIcon, { className: "w-16 h-16 mb-4 opacity-20" }),
+                                h('p', { className: "text-lg font-medium" }, "Search for a video to start playing")
                             )
                         ),
-                        h('div', { className: "w-full lg:w-80 border-l border-border-color bg-panel-bg flex flex-col" },
-                            h('div', { className: "p-4 border-b border-border-color" },
-                                h('h4', { className: "font-bold text-sm uppercase tracking-wider text-gray-500 mb-2" }, t('youtubePanel.upNext')),
-                                h('div', { className: "space-y-2 max-h-60 overflow-y-auto" },
-                                    youtubeQueue.length === 0 ? h('p', { className: "text-sm text-gray-500 italic" }, "Queue is empty.") : youtubeQueue.map((video, i) => 
-                                        h('div', { key: i, className: "youtube-queue-item flex items-center gap-2 cursor-pointer hover:bg-white/5 p-2 rounded" },
-                                            h('div', { className: "w-16 h-9 bg-gray-800 rounded overflow-hidden flex-shrink-0 relative" },
-                                                h('img', { src: `https://img.youtube.com/vi/${video.videoId}/default.jpg`, alt: "", className: "w-full h-full object-cover opacity-70" }),
-                                                h('div', { className: "absolute inset-0 flex items-center justify-center" }, h(PlayIcon, { className: "w-4 h-4 text-white drop-shadow-md" }))
+                        h('div', { className: "w-full lg:w-96 border-l border-border-color bg-gray-900/50 flex flex-col h-[40vh] lg:h-auto backdrop-blur-sm" },
+                            h('div', { className: "p-4 border-b border-border-color bg-black/20" },
+                                h('div', { className: "relative group" },
+                                    h('input', {
+                                        type: "text",
+                                        value: manualYoutubeQuery,
+                                        onChange: (e) => setManualYoutubeQuery(e.target.value),
+                                        onKeyDown: (e) => e.key === 'Enter' && handleManualYoutubeSearch(),
+                                        placeholder: t('youtubePanel.searchPlaceholder'),
+                                        className: "w-full bg-black/40 border border-gray-700 rounded-xl pl-4 pr-12 py-3 text-sm text-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none placeholder-gray-600 transition-all"
+                                    }),
+                                    h('button', {
+                                        onClick: handleManualYoutubeSearch,
+                                        disabled: isSearchingYoutube,
+                                        className: "absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/5 transition-colors"
+                                    },
+                                        isSearchingYoutube ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : h(SendIcon, { className: "w-4 h-4" })
+                                    )
+                                )
+                            ),
+                            h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-0" },
+                                h('div', { className: "p-4 sticky top-0 bg-gray-900/95 backdrop-blur z-10 border-b border-border-color flex justify-between items-center" },
+                                    h('h4', { className: "font-bold text-xs uppercase tracking-wider text-gray-500" }, t('youtubePanel.upNext')),
+                                    youtubeQueue.length > 0 && h('button', { 
+                                        onClick: () => { setYoutubeQueue([]); setYoutubeVideoDetails(null); },
+                                        className: "text-[10px] text-red-400 hover:text-red-300 font-medium uppercase tracking-wide" 
+                                    }, "Clear")
+                                ),
+                                h('div', { className: "p-2 space-y-1" },
+                                    youtubeQueue.length === 0 ? h('div', { className: "p-8 text-center" },
+                                        h('p', { className: "text-sm text-gray-600 italic" }, "History is empty")
+                                    ) : youtubeQueue.map((video, i) => 
+                                        h('div', { 
+                                            key: i, 
+                                            onClick: () => setYoutubeVideoDetails(video),
+                                            className: `flex items-start gap-3 cursor-pointer p-3 rounded-xl transition-all ${
+                                                youtubeVideoDetails?.videoId === video.videoId 
+                                                ? 'bg-red-500/10 border border-red-500/20' 
+                                                : 'hover:bg-white/5 border border-transparent'
+                                            }` 
+                                        },
+                                            h('div', { className: "w-24 aspect-video bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 relative group" },
+                                                h('img', { src: `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`, alt: "", className: "w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" }),
+                                                h('div', { className: "absolute inset-0 flex items-center justify-center bg-black/20" }, h(PlayIcon, { className: "w-6 h-6 text-white drop-shadow-md opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" }))
                                             ),
-                                            h('div', { className: "flex-1 min-w-0" },
-                                                h('p', { className: "text-sm font-medium truncate" }, video.title),
+                                            h('div', { className: "flex-1 min-w-0 pt-0.5" },
+                                                h('p', { className: `text-sm font-medium leading-tight mb-1 line-clamp-2 ${youtubeVideoDetails?.videoId === video.videoId ? 'text-red-400' : 'text-gray-200'}` }, video.title),
                                                 h('p', { className: "text-xs text-gray-500 truncate" }, video.channelTitle)
                                             )
                                         )
                                     )
                                 )
                             ),
-                            youtubeVideoDetails && h('div', { className: "p-4 flex-1 overflow-y-auto" },
-                                h('h4', { className: "font-bold text-lg leading-tight mb-1" }, youtubeVideoDetails.title),
-                                h('p', { className: "text-cyan-400 text-sm font-medium mb-4" }, youtubeVideoDetails.channelTitle),
-                                youtubeVideoDetails.viewCount && h('p', { className: "text-xs text-gray-500 flex items-center gap-1" }, h('span', { className: "w-2 h-2 rounded-full bg-red-500 inline-block" }), t('youtubePanel.views', {count: youtubeVideoDetails.viewCount.toLocaleString()}))
+                            youtubeVideoDetails && h('div', { className: "p-5 border-t border-border-color bg-black/20" },
+                                h('h4', { className: "font-bold text-base leading-snug mb-2 text-white line-clamp-2" }, youtubeVideoDetails.title),
+                                h('div', { className: "flex items-center justify-between" },
+                                    h('p', { className: "text-cyan-400 text-sm font-medium" }, youtubeVideoDetails.channelTitle),
+                                    youtubeVideoDetails.viewCount && h('p', { className: "text-xs text-gray-500 flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-md" }, 
+                                        h('span', { className: "w-1.5 h-1.5 rounded-full bg-red-500 inline-block animate-pulse" }), 
+                                        t('youtubePanel.views', {count: youtubeVideoDetails.viewCount.toLocaleString()})
+                                    )
+                                )
                             )
                         )
                     )
                 )
             ),
 
+            activePanel === 'weather' && weatherData && h('div', { className: "absolute top-1/4 right-8 z-20 animate-panel-enter" },
+                h('div', { className: "glass-panel bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-72 shadow-2xl" },
+                    h('div', { className: "flex justify-between items-start mb-4" },
+                        h('div', null,
+                            h('h2', { className: "text-2xl font-bold" }, weatherData.location.split(',')[0]),
+                            h('p', { className: "text-gray-400 text-sm" }, new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'}))
+                        ),
+                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
+                    ),
+                    h('div', { className: "flex-1 flex-col justify-end" },
+                        h('div', { className: "flex items-center gap-4 mb-6" },
+                            h('div', { className: "text-5xl font-thin" }, `${weatherData.temp}°`),
+                            h('div', { className: "text-right flex-1" },
+                                h(WeatherIcon, { className: "w-8 h-8 text-yellow-400 mb-1 ml-auto weather-icon-glow" }),
+                                h('p', { className: "text-sm font-medium" }, weatherData.conditions)
+                            )
+                        ),
+                        h('p', { className: "text-sm text-gray-300 border-t border-white/10 pt-4 leading-relaxed" }, weatherData.summary)
+                    )
+                )
+            ),
+            
             activePanel === 'code' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-panel-enter p-8" },
                 h('div', { className: "w-full max-w-6xl h-[85vh] bg-[#0d1117] rounded-xl border border-border-color shadow-2xl flex flex-col code-editor-container" },
                     h('div', { className: "editor-controls-pane" },
@@ -1419,6 +1502,14 @@ export const App = () => {
                     h(DisconnectIcon, { className: "w-5 h-5" }),
                     t('footer.disconnect')
                 )
+            ),
+             h('button', {
+                onClick: () => setActivePanel('youtube'),
+                className: "p-3 rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-red-500 transition-all backdrop-blur-md group relative overflow-hidden",
+                title: "YouTube Player"
+            },
+                h('div', { className: "absolute inset-0 bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity" }),
+                h(YouTubeIcon, { className: "w-5 h-5 group-hover:scale-110 transition-transform relative z-10" })
             ),
              h('button', {
                 onClick: handleRecognizeSong,
