@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -6,12 +8,9 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
-import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
-import { useTranslation, availableLanguages } from './i18n/index';
-import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useTranslation, availableLanguages } from './i18n/index.tsx';
 
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
@@ -165,7 +164,7 @@ async function decodeAudioData(
 // --- Components ---
 
 // Real-Girl Holographic Avatar Implementation
-const Avatar = ({ state, mood = 'neutral' }) => {
+const Avatar = ({ state, mood = 'neutral', customUrl }) => {
     const wrapRef = React.useRef(null);
     const containerRef = React.useRef(null);
     const [glitches, setGlitches] = React.useState([]);
@@ -218,7 +217,8 @@ const Avatar = ({ state, mood = 'neutral' }) => {
     const moodClass = `avatar-mood-${mood}`;
 
     // 3D Cartoon / Stylized Character Image suitable for Holographic projection
-    const imageUrl = "https://images.unsplash.com/photo-1634926878768-2a5b3c42f139?q=80&w=2556&auto=format&fit=crop";
+    // Use custom URL if provided, otherwise fallback to the requested GIF
+    const imageUrl = customUrl || "https://i.gifer.com/NTHO.gif";
 
     return h('div', { 
             className: `avatar-wrap ${stateClass} ${moodClass}`,
@@ -242,7 +242,7 @@ const Avatar = ({ state, mood = 'neutral' }) => {
                     height: `${g.height}%`,
                     left: `${g.left}px`,
                     width: '100%',
-                    backgroundColor: 'rgba(var(--avatar-rgb), 0.5)', // Use CSS variable
+                    backgroundColor: 'rgba(34, 211, 238, 0.5)',
                     opacity: 0.5,
                     transform: `translateX(${Math.random() > 0.5 ? 5 : -5}px)`
                 }
@@ -255,15 +255,15 @@ const Avatar = ({ state, mood = 'neutral' }) => {
 // Separated component to prevent "Rendered more hooks than during the previous render" error
 const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
-    const [validationStatus, setValidationStatus] = React.useState({});
+    // FIX: Typed validationStatus to allow string keys
+    const [validationStatus, setValidationStatus] = React.useState<Record<string, any>>({});
     const [isValidating, setIsValidating] = React.useState(false);
 
     const handleSaveKeys = async () => {
         setIsValidating(true);
         setValidationStatus({});
-        // FIX: Added 'any' type to the status object to allow dynamic assignment of properties,
-        // which resolves the TypeScript errors about properties not existing on type '{}'.
-        const status: any = {};
+        // FIX: Typed status object to allow dynamic assignment
+        const status: Record<string, any> = {};
         
         const wRes = await validateWeatherKey(localKeys.weather);
         status.weather = wRes;
@@ -345,10 +345,7 @@ const SettingsModal = ({
     ambientVolume, setAmbientVolume,
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
-    dailyUsage,
-    user,
-    handleLogin,
-    handleLogout
+    dailyUsage
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -387,10 +384,10 @@ const SettingsModal = ({
         if (!amount) return;
 
         try {
-            // Use existing auth info if available, else placeholders
-            const customerId = user ? user.uid : `guest_${Date.now()}`;
+            // Since firebase auth is removed, we default to guest details
+            const customerId = `guest_${Date.now()}`;
             const customerPhone = "9999999999"; 
-            const customerEmail = user ? user.email : "guest@example.com";
+            const customerEmail = "guest@example.com";
 
             const paymentSessionId = await createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail);
             
@@ -439,37 +436,6 @@ const SettingsModal = ({
 
     const renderTabContent = () => {
         switch (activeTab) {
-            case 'account':
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 flex flex-col items-center justify-center text-center min-h-[300px]" },
-                        user ? h(React.Fragment, null,
-                            h('div', { className: "w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold mb-4 shadow-lg" },
-                                user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full rounded-full" }) : user.email ? user.email[0].toUpperCase() : 'U'
-                            ),
-                            h('h3', { className: "text-xl font-bold text-white mb-1" }, user.displayName || "User"),
-                            h('p', { className: "text-gray-400 text-sm mb-6" }, user.email),
-                            h('div', { className: "flex gap-3" },
-                                h('button', {
-                                    onClick: handleLogout,
-                                    className: "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-6 py-2 rounded-lg font-medium transition-colors"
-                                }, "Sign Out")
-                            )
-                        ) : h(React.Fragment, null,
-                            h('div', { className: "p-4 bg-cyan-900/20 rounded-full mb-4" },
-                                h(UserIcon, { className: "w-8 h-8 text-cyan-400" })
-                            ),
-                            h('h3', { className: "text-xl font-bold text-white mb-2" }, "Sign In to Kaniska"),
-                            h('p', { className: "text-gray-400 text-sm mb-8 max-w-xs" }, "Sync your settings, manage your subscription, and access your profile across devices."),
-                            h('button', {
-                                onClick: handleLogin,
-                                className: "bg-white text-gray-900 hover:bg-gray-100 px-6 py-3 rounded-lg font-bold flex items-center gap-3 transition-colors shadow-lg"
-                            },
-                                h('img', { src: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg", alt: "Google", className: "w-5 h-5" }),
-                                "Sign in with Google"
-                            )
-                        )
-                     )
-                );
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
@@ -836,7 +802,7 @@ const SettingsModal = ({
             h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
                 h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
                     h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
-                        h(SettingsIcon, { className: "w-6 h-6" }),
+                        h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }),
                         t('settings.title')
                     ),
                     h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white" },
@@ -845,7 +811,6 @@ const SettingsModal = ({
                 ),
                 h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
                     [
-                        { id: 'account', icon: UserIcon, label: "Account" },
                         { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
                         { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
                         { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
@@ -885,7 +850,7 @@ const SettingsModal = ({
                     )
                 )
             ),
-            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col h-full overflow-hidden bg-black md:bg-panel-bg relative` },
+            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-panel-bg relative` },
                 h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-border-color" },
                     h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" },
                         h(ArrowLeftIcon, { className: "w-5 h-5" }),
@@ -896,7 +861,7 @@ const SettingsModal = ({
                         h(XIcon, { className: "w-5 h-5" })
                     )
                 ),
-                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/5 transition-colors" },
+                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" },
                     h(XIcon, { className: "w-6 h-6" })
                 ),
                 h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
@@ -909,5 +874,597 @@ const SettingsModal = ({
                 )
             )
         )
+    );
+};
+
+export const App = () => {
+    const { t, lang, setLang } = useTranslation();
+
+    const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
+    const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
+    const [greetingMessage, setGreetingMessage] = usePersistentState(
+        'kaniska-greeting',
+        DEFAULT_FEMALE_GREETING
+    );
+    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-custom-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
+    const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion-tuning', {
+        happiness: 50, empathy: 70, formality: 30, excitement: 50, sadness: 20, curiosity: 60
+    });
+    const [apiKeys, setApiKeys] = usePersistentState('kaniska-api-keys', {
+        weather: '', news: '', youtube: '', auddio: ''
+    });
+    const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Zephyr' });
+    const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Charon' });
+    const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-volume', 0.1);
+    const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar-url', '');
+    const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-subscription-plan', 'free');
+    
+    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+    const [settingsTab, setSettingsTab] = usePersistentState('kaniska-settings-tab', 'persona');
+    // REMOVED: User state (Firebase Auth)
+
+    // --- MAIN APP STATE ---
+    const [activePanel, setActivePanel] = React.useState('chat');
+    const [chatHistory, setChatHistory] = React.useState([]);
+    const [assistantState, setAssistantState] = React.useState('idle'); // idle, listening, thinking, speaking
+    const [mood, setMood] = React.useState('neutral');
+    const [isModelSpeaking, setIsModelSpeaking] = React.useState(false);
+    const [isConnected, setIsConnected] = React.useState(false);
+    const isConnectingRef = React.useRef(false);
+    
+    // Tools State
+    const [weatherData, setWeatherData] = React.useState(null);
+    const [timerData, setTimerData] = React.useState({ remaining: 0, duration: 0 });
+    const [youtubeQueue, setYoutubeQueue] = React.useState([]);
+    const [youtubeVideoDetails, setYoutubeVideoDetails] = React.useState(null);
+    const playerRef = React.useRef(null);
+    const [code, setCode] = React.useState('console.log("Hello World");');
+    const [codeLanguage, setCodeLanguage] = React.useState('javascript');
+    const [codeInstruction, setCodeInstruction] = React.useState('');
+    const [isCodeLoading, setIsCodeLoading] = React.useState(false);
+    
+    // Fixed: Track daily usage with persistence and date reset
+    const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-daily-usage', { date: new Date().toDateString(), seconds: 0 });
+
+    // Live API
+    const [liveSession, setLiveSession] = React.useState(null);
+    const outputAudioContextRef = React.useRef(null);
+    const nextAudioStartTimeRef = React.useRef(0);
+    const audioContextRef = React.useRef(null);
+    const mediaStreamRef = React.useRef(null);
+    const workletNodeRef = React.useRef(null);
+
+    React.useEffect(() => {
+        document.documentElement.className = theme;
+    }, [theme]);
+
+    React.useEffect(() => {
+        let timer;
+        if (timerData.remaining > 0) {
+            timer = setInterval(() => {
+                setTimerData(prev => {
+                    if (prev.remaining <= 1) {
+                        clearInterval(timer);
+                        return { ...prev, remaining: 0 };
+                    }
+                    return { ...prev, remaining: prev.remaining - 1 };
+                });
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [timerData.remaining]);
+
+    // Usage Tracking Effect
+    React.useEffect(() => {
+        let interval;
+        if (isConnected) {
+            interval = setInterval(() => {
+                setDailyUsage(prev => {
+                    const today = new Date().toDateString();
+                    // Reset if it's a new day
+                    if (prev.date !== today) {
+                         return { date: today, seconds: 1 };
+                    }
+                    return { ...prev, seconds: prev.seconds + 1 };
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isConnected, setDailyUsage]);
+
+    // Enforce Limit Effect
+    React.useEffect(() => {
+        // 1 Hour Limit (3600 seconds) for Free plan
+        if (subscriptionPlan === 'free' && dailyUsage.seconds >= 3600 && isConnected) {
+            disconnect();
+            alert(t('errors.dailyLimit'));
+        }
+    }, [dailyUsage, subscriptionPlan, isConnected, t]);
+
+    const handleSetupClick = () => {
+        setSettingsTab('apiKeys');
+        setIsSettingsOpen(true);
+    };
+
+    const handleRecognizeSong = async () => {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert(t('errors.micNotAllowed'));
+            return;
+        }
+        setAssistantState('recognizing');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            const chunks = [];
+            
+            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                try {
+                   const song = await recognizeSong(apiKeys.auddio, blob);
+                   if (song) {
+                       const message = t('chat.songRecognized', { title: song.title, artist: song.artist });
+                       setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: message }]);
+                   } else {
+                       setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: t('chat.songNotFound') }]);
+                   }
+                } catch (e) {
+                   setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: e.message, isError: true }]);
+                } finally {
+                   setAssistantState('idle');
+                   stream.getTracks().forEach(track => track.stop());
+                }
+            };
+            
+            mediaRecorder.start();
+            setTimeout(() => mediaRecorder.stop(), 5000); // Record for 5 seconds
+        } catch (e) {
+            console.error(e);
+            setAssistantState('idle');
+            alert(t('errors.auddioRecording'));
+        }
+    };
+
+    const handleCodeCommand = async () => {
+        if (!codeInstruction) return;
+        setIsCodeLoading(true);
+        try {
+             const result = await processCodeCommand(code, codeLanguage, codeInstruction);
+             setCode(result.newCode);
+             setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: result.explanation }]);
+             setCodeInstruction('');
+        } catch (e) {
+             setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: e.message, isError: true }]);
+        } finally {
+             setIsCodeLoading(false);
+        }
+    };
+
+    // --- Live API Integration ---
+    const connect = async () => {
+        if (isConnectingRef.current || isConnected) return;
+        isConnectingRef.current = true;
+        setAssistantState('listening');
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStreamRef.current = stream;
+
+            // Output Audio Context (Reuse for performance)
+            const outputCtx = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 24000 });
+            outputAudioContextRef.current = outputCtx;
+            nextAudioStartTimeRef.current = outputCtx.currentTime;
+
+            const inputAudioContext = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 16000 });
+            audioContextRef.current = inputAudioContext;
+
+            // Tools Definition
+            const getWeatherTool = {
+                name: 'get_weather',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: { location: { type: Type.STRING } },
+                    required: ['location']
+                }
+            };
+            const searchYoutubeTool = {
+                 name: 'search_youtube',
+                 parameters: {
+                     type: Type.OBJECT,
+                     properties: { query: { type: Type.STRING } },
+                     required: ['query']
+                 }
+            };
+            const setTimerTool = {
+                name: 'set_timer',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: { seconds: { type: Type.NUMBER } },
+                    required: ['seconds']
+                }
+            };
+
+            const sessionPromise = ai.live.connect({
+                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                config: {
+                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, setTimerTool] }],
+                    systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: {
+                         voiceConfig: { prebuiltVoiceConfig: { voiceName: (gender === 'female' ? femaleVoices.main : maleVoices.main) } }
+                    }
+                },
+                callbacks: {
+                    onopen: async () => {
+                        console.log('Live Session Connected');
+                        setIsConnected(true);
+                        isConnectingRef.current = false;
+                        
+                        // Audio Input Setup
+                        const source = inputAudioContext.createMediaStreamSource(stream);
+                        const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
+                        processor.onaudioprocess = (e) => {
+                            const inputData = e.inputBuffer.getChannelData(0);
+                            const pcmBlob = createBlob(inputData);
+                            sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+                        };
+                        source.connect(processor);
+                        processor.connect(inputAudioContext.destination);
+                        workletNodeRef.current = processor;
+                    },
+                    onmessage: async (msg) => {
+                         // Handle Audio Output
+                         if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
+                             const base64 = msg.serverContent.modelTurn.parts[0].inlineData.data;
+                             const currentOutputCtx = outputAudioContextRef.current;
+                             if (currentOutputCtx) {
+                                const audioBuffer = await decodeAudioData(decode(base64), currentOutputCtx, 24000, 1);
+                                const source = currentOutputCtx.createBufferSource();
+                                source.buffer = audioBuffer;
+                                source.connect(currentOutputCtx.destination);
+                                
+                                // Schedule audio to play without gaps
+                                const startTime = Math.max(currentOutputCtx.currentTime, nextAudioStartTimeRef.current);
+                                source.start(startTime);
+                                nextAudioStartTimeRef.current = startTime + audioBuffer.duration;
+                                
+                                setAssistantState('speaking');
+                                setIsModelSpeaking(true);
+                                
+                                source.onended = () => {
+                                    // Simple check: if current time is past the scheduled end time, we are idle.
+                                    if (currentOutputCtx.currentTime >= nextAudioStartTimeRef.current - 0.1) {
+                                        setAssistantState('idle');
+                                        setIsModelSpeaking(false);
+                                    }
+                                };
+                             }
+                         }
+
+                         // Handle Tool Calls
+                         if (msg.toolCall) {
+                             const responses = [];
+                             for (const call of msg.toolCall.functionCalls) {
+                                 // FIX: Typed result to allow error property
+                                 let result: Record<string, any> = { result: 'ok' };
+                                 try {
+                                     if (call.name === 'get_weather') {
+                                         const data = await fetchWeatherSummary(call.args.location, apiKeys.weather);
+                                         setWeatherData(data);
+                                         setActivePanel('weather');
+                                         result = { result: `Displayed weather for ${data.location}` };
+                                     } else if (call.name === 'search_youtube') {
+                                         const video = await searchYouTube(apiKeys.youtube, call.args.query);
+                                         if (video) {
+                                             setYoutubeQueue([video]);
+                                             setYoutubeVideoDetails(video);
+                                             setActivePanel('youtube');
+                                             result = { result: `Playing ${video.title}` };
+                                         } else {
+                                             result = { result: 'No video found' };
+                                         }
+                                     } else if (call.name === 'set_timer') {
+                                         setTimerData({ remaining: call.args.seconds, duration: call.args.seconds });
+                                         setActivePanel('timer');
+                                         result = { result: 'Timer set' };
+                                     }
+                                 } catch (e) {
+                                     result = { error: e.message };
+                                     setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: e.message, isError: true }]);
+                                 }
+                                 responses.push({
+                                     id: call.id,
+                                     name: call.name,
+                                     response: result
+                                 });
+                             }
+                             sessionPromise.then(session => session.sendToolResponse({ functionResponses: responses }));
+                         }
+                    },
+                    onclose: () => {
+                        console.log('Live Session Closed');
+                        disconnect();
+                    },
+                    onerror: (err) => {
+                        console.error("Live API Error", err);
+                        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: "Connection error.", isError: true }]);
+                        disconnect();
+                    }
+                }
+            });
+            setLiveSession(sessionPromise);
+
+        } catch (e) {
+            console.error("Connection Failed", e);
+            isConnectingRef.current = false;
+            setAssistantState('idle');
+            alert(t('errors.connection'));
+        }
+    };
+
+    const disconnect = () => {
+        if (liveSession) {
+            liveSession.then(s => s.close());
+            setLiveSession(null);
+        }
+        if (outputAudioContextRef.current) {
+            outputAudioContextRef.current.close();
+            outputAudioContextRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(t => t.stop());
+            mediaStreamRef.current = null;
+        }
+        if (workletNodeRef.current) {
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current = null;
+        }
+        setIsConnected(false);
+        isConnectingRef.current = false;
+        setAssistantState('idle');
+        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'system', text: t('chat.placeholder.info') }]);
+    };
+
+    return h('div', { 
+            className: "relative flex flex-col h-screen w-screen overflow-hidden font-sans text-white selection:bg-cyan-500/30 selection:text-cyan-100", 
+            style: { backgroundColor: '#000000' } 
+        },
+        h('header', { className: "flex-shrink-0 h-16 flex items-center justify-between px-6 bg-gradient-to-b from-black/80 to-transparent z-20" },
+            h('div', { className: "flex items-center gap-3" },
+                h('h1', { className: "text-2xl font-bold tracking-wider text-cyan-400 glowing-text header-logo" }, "KANISKA")
+            ),
+            h('div', { className: "flex gap-2" },
+                h('button', { 
+                    onClick: () => setIsSettingsOpen(true), 
+                    className: "p-2 rounded-full hover:bg-white/10 transition-colors relative group" 
+                },
+                    h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" })
+                )
+            )
+        ),
+
+        h('main', { className: "flex-grow flex flex-col items-center justify-center relative p-4 z-10" },
+            // Only show Avatar if settings are CLOSED to prevent overlap
+            !isSettingsOpen && h('div', { className: `transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
+                h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: mood, customUrl: avatarUrl })
+            ),
+
+            activePanel === 'chat' && h('div', { className: "absolute bottom-24 left-0 right-0 mx-auto w-full max-w-3xl h-[40vh] flex flex-col justify-end pointer-events-none px-4" },
+                h('div', { className: "chat-container overflow-y-auto space-y-3 pointer-events-auto px-2 pb-2 mask-image-gradient scrollbar-hide" },
+                    chatHistory.map(msg => 
+                        h('div', { key: msg.id, className: `flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation` },
+                            h('div', { className: `max-w-[80%] rounded-2xl backdrop-blur-md border overflow-hidden ${
+                                msg.sender === 'user' 
+                                    ? 'bg-cyan-900/50 border-cyan-500/30 text-cyan-50 rounded-tr-none px-5 py-3' 
+                                    : msg.isError 
+                                        ? 'error-bubble rounded-tl-none px-5 py-3'
+                                        : 'bg-assistant-bubble-bg border-border-color text-text-color rounded-tl-none shadow-lg'
+                            }` },
+                                // Render text content if available
+                                msg.text && h('p', { className: `leading-relaxed whitespace-pre-wrap ${msg.sender !== 'user' && !msg.isError ? 'px-5 py-3' : ''}` }, msg.text),
+                                
+                                // Render image content if available
+                                msg.image && h('div', { className: "relative group" },
+                                    h('img', { src: msg.image, alt: "Generated content", className: "w-full h-auto max-h-[300px] object-cover rounded-b-xl" }),
+                                    h('a', { href: msg.image, download: "generated-image.png", className: "absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity" },
+                                        h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }), h('polyline', { points: "7 10 12 15 17 10" }), h('line', { x1: "12", y1: "15", x2: "12", y2: "3" }))
+                                    )
+                                ),
+
+                                msg.isApiKeyError && msg.keyType && h('button', { 
+                                    onClick: handleSetupClick,
+                                    className: "mt-2 text-xs font-bold uppercase tracking-wide underline decoration-dotted hover:text-white transition-colors flex items-center gap-1 px-5 pb-3"
+                                },
+                                    h(HelpIcon, { className: "w-3 h-3" }), t('chat.setupInstructions') || 'View Setup Instructions'
+                                )
+                            )
+                        )
+                    ),
+                    h('div', { id: "chat-end" })
+                )
+            ),
+            
+            activePanel === 'youtube' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md animate-panel-enter p-6" },
+                h('div', { className: "w-full max-w-4xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[80vh]" },
+                    h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/20" },
+                        h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-5 h-5 text-red-500" }), t('youtubePanel.title')),
+                        h('button', { onClick: () => { setActivePanel('chat'); playerRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full" }, h(XIcon, { className: "w-5 h-5" }))
+                    ),
+                    h('div', { className: "flex-1 flex flex-col lg:flex-row" },
+                        h('div', { className: "flex-1 bg-black relative" },
+                            h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" },
+                                // Fallback for YouTube embed
+                                youtubeVideoDetails && h('iframe', {
+                                    width: "100%",
+                                    height: "100%",
+                                    src: `https://www.youtube.com/embed/${youtubeVideoDetails.videoId}?autoplay=1`,
+                                    title: youtubeVideoDetails.title,
+                                    frameBorder: "0",
+                                    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+                                    allowFullScreen: true
+                                })
+                            )
+                        ),
+                        h('div', { className: "w-full lg:w-80 border-l border-border-color bg-panel-bg flex flex-col" },
+                            h('div', { className: "p-4 border-b border-border-color" },
+                                h('h4', { className: "font-bold text-sm uppercase tracking-wider text-gray-500 mb-2" }, t('youtubePanel.upNext')),
+                                h('div', { className: "space-y-2 max-h-60 overflow-y-auto" },
+                                    youtubeQueue.length === 0 ? h('p', { className: "text-sm text-gray-500 italic" }, "Queue is empty.") : youtubeQueue.map((video, i) => 
+                                        h('div', { key: i, className: "youtube-queue-item flex items-center gap-2 cursor-pointer hover:bg-white/5 p-2 rounded" },
+                                            h('div', { className: "w-16 h-9 bg-gray-800 rounded overflow-hidden flex-shrink-0 relative" },
+                                                h('img', { src: `https://img.youtube.com/vi/${video.videoId}/default.jpg`, alt: "", className: "w-full h-full object-cover opacity-70" }),
+                                                h('div', { className: "absolute inset-0 flex items-center justify-center" }, h(PlayIcon, { className: "w-4 h-4 text-white drop-shadow-md" }))
+                                            ),
+                                            h('div', { className: "flex-1 min-w-0" },
+                                                h('p', { className: "text-sm font-medium truncate" }, video.title),
+                                                h('p', { className: "text-xs text-gray-500 truncate" }, video.channelTitle)
+                                            )
+                                        )
+                                    )
+                                )
+                            ),
+                            youtubeVideoDetails && h('div', { className: "p-4 flex-1 overflow-y-auto" },
+                                h('h4', { className: "font-bold text-lg leading-tight mb-1" }, youtubeVideoDetails.title),
+                                h('p', { className: "text-cyan-400 text-sm font-medium mb-4" }, youtubeVideoDetails.channelTitle),
+                                youtubeVideoDetails.viewCount && h('p', { className: "text-xs text-gray-500 flex items-center gap-1" }, h('span', { className: "w-2 h-2 rounded-full bg-red-500 inline-block" }), t('youtubePanel.views', {count: youtubeVideoDetails.viewCount.toLocaleString()}))
+                            )
+                        )
+                    )
+                )
+            ),
+
+            activePanel === 'weather' && weatherData && h('div', { className: "absolute top-1/4 right-8 z-20 animate-panel-enter" },
+                h('div', { className: "glass-panel bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-72 shadow-2xl" },
+                    h('div', { className: "flex justify-between items-start mb-4" },
+                        h('div', null,
+                            h('h2', { className: "text-2xl font-bold" }, weatherData.location.split(',')[0]),
+                            h('p', { className: "text-gray-400 text-sm" }, new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'}))
+                        ),
+                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
+                    ),
+                    h('div', { className: "flex-1 flex-col justify-end" },
+                        h('div', { className: "flex items-center gap-4 mb-6" },
+                            h('div', { className: "text-5xl font-thin" }, `${weatherData.temp}°`),
+                            h('div', { className: "text-right flex-1" },
+                                h(WeatherIcon, { className: "w-8 h-8 text-yellow-400 mb-1 ml-auto weather-icon-glow" }),
+                                h('p', { className: "text-sm font-medium" }, weatherData.conditions)
+                            )
+                        ),
+                        h('p', { className: "text-sm text-gray-300 border-t border-white/10 pt-4 leading-relaxed" }, weatherData.summary)
+                    )
+                )
+            ),
+            
+            activePanel === 'code' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-panel-enter p-8" },
+                h('div', { className: "w-full max-w-6xl h-[85vh] bg-[#0d1117] rounded-xl border border-border-color shadow-2xl flex flex-col code-editor-container" },
+                    h('div', { className: "editor-controls-pane" },
+                        h('div', { className: "flex items-center gap-2 mr-4" },
+                            h(CodeIcon, { className: "w-5 h-5 text-purple-400" }),
+                            h('span', { className: "font-bold text-sm" }, "Code Editor")
+                        ),
+                        h('div', { className: "editor-control-group" },
+                            h('select', { 
+                                value: codeLanguage, 
+                                onChange: (e) => setCodeLanguage(e.target.value),
+                                className: "editor-language-select text-xs uppercase"
+                            },
+                                h('option', { value: "javascript" }, "JavaScript"),
+                                h('option', { value: "html" }, "HTML"),
+                                h('option', { value: "css" }, "CSS"),
+                                h('option', { value: "python" }, "Python")
+                            )
+                        ),
+                        h('div', { className: "flex-1 mx-4" },
+                            h('input', { 
+                                type: "text", 
+                                value: codeInstruction,
+                                onChange: (e) => setCodeInstruction(e.target.value),
+                                onKeyDown: (e) => e.key === 'Enter' && handleCodeCommand(),
+                                placeholder: "Type instructions to edit code (e.g., 'Fix the bug', 'Add a button')...",
+                                className: "w-full bg-black/30 border border-border-color rounded px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none transition-colors"
+                            })
+                        ),
+                        h('button', { 
+                            onClick: handleCodeCommand,
+                            disabled: isCodeLoading,
+                            className: "bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-colors"
+                        },
+                            isCodeLoading ? h(SpinnerIcon, { className: "w-4 h-4" }) : h(SendIcon, { className: "w-4 h-4" }),
+                            "Apply"
+                        ),
+                        h('button', { onClick: () => setActivePanel('chat'), className: "ml-2 p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
+                    ),
+                    h('div', { className: "editor-main-pane" },
+                        h('div', { className: "editor-pane" },
+                            h(Editor, {
+                                value: code,
+                                onValueChange: setCode,
+                                highlight: code => window['Prism'].highlight(code, window['Prism'].languages[codeLanguage] || window['Prism'].languages.javascript, codeLanguage),
+                                padding: 20,
+                                style: { fontFamily: '"Fira Code", "Fira Mono", monospace', fontSize: 14, backgroundColor: 'transparent', minHeight: '100%' },
+                                textareaClassName: "focus:outline-none"
+                            })
+                        ),
+                        codeLanguage === 'html' && h('div', { className: "preview-pane" },
+                            h('iframe', { srcDoc: code, title: "preview", sandbox: "allow-scripts" })
+                        )
+                    )
+                )
+            )
+        ),
+        
+        h('footer', { className: "absolute bottom-6 z-30 flex items-center justify-center w-full gap-4 pointer-events-auto" },
+             !isConnected ? h('button', {
+                onClick: connect,
+                disabled: isConnectingRef.current,
+                className: `px-8 py-3 rounded-full font-bold transition-all shadow-lg backdrop-blur-md flex items-center gap-3 bg-cyan-500/80 hover:bg-cyan-400/90 text-white shadow-cyan-900/30`
+            },
+                isConnectingRef.current 
+                    ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" })
+                    : h(ConnectIcon, { className: "w-5 h-5" }),
+                isConnectingRef.current ? "Connecting..." : "Start Conversation"
+            ) : h('div', { className: "flex gap-4" },
+                 h('button', {
+                    onClick: disconnect,
+                    className: `px-6 py-3 rounded-full font-bold transition-all shadow-lg backdrop-blur-md flex items-center gap-2 bg-red-500/80 hover:bg-red-600/90 text-white shadow-red-900/20`
+                },
+                    h(DisconnectIcon, { className: "w-5 h-5" }),
+                    t('footer.disconnect')
+                )
+            ),
+             h('button', {
+                onClick: handleRecognizeSong,
+                disabled: isConnected && assistantState !== 'idle', 
+                className: "p-3 rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white transition-all backdrop-blur-md",
+                title: t('footer.recognizeSong')
+            },
+                h(MusicIcon, { className: "w-5 h-5" })
+            )
+        ),
+
+        h(SettingsModal, { 
+            isOpen: isSettingsOpen, 
+            onClose: () => setIsSettingsOpen(false), 
+            activeTab: settingsTab,
+            setActiveTab: setSettingsTab,
+            theme: theme, setTheme: setTheme,
+            gender: gender, setGender: setGender,
+            greetingMessage: greetingMessage, setGreetingMessage: setGreetingMessage,
+            customInstructions: customInstructions, setCustomInstructions: setCustomInstructions,
+            emotionTuning: emotionTuning, setEmotionTuning: setEmotionTuning,
+            apiKeys: apiKeys, setApiKeys: setApiKeys,
+            lang: lang, setLang: setLang,
+            femaleVoices: femaleVoices, setFemaleVoices: setFemaleVoices,
+            maleVoices: maleVoices, setMaleVoices: setMaleVoices,
+            ambientVolume: ambientVolume, setAmbientVolume: setAmbientVolume,
+            avatarUrl: avatarUrl, setAvatarUrl: setAvatarUrl,
+            subscriptionPlan: subscriptionPlan, setSubscriptionPlan: setSubscriptionPlan,
+            dailyUsage: dailyUsage
+        })
     );
 };
