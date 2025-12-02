@@ -78,13 +78,14 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
 2.  **Responding to queries:** Answer questions conversationally.
 3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
-4.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
-5.  **Getting News:** Use the 'GET_NEWS' tool to fetch top news headlines for a specific topic.
-6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
-7.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
-8.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
-9.  **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
-10. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks you to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+4.  **Controlling YouTube playback:** Use the 'CONTROL_MEDIA' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
+5.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
+6.  **Getting News:** Use the 'GET_NEWS' tool to fetch top news headlines for a specific topic.
+7.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
+8.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
+9.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
+10. **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
+11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks you to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -752,7 +753,7 @@ const SettingsModal = ({
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
-                                    subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
+                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
                                 h('div', { className: "flex items-baseline gap-1" },
                                     h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
@@ -918,15 +919,13 @@ export const App = () => {
     const [youtubeQueue, setYoutubeQueue] = React.useState([]);
     const [youtubeVideoDetails, setYoutubeVideoDetails] = React.useState(null);
     const playerRef = React.useRef(null);
+    const playerInstanceRef = React.useRef(null); // Ref for the actual YT player object
+
     const [code, setCode] = React.useState('console.log("Hello World");');
     const [codeLanguage, setCodeLanguage] = React.useState('javascript');
     const [codeInstruction, setCodeInstruction] = React.useState('');
     const [isCodeLoading, setIsCodeLoading] = React.useState(false);
     
-    // Manual YouTube Search State
-    const [manualYoutubeQuery, setManualYoutubeQuery] = React.useState('');
-    const [isSearchingYoutube, setIsSearchingYoutube] = React.useState(false);
-
     // Fixed: Track daily usage with persistence and date reset
     const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-daily-usage', { date: new Date().toDateString(), seconds: 0 });
 
@@ -985,6 +984,62 @@ export const App = () => {
         }
     }, [dailyUsage, subscriptionPlan, isConnected, t]);
 
+    // --- YouTube Player Logic ---
+    React.useEffect(() => {
+        // Load the IFrame Player API code asynchronously.
+        if (!window['YT']) {
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            
+            // This global callback is required by the YouTube API
+            window['onYouTubeIframeAPIReady'] = () => {
+                console.log("YouTube API Ready");
+            };
+        }
+    }, []);
+
+    // Effect to initialize/update player when panel is active and video details change
+    React.useEffect(() => {
+        if (activePanel === 'youtube' && youtubeVideoDetails && window['YT']) {
+            // Check if player already exists
+            if (playerInstanceRef.current) {
+                if (typeof playerInstanceRef.current.loadVideoById === 'function') {
+                    playerInstanceRef.current.loadVideoById(youtubeVideoDetails.videoId);
+                }
+            } else {
+                // Initialize new player
+                playerInstanceRef.current = new window['YT'].Player('youtube-player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: youtubeVideoDetails.videoId,
+                    playerVars: {
+                        'autoplay': 1,
+                        'controls': 1,
+                        'enablejsapi': 1
+                    },
+                    events: {
+                        'onReady': (event) => {
+                             event.target.playVideo();
+                        }
+                    }
+                });
+            }
+        } else if (activePanel !== 'youtube' && playerInstanceRef.current) {
+            // Clean up player when leaving panel
+            try {
+                if (typeof playerInstanceRef.current.destroy === 'function') {
+                    playerInstanceRef.current.destroy();
+                }
+            } catch (e) {
+                console.warn("Error destroying player", e);
+            }
+            playerInstanceRef.current = null;
+        }
+    }, [activePanel, youtubeVideoDetails]);
+
+
     const handleSetupClick = () => {
         setSettingsTab('apiKeys');
         setIsSettingsOpen(true);
@@ -1026,33 +1081,6 @@ export const App = () => {
             console.error(e);
             setAssistantState('idle');
             alert(t('errors.auddioRecording'));
-        }
-    };
-    
-    const handleManualYoutubeSearch = async () => {
-        if (!manualYoutubeQuery.trim()) return;
-        setIsSearchingYoutube(true);
-        try {
-            const video = await searchYouTube(apiKeys.youtube, manualYoutubeQuery);
-            if (video) {
-                setYoutubeQueue(prev => [video, ...prev]);
-                setYoutubeVideoDetails(video);
-            } else {
-                alert("No video found.");
-            }
-        } catch (e) {
-            console.error(e);
-            if (e instanceof ApiKeyError) {
-                if(window.confirm(e.message + "\n\nWould you like to open Settings to enter your key now?")) {
-                    setSettingsTab('apiKeys');
-                    setIsSettingsOpen(true);
-                }
-            } else {
-                alert(e.message);
-            }
-        } finally {
-            setIsSearchingYoutube(false);
-            setManualYoutubeQuery('');
         }
     };
 
@@ -1107,6 +1135,17 @@ export const App = () => {
                      required: ['query']
                  }
             };
+            const controlMediaTool = {
+                name: 'control_media',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: { 
+                        action: { type: Type.STRING, enum: ['play', 'pause', 'rewind', 'forward', 'stop'] },
+                        amount: { type: Type.NUMBER, description: "Amount of time in seconds to rewind or forward. Default is 10." }
+                    },
+                    required: ['action']
+                }
+            };
             const setTimerTool = {
                 name: 'set_timer',
                 parameters: {
@@ -1119,7 +1158,7 @@ export const App = () => {
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
-                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, setTimerTool] }],
+                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool] }],
                     systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {
@@ -1195,6 +1234,32 @@ export const App = () => {
                                          } else {
                                              result = { result: 'No video found' };
                                          }
+                                     } else if (call.name === 'control_media') {
+                                        const action = call.args.action;
+                                        const amount = call.args.amount || 10;
+                                        if (playerInstanceRef.current && typeof playerInstanceRef.current.getPlayerState === 'function') {
+                                            if (action === 'play') {
+                                                playerInstanceRef.current.playVideo();
+                                                result = { result: 'ok', message: 'Resumed video.' };
+                                            } else if (action === 'pause') {
+                                                playerInstanceRef.current.pauseVideo();
+                                                result = { result: 'ok', message: 'Paused video.' };
+                                            } else if (action === 'stop') {
+                                                playerInstanceRef.current.stopVideo();
+                                                result = { result: 'ok', message: 'Stopped video.' };
+                                            } else if (action === 'rewind') {
+                                                const currentTime = playerInstanceRef.current.getCurrentTime();
+                                                playerInstanceRef.current.seekTo(Math.max(0, currentTime - amount), true);
+                                                result = { result: 'ok', message: `Rewound ${amount} seconds.` };
+                                            } else if (action === 'forward') {
+                                                const currentTime = playerInstanceRef.current.getCurrentTime();
+                                                const duration = playerInstanceRef.current.getDuration();
+                                                playerInstanceRef.current.seekTo(Math.min(duration, currentTime + amount), true);
+                                                result = { result: 'ok', message: `Fast forwarded ${amount} seconds.` };
+                                            }
+                                        } else {
+                                            result = { error: 'No media player is currently active.' };
+                                        }
                                      } else if (call.name === 'set_timer') {
                                          setTimerData({ remaining: call.args.seconds, duration: call.args.seconds });
                                          setActivePanel('timer');
@@ -1255,6 +1320,15 @@ export const App = () => {
             workletNodeRef.current.disconnect();
             workletNodeRef.current = null;
         }
+        // Cleanup player if active
+        if (playerInstanceRef.current) {
+             try {
+                if (typeof playerInstanceRef.current.pauseVideo === 'function') {
+                    playerInstanceRef.current.pauseVideo();
+                }
+             } catch(e){}
+        }
+        
         setIsConnected(false);
         isConnectingRef.current = false;
         setAssistantState('idle');
@@ -1321,90 +1395,38 @@ export const App = () => {
             ),
             
             activePanel === 'youtube' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md animate-panel-enter p-6" },
-                h('div', { className: "w-full max-w-5xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[85vh]" },
+                h('div', { className: "w-full max-w-4xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[80vh]" },
                     h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/20" },
-                        h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-6 h-6 text-red-500" }), t('youtubePanel.title')),
-                        h('button', { onClick: () => { setActivePanel('chat'); playerRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full transition-colors" }, h(XIcon, { className: "w-6 h-6 text-gray-400 hover:text-white" }))
+                        h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-5 h-5 text-red-500" }), t('youtubePanel.title')),
+                        h('button', { onClick: () => { setActivePanel('chat'); playerInstanceRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full" }, h(XIcon, { className: "w-5 h-5" }))
                     ),
-                    h('div', { className: "flex-1 flex flex-col lg:flex-row overflow-hidden" },
-                        h('div', { className: "flex-1 bg-black relative flex items-center justify-center" },
-                            youtubeVideoDetails ? h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" },
-                                h('iframe', {
-                                    width: "100%",
-                                    height: "100%",
-                                    src: `https://www.youtube.com/embed/${youtubeVideoDetails.videoId}?autoplay=1`,
-                                    title: youtubeVideoDetails.title,
-                                    frameBorder: "0",
-                                    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
-                                    allowFullScreen: true
-                                })
-                            ) : h('div', { className: "text-center p-8 text-gray-500 flex flex-col items-center" },
-                                h(YouTubeIcon, { className: "w-16 h-16 mb-4 opacity-20" }),
-                                h('p', { className: "text-lg font-medium" }, "Search for a video to start playing")
-                            )
+                    h('div', { className: "flex-1 flex flex-col lg:flex-row" },
+                        h('div', { className: "flex-1 bg-black relative" },
+                            // Replaced iframe with API targeted div
+                            h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" })
                         ),
-                        h('div', { className: "w-full lg:w-96 border-l border-border-color bg-gray-900/50 flex flex-col h-[40vh] lg:h-auto backdrop-blur-sm" },
-                            h('div', { className: "p-4 border-b border-border-color bg-black/20" },
-                                h('div', { className: "relative group" },
-                                    h('input', {
-                                        type: "text",
-                                        value: manualYoutubeQuery,
-                                        onChange: (e) => setManualYoutubeQuery(e.target.value),
-                                        onKeyDown: (e) => e.key === 'Enter' && handleManualYoutubeSearch(),
-                                        placeholder: t('youtubePanel.searchPlaceholder'),
-                                        className: "w-full bg-black/40 border border-gray-700 rounded-xl pl-4 pr-12 py-3 text-sm text-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none placeholder-gray-600 transition-all"
-                                    }),
-                                    h('button', {
-                                        onClick: handleManualYoutubeSearch,
-                                        disabled: isSearchingYoutube,
-                                        className: "absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/5 transition-colors"
-                                    },
-                                        isSearchingYoutube ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : h(SendIcon, { className: "w-4 h-4" })
-                                    )
-                                )
-                            ),
-                            h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-0" },
-                                h('div', { className: "p-4 sticky top-0 bg-gray-900/95 backdrop-blur z-10 border-b border-border-color flex justify-between items-center" },
-                                    h('h4', { className: "font-bold text-xs uppercase tracking-wider text-gray-500" }, t('youtubePanel.upNext')),
-                                    youtubeQueue.length > 0 && h('button', { 
-                                        onClick: () => { setYoutubeQueue([]); setYoutubeVideoDetails(null); },
-                                        className: "text-[10px] text-red-400 hover:text-red-300 font-medium uppercase tracking-wide" 
-                                    }, "Clear")
-                                ),
-                                h('div', { className: "p-2 space-y-1" },
-                                    youtubeQueue.length === 0 ? h('div', { className: "p-8 text-center" },
-                                        h('p', { className: "text-sm text-gray-600 italic" }, "History is empty")
-                                    ) : youtubeQueue.map((video, i) => 
-                                        h('div', { 
-                                            key: i, 
-                                            onClick: () => setYoutubeVideoDetails(video),
-                                            className: `flex items-start gap-3 cursor-pointer p-3 rounded-xl transition-all ${
-                                                youtubeVideoDetails?.videoId === video.videoId 
-                                                ? 'bg-red-500/10 border border-red-500/20' 
-                                                : 'hover:bg-white/5 border border-transparent'
-                                            }` 
-                                        },
-                                            h('div', { className: "w-24 aspect-video bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 relative group" },
-                                                h('img', { src: `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`, alt: "", className: "w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" }),
-                                                h('div', { className: "absolute inset-0 flex items-center justify-center bg-black/20" }, h(PlayIcon, { className: "w-6 h-6 text-white drop-shadow-md opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" }))
+                        h('div', { className: "w-full lg:w-80 border-l border-border-color bg-panel-bg flex flex-col" },
+                            h('div', { className: "p-4 border-b border-border-color" },
+                                h('h4', { className: "font-bold text-sm uppercase tracking-wider text-gray-500 mb-2" }, t('youtubePanel.upNext')),
+                                h('div', { className: "space-y-2 max-h-60 overflow-y-auto" },
+                                    youtubeQueue.length === 0 ? h('p', { className: "text-sm text-gray-500 italic" }, "Queue is empty.") : youtubeQueue.map((video, i) => 
+                                        h('div', { key: i, className: "youtube-queue-item flex items-center gap-2 cursor-pointer hover:bg-white/5 p-2 rounded" },
+                                            h('div', { className: "w-16 h-9 bg-gray-800 rounded overflow-hidden flex-shrink-0 relative" },
+                                                h('img', { src: `https://img.youtube.com/vi/${video.videoId}/default.jpg`, alt: "", className: "w-full h-full object-cover opacity-70" }),
+                                                h('div', { className: "absolute inset-0 flex items-center justify-center" }, h(PlayIcon, { className: "w-4 h-4 text-white drop-shadow-md" }))
                                             ),
-                                            h('div', { className: "flex-1 min-w-0 pt-0.5" },
-                                                h('p', { className: `text-sm font-medium leading-tight mb-1 line-clamp-2 ${youtubeVideoDetails?.videoId === video.videoId ? 'text-red-400' : 'text-gray-200'}` }, video.title),
+                                            h('div', { className: "flex-1 min-w-0" },
+                                                h('p', { className: "text-sm font-medium truncate" }, video.title),
                                                 h('p', { className: "text-xs text-gray-500 truncate" }, video.channelTitle)
                                             )
                                         )
                                     )
                                 )
                             ),
-                            youtubeVideoDetails && h('div', { className: "p-5 border-t border-border-color bg-black/20" },
-                                h('h4', { className: "font-bold text-base leading-snug mb-2 text-white line-clamp-2" }, youtubeVideoDetails.title),
-                                h('div', { className: "flex items-center justify-between" },
-                                    h('p', { className: "text-cyan-400 text-sm font-medium" }, youtubeVideoDetails.channelTitle),
-                                    youtubeVideoDetails.viewCount && h('p', { className: "text-xs text-gray-500 flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-md" }, 
-                                        h('span', { className: "w-1.5 h-1.5 rounded-full bg-red-500 inline-block animate-pulse" }), 
-                                        t('youtubePanel.views', {count: youtubeVideoDetails.viewCount.toLocaleString()})
-                                    )
-                                )
+                            youtubeVideoDetails && h('div', { className: "p-4 flex-1 overflow-y-auto" },
+                                h('h4', { className: "font-bold text-lg leading-tight mb-1" }, youtubeVideoDetails.title),
+                                h('p', { className: "text-cyan-400 text-sm font-medium mb-4" }, youtubeVideoDetails.channelTitle),
+                                youtubeVideoDetails.viewCount && h('p', { className: "text-xs text-gray-500 flex items-center gap-1" }, h('span', { className: "w-2 h-2 rounded-full bg-red-500 inline-block" }), t('youtubePanel.views', {count: youtubeVideoDetails.viewCount.toLocaleString()}))
                             )
                         )
                     )
@@ -1509,14 +1531,6 @@ export const App = () => {
                     h(DisconnectIcon, { className: "w-5 h-5" }),
                     t('footer.disconnect')
                 )
-            ),
-             h('button', {
-                onClick: () => setActivePanel('youtube'),
-                className: "p-3 rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-red-500 transition-all backdrop-blur-md group relative overflow-hidden",
-                title: "YouTube Player"
-            },
-                h('div', { className: "absolute inset-0 bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity" }),
-                h(YouTubeIcon, { className: "w-5 h-5 group-hover:scale-110 transition-transform relative z-10" })
             ),
              h('button', {
                 onClick: handleRecognizeSong,
