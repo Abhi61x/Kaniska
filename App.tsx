@@ -85,7 +85,7 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 8.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
 9.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
 10. **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
-11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks you to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -753,7 +753,7 @@ const SettingsModal = ({
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
-                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
+                                    subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
                                 h('div', { className: "flex items-baseline gap-1" },
                                     h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
@@ -918,7 +918,6 @@ export const App = () => {
     const [timerData, setTimerData] = React.useState({ remaining: 0, duration: 0 });
     const [youtubeQueue, setYoutubeQueue] = React.useState([]);
     const [youtubeVideoDetails, setYoutubeVideoDetails] = React.useState(null);
-    const playerRef = React.useRef(null);
     const playerInstanceRef = React.useRef(null); // Ref for the actual YT player object
 
     const [code, setCode] = React.useState('console.log("Hello World");');
@@ -1099,6 +1098,33 @@ export const App = () => {
         }
     };
 
+    const disconnect = () => {
+        if (liveSession) {
+            liveSession.then(s => s.close());
+            setLiveSession(null);
+        }
+        if (outputAudioContextRef.current) {
+            outputAudioContextRef.current.close();
+            outputAudioContextRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(t => t.stop());
+            mediaStreamRef.current = null;
+        }
+        if (workletNodeRef.current) {
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current = null;
+        }
+        setIsConnected(false);
+        isConnectingRef.current = false;
+        setAssistantState('idle');
+        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'system', text: t('chat.placeholder.info') }]);
+    };
+
     // --- Live API Integration ---
     const connect = async () => {
         if (isConnectingRef.current || isConnected) return;
@@ -1237,28 +1263,30 @@ export const App = () => {
                                      } else if (call.name === 'control_media') {
                                         const action = call.args.action;
                                         const amount = call.args.amount || 10;
+                                        let resultText = 'Command executed';
+
                                         if (playerInstanceRef.current && typeof playerInstanceRef.current.getPlayerState === 'function') {
                                             if (action === 'play') {
                                                 playerInstanceRef.current.playVideo();
-                                                result = { result: 'ok', message: 'Resumed video.' };
+                                                resultText = 'Resumed video';
                                             } else if (action === 'pause') {
                                                 playerInstanceRef.current.pauseVideo();
-                                                result = { result: 'ok', message: 'Paused video.' };
+                                                resultText = 'Paused video';
                                             } else if (action === 'stop') {
                                                 playerInstanceRef.current.stopVideo();
-                                                result = { result: 'ok', message: 'Stopped video.' };
+                                                resultText = 'Stopped video';
                                             } else if (action === 'rewind') {
                                                 const currentTime = playerInstanceRef.current.getCurrentTime();
                                                 playerInstanceRef.current.seekTo(Math.max(0, currentTime - amount), true);
-                                                result = { result: 'ok', message: `Rewound ${amount} seconds.` };
+                                                resultText = `Rewound ${amount} seconds`;
                                             } else if (action === 'forward') {
                                                 const currentTime = playerInstanceRef.current.getCurrentTime();
-                                                const duration = playerInstanceRef.current.getDuration();
-                                                playerInstanceRef.current.seekTo(Math.min(duration, currentTime + amount), true);
-                                                result = { result: 'ok', message: `Fast forwarded ${amount} seconds.` };
+                                                playerInstanceRef.current.seekTo(currentTime + amount, true);
+                                                resultText = `Fast-forwarded ${amount} seconds`;
                                             }
+                                            result = { result: resultText };
                                         } else {
-                                            result = { error: 'No media player is currently active.' };
+                                            result = { error: 'No video is currently playing.' };
                                         }
                                      } else if (call.name === 'set_timer') {
                                          setTimerData({ remaining: call.args.seconds, duration: call.args.seconds });
@@ -1299,42 +1327,6 @@ export const App = () => {
         }
     };
 
-    const disconnect = () => {
-        if (liveSession) {
-            liveSession.then(s => s.close());
-            setLiveSession(null);
-        }
-        if (outputAudioContextRef.current) {
-            outputAudioContextRef.current.close();
-            outputAudioContextRef.current = null;
-        }
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(t => t.stop());
-            mediaStreamRef.current = null;
-        }
-        if (workletNodeRef.current) {
-            workletNodeRef.current.disconnect();
-            workletNodeRef.current = null;
-        }
-        // Cleanup player if active
-        if (playerInstanceRef.current) {
-             try {
-                if (typeof playerInstanceRef.current.pauseVideo === 'function') {
-                    playerInstanceRef.current.pauseVideo();
-                }
-             } catch(e){}
-        }
-        
-        setIsConnected(false);
-        isConnectingRef.current = false;
-        setAssistantState('idle');
-        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'system', text: t('chat.placeholder.info') }]);
-    };
-
     return h('div', { 
             className: "relative flex flex-col h-screen w-screen overflow-hidden font-sans text-white selection:bg-cyan-500/30 selection:text-cyan-100", 
             style: { backgroundColor: '#000000' } 
@@ -1355,7 +1347,7 @@ export const App = () => {
 
         h('main', { className: "flex-grow flex flex-col items-center justify-center relative p-4 z-10" },
             // Only show Avatar if settings are CLOSED to prevent overlap
-            !isSettingsOpen && h('div', { className: `transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
+            !isSettingsOpen && h('div', { className: `mb-24 transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
                 h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: mood, customUrl: avatarUrl })
             ),
 
@@ -1402,8 +1394,18 @@ export const App = () => {
                     ),
                     h('div', { className: "flex-1 flex flex-col lg:flex-row" },
                         h('div', { className: "flex-1 bg-black relative" },
-                            // Replaced iframe with API targeted div
-                            h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" })
+                            h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" },
+                                // Fallback for YouTube embed
+                                youtubeVideoDetails && h('iframe', {
+                                    width: "100%",
+                                    height: "100%",
+                                    src: `https://www.youtube.com/embed/${youtubeVideoDetails.videoId}?autoplay=1`,
+                                    title: youtubeVideoDetails.title,
+                                    frameBorder: "0",
+                                    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+                                    allowFullScreen: true
+                                })
+                            )
                         ),
                         h('div', { className: "w-full lg:w-80 border-l border-border-color bg-panel-bg flex flex-col" },
                             h('div', { className: "p-4 border-b border-border-color" },
@@ -1513,7 +1515,7 @@ export const App = () => {
             )
         ),
         
-        h('footer', { className: "absolute bottom-6 z-30 flex items-center justify-center w-full gap-4 pointer-events-auto" },
+        h('footer', { className: "absolute bottom-16 z-30 flex items-center justify-center w-full gap-4 pointer-events-auto" },
              !isConnected ? h('button', {
                 onClick: connect,
                 disabled: isConnectingRef.current,
