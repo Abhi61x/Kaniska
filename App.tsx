@@ -1042,7 +1042,14 @@ export const App = () => {
             }
         } catch (e) {
             console.error(e);
-            alert(e.message);
+            if (e instanceof ApiKeyError) {
+                if(window.confirm(e.message + "\n\nWould you like to open Settings to enter your key now?")) {
+                    setSettingsTab('apiKeys');
+                    setIsSettingsOpen(true);
+                }
+            } else {
+                alert(e.message);
+            }
         } finally {
             setIsSearchingYoutube(false);
             setManualYoutubeQuery('');
@@ -1315,7 +1322,7 @@ export const App = () => {
             
             activePanel === 'youtube' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md animate-panel-enter p-6" },
                 h('div', { className: "w-full max-w-5xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[85vh]" },
-                    h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/40" },
+                    h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/20" },
                         h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-6 h-6 text-red-500" }), t('youtubePanel.title')),
                         h('button', { onClick: () => { setActivePanel('chat'); playerRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full transition-colors" }, h(XIcon, { className: "w-6 h-6 text-gray-400 hover:text-white" }))
                     ),
