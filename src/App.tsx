@@ -43,6 +43,8 @@ const MenuIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.
 const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), h('circle', { cx: "12", cy: "7", r: "4" }));
 const ImageIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }), h('circle', { cx: "8.5", cy: "8.5", r: "1.5" }), h('polyline', { points: "21 15 16 10 5 21" }));
 const SearchIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "11", cy: "11", r: "8" }), h('line', { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }));
+const WhatsAppIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" }));
+const MailIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), h('polyline', { points: "22,6 12,13 2,6" }));
 const SpaciousIcon = ({ className }) => h('svg', { className, viewBox: "0 0 24 24", height: "24", width: "24", xmlns: "http://www.w3.org/2000/svg" },
     h('g', { fill: "none" },
         h('path', { d: "m12.594 23.258l-.012.002l-.071.035l-.02.004l-.014-.004l-.071-.036q-.016-.004-.024.006l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.016-.018m.264-.113l-.014.002l-.184.093l-.01.01l-.003.011l.018.43l.005.012l.008.008l.201.092q.019.005.029-.008l.004-.014l-.034-.614q-.005-.019-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.003-.011l.018-.43l-.003-.012l-.01-.01z", fill: "currentColor" }),
@@ -92,6 +94,8 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 9.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
 10. **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
 11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+12. **Sending WhatsApp Messages:** Use the 'send_whatsapp' tool when the user wants to send a WhatsApp message. You need the contact name and the message content. If either is missing, ask the user for it.
+13. **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You need the recipient's email address, the subject, and the message body.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -930,6 +934,13 @@ export const App = () => {
     const [youtubeSearchQuery, setYoutubeSearchQuery] = React.useState('');
     const [isYoutubeSearching, setIsYoutubeSearching] = React.useState(false);
 
+    // WhatsApp State
+    const [whatsappDraft, setWhatsappDraft] = React.useState({ contact: '', message: '' });
+    const [isWhatsappConnected, setIsWhatsappConnected] = React.useState(false);
+
+    // Email State
+    const [emailDraft, setEmailDraft] = React.useState({ to: '', subject: '', body: '' });
+
     const [code, setCode] = React.useState('console.log("Hello World");');
     const [codeLanguage, setCodeLanguage] = React.useState('javascript');
     const [codeInstruction, setCodeInstruction] = React.useState('');
@@ -1112,6 +1123,29 @@ export const App = () => {
         }
     };
 
+    const handleSendWhatsapp = () => {
+        if (!whatsappDraft.contact) return;
+        
+        const message = whatsappDraft.message || "";
+        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        
+        // If we had a number, we could use wa.me/NUMBER
+        const isNumber = /^\d+$/.test(whatsappDraft.contact.replace(/[\s+-]/g, ''));
+        const finalUrl = isNumber 
+            ? `https://wa.me/${whatsappDraft.contact.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
+            : `https://wa.me/?text=${encodeURIComponent(message)}`;
+            
+        window.open(finalUrl, '_blank');
+    };
+
+    const handleSendEmail = () => {
+        if (!emailDraft.to) return;
+        const subject = encodeURIComponent(emailDraft.subject || "");
+        const body = encodeURIComponent(emailDraft.body || "");
+        const mailtoLink = `mailto:${emailDraft.to}?subject=${subject}&body=${body}`;
+        window.open(mailtoLink, '_self');
+    };
+
     const handleCodeCommand = async () => {
         if (!codeInstruction) return;
         setIsCodeLoading(true);
@@ -1157,6 +1191,14 @@ export const App = () => {
     // --- Live API Integration ---
     const connect = async () => {
         if (isConnectingRef.current || isConnected) return;
+
+        if (!process.env.API_KEY) {
+            alert("API Key is missing. Please set it in the environment.");
+            isConnectingRef.current = false;
+            setAssistantState('idle');
+            return;
+        }
+
         isConnectingRef.current = true;
         setAssistantState('listening');
 
@@ -1174,46 +1216,112 @@ export const App = () => {
             audioContextRef.current = inputAudioContext;
 
             // Tools Definition
-            const getWeatherTool = {
+            const getWeatherTool: FunctionDeclaration = {
                 name: 'get_weather',
-                parameters: {
-                    type: Type.OBJECT,
-                    properties: { location: { type: Type.STRING } },
-                    required: ['location']
-                }
-            };
-            const searchYoutubeTool = {
-                 name: 'search_youtube',
-                 parameters: {
-                     type: Type.OBJECT,
-                     properties: { query: { type: Type.STRING } },
-                     required: ['query']
-                 }
-            };
-            const controlMediaTool = {
-                name: 'control_media',
+                description: 'Get the weather forecast for a specific location.',
                 parameters: {
                     type: Type.OBJECT,
                     properties: { 
-                        action: { type: Type.STRING, enum: ['play', 'pause', 'rewind', 'forward', 'stop'] },
-                        amount: { type: Type.NUMBER, description: "Amount of time in seconds to rewind or forward. Default is 10." }
+                        location: { 
+                            type: Type.STRING,
+                            description: 'The city and state, e.g. San Francisco, CA'
+                        } 
+                    },
+                    required: ['location']
+                }
+            };
+            const searchYoutubeTool: FunctionDeclaration = {
+                 name: 'search_youtube',
+                 description: 'Search for and play a video on YouTube.',
+                 parameters: {
+                     type: Type.OBJECT,
+                     properties: { 
+                         query: { 
+                             type: Type.STRING,
+                             description: 'The search query for the video.'
+                         } 
+                     },
+                     required: ['query']
+                 }
+            };
+            const controlMediaTool: FunctionDeclaration = {
+                name: 'control_media',
+                description: 'Control the playback of the current media (YouTube video).',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: { 
+                        action: { 
+                            type: Type.STRING, 
+                            enum: ['play', 'pause', 'rewind', 'forward', 'stop'],
+                            description: 'The action to perform.'
+                        },
+                        amount: { 
+                            type: Type.NUMBER, 
+                            description: "Amount of time in seconds to rewind or forward. Default is 10." 
+                        }
                     },
                     required: ['action']
                 }
             };
-            const setTimerTool = {
+            const setTimerTool: FunctionDeclaration = {
                 name: 'set_timer',
+                description: 'Set a countdown timer.',
                 parameters: {
                     type: Type.OBJECT,
-                    properties: { seconds: { type: Type.NUMBER } },
+                    properties: { 
+                        seconds: { 
+                            type: Type.NUMBER,
+                            description: 'The duration of the timer in seconds.'
+                        } 
+                    },
                     required: ['seconds']
+                }
+            };
+            const sendWhatsappTool: FunctionDeclaration = {
+                name: 'send_whatsapp',
+                description: 'Draft a WhatsApp message to a contact.',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        contactName: { 
+                            type: Type.STRING,
+                            description: 'The name or number of the contact.'
+                        },
+                        message: { 
+                            type: Type.STRING,
+                            description: 'The content of the message.'
+                        }
+                    },
+                    required: ['contactName', 'message']
+                }
+            };
+            const sendEmailTool: FunctionDeclaration = {
+                name: 'send_email',
+                description: 'Draft an email to a recipient.',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        recipient: { 
+                            type: Type.STRING,
+                            description: 'The email address of the recipient.'
+                        },
+                        subject: { 
+                            type: Type.STRING,
+                            description: 'The subject line of the email.'
+                        },
+                         body: { 
+                            type: Type.STRING,
+                            description: 'The body content of the email.'
+                        }
+                    },
+                    required: ['recipient', 'subject', 'body']
                 }
             };
 
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
-                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool] }],
+                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, sendEmailTool] }],
                     systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {
@@ -1294,7 +1402,8 @@ export const App = () => {
                                         const amount = call.args.amount || 10;
                                         let resultText = 'Command executed';
 
-                                        if (playerInstanceRef.current && typeof playerInstanceRef.current.getPlayerState === 'function') {
+                                        // Ensure player instance exists AND the player state is valid before calling methods
+                                        if (activePanel === 'youtube' && playerInstanceRef.current && typeof playerInstanceRef.current.getPlayerState === 'function') {
                                             if (action === 'play') {
                                                 playerInstanceRef.current.playVideo();
                                                 resultText = 'Resumed video';
@@ -1305,22 +1414,36 @@ export const App = () => {
                                                 playerInstanceRef.current.stopVideo();
                                                 resultText = 'Stopped video';
                                             } else if (action === 'rewind') {
-                                                const currentTime = playerInstanceRef.current.getCurrentTime();
-                                                playerInstanceRef.current.seekTo(Math.max(0, currentTime - amount), true);
-                                                resultText = `Rewound ${amount} seconds`;
+                                                // Check for getCurrentTime availability
+                                                if (typeof playerInstanceRef.current.getCurrentTime === 'function') {
+                                                    const currentTime = playerInstanceRef.current.getCurrentTime();
+                                                    playerInstanceRef.current.seekTo(Math.max(0, currentTime - amount), true);
+                                                    resultText = `Rewound ${amount} seconds`;
+                                                }
                                             } else if (action === 'forward') {
-                                                const currentTime = playerInstanceRef.current.getCurrentTime();
-                                                playerInstanceRef.current.seekTo(currentTime + amount, true);
-                                                resultText = `Fast-forwarded ${amount} seconds`;
+                                                if (typeof playerInstanceRef.current.getCurrentTime === 'function') {
+                                                    const currentTime = playerInstanceRef.current.getCurrentTime();
+                                                    playerInstanceRef.current.seekTo(currentTime + amount, true);
+                                                    resultText = `Fast-forwarded ${amount} seconds`;
+                                                }
                                             }
                                             result = { result: resultText };
                                         } else {
-                                            result = { error: 'No video is currently playing.' };
+                                            result = { error: 'Video control unavailable. Ensure YouTube player is active.' };
                                         }
                                      } else if (call.name === 'set_timer') {
                                          setTimerData({ remaining: call.args.seconds, duration: call.args.seconds });
                                          setActivePanel('timer');
                                          result = { result: 'Timer set' };
+                                     } else if (call.name === 'send_whatsapp') {
+                                         setWhatsappDraft({ contact: call.args.contactName, message: call.args.message });
+                                         setIsWhatsappConnected(true);
+                                         setActivePanel('whatsapp');
+                                         result = { result: `Drafted WhatsApp message to ${call.args.contactName}` };
+                                     } else if (call.name === 'send_email') {
+                                         setEmailDraft({ to: call.args.recipient, subject: call.args.subject, body: call.args.body });
+                                         setActivePanel('email');
+                                         result = { result: `Drafted email to ${call.args.recipient}` };
                                      }
                                  } catch (e) {
                                      result = { error: e.message };
@@ -1489,6 +1612,109 @@ export const App = () => {
                 )
             ),
 
+             activePanel === 'whatsapp' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-panel-enter p-6" },
+                h('div', { className: "w-full max-w-md bg-black rounded-3xl overflow-hidden rgb-border shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col" },
+                    h('div', { className: "p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center" },
+                        h('div', { className: "flex items-center gap-3" },
+                            h(WhatsAppIcon, { className: "w-8 h-8 text-green-500 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" }),
+                            h('span', { className: "font-bold text-lg rgb-text-glow tracking-widest" }, "WHATSAPP")
+                        ),
+                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
+                    ),
+                    
+                    !isWhatsappConnected ? h('div', { className: "flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6" },
+                        h('div', { className: "w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mb-2 animate-pulse" },
+                             h(WhatsAppIcon, { className: "w-10 h-10 text-green-500" })
+                        ),
+                        h('h3', { className: "text-xl font-bold text-white" }, "Connect WhatsApp"),
+                        h('p', { className: "text-gray-400 text-sm" }, "Link your account to enable voice messaging capabilities."),
+                        h('button', { 
+                            onClick: () => setIsWhatsappConnected(true),
+                            className: "w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)]" 
+                        }, "Connect Now")
+                    ) : h('div', { className: "flex-1 flex flex-col p-6" },
+                        h('div', { className: "mb-6" },
+                            h('label', { className: "block text-xs uppercase font-bold text-gray-500 mb-2" }, "To Contact"),
+                            h('input', {
+                                type: "text",
+                                value: whatsappDraft.contact,
+                                onChange: (e) => setWhatsappDraft(prev => ({...prev, contact: e.target.value})),
+                                placeholder: "Name or Number...",
+                                className: "w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none transition-colors"
+                            })
+                        ),
+                        h('div', { className: "flex-1 mb-6" },
+                            h('label', { className: "block text-xs uppercase font-bold text-gray-500 mb-2" }, "Message"),
+                            h('textarea', {
+                                value: whatsappDraft.message,
+                                onChange: (e) => setWhatsappDraft(prev => ({...prev, message: e.target.value})),
+                                placeholder: "Type your message here...",
+                                className: "w-full h-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none transition-colors resize-none"
+                            })
+                        ),
+                        h('button', { 
+                            onClick: handleSendWhatsapp,
+                            disabled: !whatsappDraft.contact,
+                            className: "w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.4)] flex items-center justify-center gap-2" 
+                        }, 
+                            h(SendIcon, { className: "w-5 h-5" }),
+                            "Send via WhatsApp"
+                        )
+                    )
+                )
+            ),
+
+            activePanel === 'email' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-panel-enter p-6" },
+                h('div', { className: "w-full max-w-lg bg-black rounded-3xl overflow-hidden border border-blue-900 shadow-[0_0_50px_rgba(0,0,255,0.2)] flex flex-col" },
+                    h('div', { className: "p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center" },
+                        h('div', { className: "flex items-center gap-3" },
+                            h(MailIcon, { className: "w-6 h-6 text-blue-400" }),
+                            h('span', { className: "font-bold text-lg tracking-widest text-blue-400" }, "CLOUD EMAIL")
+                        ),
+                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
+                    ),
+                    h('div', { className: "flex-1 flex flex-col p-6 space-y-4" },
+                         h('div', null,
+                            h('label', { className: "block text-xs uppercase font-bold text-gray-500 mb-1" }, "Recipient"),
+                            h('input', {
+                                type: "email",
+                                value: emailDraft.to,
+                                onChange: (e) => setEmailDraft(prev => ({...prev, to: e.target.value})),
+                                placeholder: "recipient@example.com",
+                                className: "w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none transition-colors"
+                            })
+                        ),
+                         h('div', null,
+                            h('label', { className: "block text-xs uppercase font-bold text-gray-500 mb-1" }, "Subject"),
+                            h('input', {
+                                type: "text",
+                                value: emailDraft.subject,
+                                onChange: (e) => setEmailDraft(prev => ({...prev, subject: e.target.value})),
+                                placeholder: "Subject",
+                                className: "w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none transition-colors"
+                            })
+                        ),
+                        h('div', { className: "flex-1" },
+                            h('label', { className: "block text-xs uppercase font-bold text-gray-500 mb-1" }, "Body"),
+                            h('textarea', {
+                                value: emailDraft.body,
+                                onChange: (e) => setEmailDraft(prev => ({...prev, body: e.target.value})),
+                                placeholder: "Write your email here...",
+                                className: "w-full h-32 bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none transition-colors resize-none"
+                            })
+                        ),
+                        h('button', { 
+                            onClick: handleSendEmail,
+                            disabled: !emailDraft.to,
+                            className: "w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] flex items-center justify-center gap-2" 
+                        }, 
+                            h(SendIcon, { className: "w-5 h-5" }),
+                            "Send via Cloud App"
+                        )
+                    )
+                )
+            ),
+
             activePanel === 'weather' && weatherData && h('div', { className: "absolute top-1/4 right-8 z-20 animate-panel-enter" },
                 h('div', { className: "glass-panel bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-72 shadow-2xl" },
                     h('div', { className: "flex justify-between items-start mb-4" },
@@ -1596,6 +1822,24 @@ export const App = () => {
                 title: t('footer.disconnect')
             },
                 h(DisconnectIcon, { className: "w-5 h-5" })
+            ),
+
+             // Email Button
+             h('button', {
+                onClick: () => setActivePanel(activePanel === 'email' ? 'chat' : 'email'),
+                className: "p-3 rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-blue-500 transition-all backdrop-blur-md shadow-lg",
+                title: "Email"
+            },
+                h(MailIcon, { className: "w-5 h-5" })
+            ),
+
+            // WhatsApp Button
+             h('button', {
+                onClick: () => setActivePanel(activePanel === 'whatsapp' ? 'chat' : 'whatsapp'),
+                className: "p-3 rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-green-500 transition-all backdrop-blur-md shadow-lg",
+                title: "WhatsApp"
+            },
+                h(WhatsAppIcon, { className: "w-5 h-5" })
             ),
 
              // Music/Recognize Song Button
