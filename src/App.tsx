@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -9,7 +7,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 
 // Helper for React.createElement to keep code readable
@@ -88,14 +86,10 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
 4.  **Controlling YouTube playback:** Use the 'CONTROL_MEDIA' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
 5.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
-6.  **Getting News:** Use the 'GET_NEWS' tool to fetch top news headlines for a specific topic.
-7.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
-8.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
-9.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
-10. **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
-11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
-12. **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
-13. **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
+6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
+7.  **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+8.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
+9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -1254,12 +1248,12 @@ export const App = () => {
                     properties: { 
                         action: { 
                             type: Type.STRING, 
-                            enum: ['play', 'pause', 'rewind', 'forward', 'stop'],
-                            description: 'The action to perform.'
+                            enum: ['play', 'pause', 'rewind', 'forward', 'seek', 'stop'],
+                            description: 'The action to perform. Use "seek" to jump to a specific timestamp.'
                         },
                         amount: { 
                             type: Type.NUMBER, 
-                            description: "Amount of time in seconds to rewind or forward. Default is 10." 
+                            description: "Amount of time in seconds to rewind, forward, or seek to. Default is 10." 
                         }
                     },
                     required: ['action']
@@ -1314,7 +1308,7 @@ export const App = () => {
                     properties: {
                         recipient: { 
                             type: Type.STRING,
-                            description: 'The email address of the recipient (e.g. user@example.com).'
+                            description: 'The email address of the recipient (e.g. user@example.com). Must be a valid email format.'
                         },
                         subject: { 
                             type: Type.STRING,
@@ -1328,11 +1322,25 @@ export const App = () => {
                     required: ['recipient', 'subject', 'body']
                 }
             };
+            const generateImageTool: FunctionDeclaration = {
+                name: 'generate_image',
+                description: 'Generate an image based on a prompt.',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        prompt: {
+                            type: Type.STRING,
+                            description: 'The description of the image to generate.'
+                        }
+                    },
+                    required: ['prompt']
+                }
+            };
 
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
-                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool] }],
+                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool, generateImageTool] }],
                     systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {
@@ -1437,6 +1445,11 @@ export const App = () => {
                                                     playerInstanceRef.current.seekTo(currentTime + amount, true);
                                                     resultText = `Fast-forwarded ${amount} seconds`;
                                                 }
+                                            } else if (action === 'seek') {
+                                                if (typeof playerInstanceRef.current.seekTo === 'function') {
+                                                    playerInstanceRef.current.seekTo(amount, true);
+                                                    resultText = `Seeked to ${amount} seconds`;
+                                                }
                                             }
                                             result = { result: resultText };
                                         } else {
@@ -1478,6 +1491,14 @@ export const App = () => {
                                          setEmailDraft({ to: call.args.recipient, subject: call.args.subject, body: call.args.body });
                                          setActivePanel('email');
                                          result = { result: `Drafted email to ${call.args.recipient}` };
+                                     } else if (call.name === 'generate_image') {
+                                         try {
+                                            const imageUrl = await generateImage(call.args.prompt);
+                                            setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', image: imageUrl, text: `Generated image: ${call.args.prompt}` }]);
+                                            result = { result: 'Image generated successfully.' };
+                                         } catch (imgError) {
+                                             result = { error: imgError.message };
+                                         }
                                      }
                                  } catch (e) {
                                      result = { error: e.message };
