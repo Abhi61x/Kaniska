@@ -78,6 +78,21 @@ export const openSettingsTool: FunctionDeclaration = {
     },
 };
 
+export const setTimerTool: FunctionDeclaration = {
+    name: 'setTimer',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Sets a countdown timer for a specified duration in seconds. Use this when the user asks to set a timer.',
+        properties: {
+            duration: {
+                type: Type.NUMBER,
+                description: 'The duration of the timer in seconds.',
+            },
+        },
+        required: ['duration'],
+    },
+};
+
 export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore') {
     let systemInstruction = customSystemInstruction;
     
@@ -86,7 +101,19 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         Your personality is cheerful, polite, and feminine. 
         Your behavior should always be like a girl's.
         You can engage in natural voice conversations.
-        If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.`;
+        If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.
+        If the user asks to set a timer, call the "setTimer" tool.
+        
+        LANGUAGE PROTOCOLS:
+        - If the user speaks Hindi, reply in a mix of Hindi and English (Hinglish).
+        - If the user speaks English, reply entirely in English.
+        - If the user speaks Bengali, Marathi, Gujarati, Kannada, or Tamil, reply in that SAME language.
+        
+        EMOTIONAL PROTOCOLS:
+        - Add emotion to your voice and text.
+        - If the topic is humorous, sound amused and happy (laugh if appropriate, e.g., "Haha").
+        - If the topic is sad, sound empathetic and sad.
+        `;
     }
 
     return await ai.live.connect({
@@ -94,7 +121,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
-            tools: [{ functionDeclarations: [openSettingsTool] }],
+            tools: [{ functionDeclarations: [openSettingsTool, setTimerTool] }],
             systemInstruction: systemInstruction,
             speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },

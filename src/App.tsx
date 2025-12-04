@@ -1,7 +1,5 @@
 
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -98,11 +96,17 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
 4.  **Controlling YouTube playback:** Use the 'CONTROL_MEDIA' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
 5.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
-6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
+6.  **Setting Timers:** To set a timer, provide the duration in seconds in the \`timerDurationSeconds\` field of your JSON response. Do not use a separate tool for this in the main chat.
 7.  **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
 8.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
 9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
 10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
+
+**LANGUAGE & EMOTION PROTOCOLS:**
+- **Emotion:** Add emotion to your replies. If the topic is humorous, include laughter (e.g., "Haha"). If it is sad, use a sad tone.
+- **Hindi/English Mix:** If the user speaks Hindi, reply in a mix of Hindi and English (Hinglish).
+- **English:** If the user speaks English, reply entirely in English.
+- **Regional Languages:** If the user speaks Bengali, Marathi, Gujarati, Kannada, or Tamil, reply in that SAME language.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -1038,6 +1042,33 @@ export const App = () => {
     // Calculate dynamic voice based on gender
     const currentVoiceName = gender === 'female' ? femaleVoices.main : maleVoices.main;
 
+    const handleTimer = (duration: number) => {
+        setTimeout(async () => {
+            const alertMsg = "Your timer is up!";
+            setMessages(prev => [...prev, { sender: 'model', text: alertMsg }]);
+            try {
+                // Play announcement
+                const stream = await generateSpeech(alertMsg, currentVoiceName);
+                const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
+                let nextTime = audioCtx.currentTime;
+                for await (const chunk of stream) {
+                    const base64 = chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    if (base64) {
+                         const bytes = decode(base64);
+                         const buffer = await decodeAudioData(bytes, audioCtx, 24000, 1);
+                         const source = audioCtx.createBufferSource();
+                         source.buffer = buffer;
+                         source.connect(audioCtx.destination);
+                         source.start(nextTime);
+                         nextTime += buffer.duration;
+                    }
+                }
+            } catch (e) {
+                console.error("Timer notification failed", e);
+            }
+        }, duration * 1000);
+    };
+
     const toggleLive = async () => {
         if (isLive) {
             if (audioContextRef.current) audioContextRef.current.close();
@@ -1120,6 +1151,23 @@ export const App = () => {
                                         ]
                                     });
                                  });
+                             } else if (fc.name === 'setTimer') {
+                                 const duration = fc.args.duration;
+                                 if (duration) {
+                                     console.log(`Setting timer for ${duration} seconds via Live tool`);
+                                     handleTimer(duration);
+                                     sessionPromise.then(session => {
+                                         session.sendToolResponse({
+                                             functionResponses: [
+                                                 {
+                                                     id: fc.id,
+                                                     name: fc.name,
+                                                     response: { result: { success: true, message: `Timer set for ${duration} seconds` } }
+                                                 }
+                                             ]
+                                         });
+                                     });
+                                 }
                              }
                          }
                      }
@@ -1162,6 +1210,11 @@ export const App = () => {
                 emotionTuning
             );
 
+            // Handle Timer if present
+            if (response.timerDurationSeconds > 0) {
+                handleTimer(response.timerDurationSeconds);
+            }
+
             setStatus('speaking');
             setMessages(prev => [...prev, { sender: 'model', text: response.reply }]);
 
@@ -1197,7 +1250,7 @@ export const App = () => {
         }
     };
 
-    return h('div', { className: "flex flex-col h-screen w-full bg-black text-white overflow-hidden relative" },
+    return h('div', { className: "flex flex-col h-[100dvh] w-full bg-black text-white overflow-hidden relative" },
         // Header
         h('header', { className: "flex items-center justify-between p-4 z-10" },
             h('div', { className: "flex items-center gap-2" },
@@ -1213,13 +1266,13 @@ export const App = () => {
         ),
 
         // Main Content
-        h('main', { className: "flex-1 flex flex-col items-center justify-center relative" },
+        h('main', { className: "flex-1 flex flex-col items-center justify-start pt-4 md:justify-center md:pt-0 relative" },
             h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
                // Optional background effects
             ),
             
             // Avatar Centerpiece
-            h('div', { className: "mb-8 z-10 transform scale-110 md:scale-125 transition-transform duration-500" },
+            h('div', { className: "mb-8 z-10 transform scale-110 md:scale-125 transition-transform duration-500 pt-4 md:pt-0" },
                 h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl })
             ),
 
@@ -1229,7 +1282,7 @@ export const App = () => {
             ),
 
             // Chat Overlay (Simplified for visual clarity)
-            h('div', { className: "absolute bottom-24 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
+            h('div', { className: "absolute bottom-44 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
                 messages.slice(-3).map((msg, i) => 
                     h('div', { key: i, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}` },
                         h('div', { className: `px-4 py-2 rounded-2xl max-w-[80%] backdrop-blur-md border ${msg.sender === 'user' ? 'bg-cyan-900/30 border-cyan-500/30 text-white' : 'bg-gray-900/50 border-gray-700/50 text-gray-200'}` },
@@ -1241,7 +1294,7 @@ export const App = () => {
         ),
 
         // Footer Controls
-        h('footer', { className: "p-4 z-20 w-full max-w-3xl mx-auto" },
+        h('footer', { className: "p-4 pb-36 md:pb-4 z-20 w-full max-w-3xl mx-auto" },
             h('div', { className: "flex gap-2 bg-gray-900/80 backdrop-blur-xl p-2 rounded-full border border-gray-700 shadow-2xl" },
                  // Live Mic Button
                 h('button', {
