@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -994,13 +992,28 @@ export const App = () => {
 
     const getSystemInstructions = () => {
         let instructions = FIXED_SYSTEM_INSTRUCTIONS;
+        
+        // Dynamic User Identity
         if (nickname) {
-            instructions += `\n\n**User Profile:**\n- The user's name is "${nickname}". Address them by this name occasionally in a natural way.`;
+            instructions += `\n\n**USER IDENTITY:**\nThe user's chosen nickname is "${nickname}". You MUST address the user by this name naturally in the conversation. Do not ask for their name again.`;
         }
+
+        // Dynamic Personality Mode
         if (personalityMode && personalityMode !== 'Default') {
-            instructions += `\n\n**Personality Mode:**\n- Adopt a "${personalityMode}" persona. Adjust your vocabulary, tone, and style to match this archetype.`;
+            instructions += `\n\n**PERSONALITY MODE: ${personalityMode}**\n`;
+            switch (personalityMode) {
+                case 'Professional': instructions += "Maintain a formal, polite, and efficient tone. Avoid slang."; break;
+                case 'Friendly': instructions += "Be warm, cheerful, and casual. Use emoticons in text if applicable."; break;
+                case 'Candid': instructions += "Be direct, honest, and straightforward. Don't sugarcoat things."; break;
+                case 'Efficient': instructions += "Be concise and to the point. Minimize small talk."; break;
+                case 'Nerdy': instructions += "Use technical terminology, make geeky references, and show enthusiasm for science/tech."; break;
+                case 'Cynical': instructions += "Be slightly sarcastic, skeptical, and dry. Dark humor is allowed."; break;
+                case 'Quirky': instructions += "Be unpredictable, fun, and use colorful metaphors. Act a bit like a sci-fi character."; break;
+            }
         }
-        instructions += `\n\n**Emotional Adaptation:**\n- You possess high emotional intelligence. Analyze the user's input (text and audio tone) to detect their mood (e.g., happy, sad, excited, frustrated, joking).\n- **Mirror the emotion:** If the user is sad, be empathetic and soft. If they are happy or laughing, be cheerful and laugh along. If they are serious, be professional.\n- Dynamic Response: Your response must reflect this detected emotion in both text and voice tone.`;
+
+        // Emotion Detection & Response
+        instructions += `\n\n**EMOTIONAL INTELLIGENCE & ADAPTATION:**\n1.  **Detect:** Continuously analyze the user's voice tone and text for emotions (Happy, Sad, Angry, Excited, Tired, Anxious, Neutral).\n2.  **Adapt:** Instantly mirror or complement the user's emotion.\n    -   If User is **Sad/Tired**: Respond with high **Empathy** and a softer, slower, comforting tone.\n    -   If User is **Happy/Excited**: Respond with high **Happiness/Excitement** and an energetic tone.\n    -   If User is **Angry/Frustrated**: Respond with **Calmness** and patience to de-escalate.\n3.  **Voice Tone:** Your voice output MUST reflect this emotion. If the text implies sadness, the voice should sound sad.`;
         
         instructions += `\n\n${customInstructions}\nUser Bio: ${userBio}`;
         return instructions;
