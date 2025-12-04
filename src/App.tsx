@@ -1,6 +1,5 @@
 
 
-
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -95,8 +94,8 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 9.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
 10. **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
 11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
-12. **Sending WhatsApp Messages:** Use the 'send_whatsapp' tool when the user wants to send a WhatsApp message. You need the contact name and the message content. If either is missing, ask the user for it.
-13. **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You need the recipient's email address, the subject, and the message body.
+12. **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
+13. **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -1146,7 +1145,7 @@ export const App = () => {
         const subject = encodeURIComponent(emailDraft.subject || "");
         const body = encodeURIComponent(emailDraft.body || "");
         const mailtoLink = `mailto:${emailDraft.to}?subject=${subject}&body=${body}`;
-        window.open(mailtoLink, '_self');
+        window.open(mailtoLink, '_blank');
     };
 
     const handleCodeCommand = async () => {
@@ -1282,7 +1281,7 @@ export const App = () => {
             };
             const sendWhatsappTool: FunctionDeclaration = {
                 name: 'send_whatsapp',
-                description: 'Draft a WhatsApp message to a contact.',
+                description: 'Draft and send a WhatsApp message to a contact.',
                 parameters: {
                     type: Type.OBJECT,
                     properties: {
@@ -1298,15 +1297,24 @@ export const App = () => {
                     required: ['contactName', 'message']
                 }
             };
+            const openWhatsappTool: FunctionDeclaration = {
+                name: 'open_whatsapp',
+                description: 'Open the WhatsApp application to view chats.',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {},
+                    required: []
+                }
+            };
             const sendEmailTool: FunctionDeclaration = {
                 name: 'send_email',
-                description: 'Draft an email to a recipient.',
+                description: 'Drafts an email with the provided recipient, subject, and body. Do not call this unless you have all three pieces of information.',
                 parameters: {
                     type: Type.OBJECT,
                     properties: {
                         recipient: { 
                             type: Type.STRING,
-                            description: 'The email address of the recipient.'
+                            description: 'The email address of the recipient (e.g. user@example.com).'
                         },
                         subject: { 
                             type: Type.STRING,
@@ -1324,7 +1332,7 @@ export const App = () => {
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
-                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, sendEmailTool] }],
+                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool] }],
                     systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {
@@ -1442,7 +1450,30 @@ export const App = () => {
                                          setWhatsappDraft({ contact: call.args.contactName, message: call.args.message });
                                          setIsWhatsappConnected(true);
                                          setActivePanel('whatsapp');
-                                         result = { result: `Drafted WhatsApp message to ${call.args.contactName}` };
+                                         
+                                         // Attempt Auto-Send
+                                         const message = call.args.message || "";
+                                         const isNumber = /^\d+$/.test(call.args.contactName.replace(/[\s+-]/g, ''));
+                                         const finalUrl = isNumber 
+                                             ? `https://wa.me/${call.args.contactName.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
+                                             : `https://wa.me/?text=${encodeURIComponent(message)}`;
+                                         
+                                         try {
+                                            const win = window.open(finalUrl, '_blank');
+                                            if (win) {
+                                                result = { result: `Opened WhatsApp with drafted message to ${call.args.contactName}` };
+                                            } else {
+                                                result = { result: `Drafted message to ${call.args.contactName}. Pop-up blocked, asking user to confirm.` };
+                                            }
+                                         } catch(e) {
+                                            result = { result: `Drafted message to ${call.args.contactName}` };
+                                         }
+                                         
+                                     } else if (call.name === 'open_whatsapp') {
+                                         window.open('https://wa.me', '_blank');
+                                         setActivePanel('whatsapp');
+                                         setIsWhatsappConnected(true);
+                                         result = { result: 'Opened WhatsApp application.' };
                                      } else if (call.name === 'send_email') {
                                          setEmailDraft({ to: call.args.recipient, subject: call.args.subject, body: call.args.body });
                                          setActivePanel('email');
@@ -1503,7 +1534,7 @@ export const App = () => {
         h('main', { className: "flex-grow flex flex-col items-center justify-center relative p-4 z-10" },
             // Only show Avatar if settings are CLOSED to prevent overlap
             !isSettingsOpen && h('div', { className: `mb-24 transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
-                h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: mood, customUrl: avatarUrl })
+                h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: activePanel === 'whatsapp' ? 'whatsapp' : mood, customUrl: avatarUrl })
             ),
 
             activePanel === 'chat' && h('div', { className: "absolute bottom-24 left-0 right-0 mx-auto w-full max-w-3xl h-[40vh] flex flex-col justify-end pointer-events-none px-4" },
