@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -1127,18 +1128,17 @@ export const App = () => {
     const handleSendWhatsapp = () => {
         if (!whatsappDraft.contact) return;
         
+        // Open immediately to prevent popup blockers
+        const message = whatsappDraft.message || "";
+        const isNumber = /^\d+$/.test(whatsappDraft.contact.replace(/[\s+-]/g, ''));
+        const finalUrl = isNumber 
+            ? `https://wa.me/${whatsappDraft.contact.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
+            : `https://wa.me/?text=${encodeURIComponent(message)}`;
+            
+        window.open(finalUrl, '_blank');
+        
         setIsSendingWhatsapp(true);
-        setTimeout(() => {
-            const message = whatsappDraft.message || "";
-            // If we had a number, we could use wa.me/NUMBER
-            const isNumber = /^\d+$/.test(whatsappDraft.contact.replace(/[\s+-]/g, ''));
-            const finalUrl = isNumber 
-                ? `https://wa.me/${whatsappDraft.contact.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
-                : `https://wa.me/?text=${encodeURIComponent(message)}`;
-                
-            window.open(finalUrl, '_blank');
-            setIsSendingWhatsapp(false);
-        }, 1500);
+        setTimeout(() => setIsSendingWhatsapp(false), 2000);
     };
 
     const handleSendEmail = () => {
