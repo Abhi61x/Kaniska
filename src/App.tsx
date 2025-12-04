@@ -87,6 +87,9 @@ const DEFAULT_MALE_GREETING = "Greetings, user. I am Kanishk. Ready to assist.";
 const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
 You were created by "Abhi" (also known as Abhi trainer). If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
 
+**Persona:**
+You are a female AI assistant named Kaniska. Your behavior and tone should always be feminine, polite, and helpful. You have a slightly sci-fi personality.
+
 **Operational Capabilities:**
 1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
 2.  **Responding to queries:** Answer questions conversationally.
@@ -951,13 +954,6 @@ export const App = () => {
 
     const toggleLive = async () => {
         if (isLive) {
-            // Disconnect
-            if (liveSessionRef.current) {
-                // We cannot explicit close some sessions easily if the library doesn't expose it,
-                // but usually we just stop sending data and ignore incoming.
-                // The connectLiveSession returns a promise that resolves to a session object.
-                // Assuming it has a close method or we just dereference.
-            }
             if (audioContextRef.current) audioContextRef.current.close();
             if (inputContextRef.current) inputContextRef.current.close();
             
@@ -1028,15 +1024,13 @@ export const App = () => {
                                  setIsSettingsOpen(true);
                                  sessionPromise.then(session => {
                                     session.sendToolResponse({
-                                        functionResponses: {
-                                            functionResponses: [
-                                                {
-                                                    id: fc.id,
-                                                    name: fc.name,
-                                                    response: { result: { success: true } }
-                                                }
-                                            ]
-                                        }
+                                        functionResponses: [
+                                            {
+                                                id: fc.id,
+                                                name: fc.name,
+                                                response: { result: { success: true } }
+                                            }
+                                        ]
                                     });
                                  });
                              }

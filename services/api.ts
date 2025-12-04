@@ -78,15 +78,22 @@ export const openSettingsTool: FunctionDeclaration = {
 };
 
 export async function connectLiveSession(callbacks) {
+    const systemInstruction = `You are Kaniska, a friendly and helpful female AI assistant. 
+    Your personality is cheerful, polite, and feminine. 
+    Your behavior should always be like a girl's.
+    You can engage in natural voice conversations.
+    If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.`;
+
     return await ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
             tools: [{ functionDeclarations: [openSettingsTool] }],
-            systemInstruction: `You are Kaniska, a friendly and helpful AI assistant. 
-            You can engage in natural voice conversations. 
-            If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.`
+            systemInstruction: systemInstruction,
+            speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+            },
         }
     });
 }
