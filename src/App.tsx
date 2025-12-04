@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -87,9 +89,6 @@ const DEFAULT_FEMALE_GREETING = "Greetings, user. I am Kaniska. Ready to assist.
 const DEFAULT_MALE_GREETING = "Greetings, user. I am Kanishk. Ready to assist.";
 const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
 You were created by "Abhi" (also known as Abhi trainer). If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
-
-**Persona:**
-You are a female AI assistant named Kaniska. Your behavior and tone should always be feminine, polite, and helpful. You have a slightly sci-fi personality.
 
 **Operational Capabilities:**
 1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
@@ -993,6 +992,13 @@ export const App = () => {
     const getSystemInstructions = () => {
         let instructions = FIXED_SYSTEM_INSTRUCTIONS;
         
+        // Dynamic Persona based on Gender
+        if (gender === 'male') {
+             instructions += `\n\n**Persona:**\nYou are a male AI assistant named Kanishk. Your behavior, voice, and tone should be distinctly masculine, polite, and helpful. You have a cool, slightly sci-fi personality.`;
+        } else {
+             instructions += `\n\n**Persona:**\nYou are a female AI assistant named Kaniska. Your behavior, voice, and tone should be distinctly feminine, polite, and helpful. You have a slightly sci-fi personality.`;
+        }
+
         // Dynamic User Identity
         if (nickname) {
             instructions += `\n\n**USER IDENTITY:**\nThe user's chosen nickname is "${nickname}". You MUST address the user by this name naturally in the conversation. Do not ask for their name again.`;
