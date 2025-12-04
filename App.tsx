@@ -9,8 +9,11 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
+import { auth, db, googleProvider } from './firebase.ts';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
@@ -42,7 +45,17 @@ const BugIcon = ({ className }) => h('svg', { className: className, xmlns: "http
 const MenuIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('line', { x1: "4", y1: "12", x2: "20", y2: "12" }), h('line', { x1: "4", y1: "6", x2: "20", y2: "6" }), h('line', { x1: "4", y1: "18", x2: "20", y2: "18" }));
 const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), h('circle', { cx: "12", cy: "7", r: "4" }));
 const ImageIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }), h('circle', { cx: "8.5", cy: "8.5", r: "1.5" }), h('polyline', { points: "21 15 16 10 5 21" }));
-
+const SearchIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "11", cy: "11", r: "8" }), h('line', { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }));
+const WhatsAppIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" }));
+const MailIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), h('polyline', { points: "22,6 12,13 2,6" }));
+const SpaciousIcon = ({ className }) => h('svg', { className, viewBox: "0 0 24 24", height: "24", width: "24", xmlns: "http://www.w3.org/2000/svg" },
+    h('g', { fill: "none" },
+        h('path', { d: "m12.594 23.258l-.012.002l-.071.035l-.02.004l-.014-.004l-.071-.036q-.016-.004-.024.006l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.016-.018m.264-.113l-.014.002l-.184.093l-.01.01l-.003.011l.018.43l.005.012l.008.008l.201.092q.019.005.029-.008l.004-.014l-.034-.614q-.005-.019-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.003-.011l.018-.43l-.003-.012l-.01-.01z", fill: "currentColor" }),
+        h('path', { d: "M9.107 5.448c.598-1.75 3.016-1.803 3.725-.159l.06.16l.807 2.36a4 4 0 0 0 2.276 2.411l.217.081l2.36.806c1.75.598 1.803 3.016.16 3.725l-.16.06l-2.36.807a4 4 0 0 0-2.412 2.276l-.081.216l-.806 2.361c-.598 1.75-3.016 1.803-3.724.16l-.062-.16l-.806-2.36a4 4 0 0 0-2.276-2.412l-.216-.081l-2.36-.806c-1.751-.598-1.804-3.016-.16-3.724l.16-.062l2.36-.806A4 4 0 0 0 8.22 8.025l.081-.216zM11 6.094l-.806 2.36a6 6 0 0 1-3.49 3.649l-.25.091l-2.36.806l2.36.806a6 6 0 0 1 3.649 3.49l.091.25l.806 2.36l.806-2.36a6 6 0 0 1 3.49-3.649l.25-.09l2.36-.807l-2.36-.806a6 6 0 0 1-3.649-3.49l-.09-.25M19 2a1 1 0 0 1 .898.56l.048.117l.35 1.026l1.027.35a1 1 0 0 1 .118 1.845l-.118.048l-1.026.35l-.35 1.027a1 1 0 0 1-1.845.117l-.048-.117l-.35-1.026l-1.027-.35a1 1 0 0 1-.118-1.845l.118-.048l1.026-.35l.35-1.027A1 1 0 0 1 19 2", fill: "currentColor" })
+    )
+);
+const AccountIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }), h('circle', { cx: "8.5", cy: "7", r: "4" }), h('line', { x1: "20", y1: "8", x2: "20", y2: "14" }), h('line', { x1: "23", y1: "11", x2: "17", y2: "11" }));
+const GoogleIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "24", height: "24" }, h('path', { fill: "#4285F4", d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" }), h('path', { fill: "#34A853", d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" }), h('path', { fill: "#FBBC05", d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" }), h('path', { fill: "#EA4335", d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" }));
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -80,12 +93,11 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
 4.  **Controlling YouTube playback:** Use the 'CONTROL_MEDIA' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
 5.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
-6.  **Getting News:** Use the 'GET_NEWS' tool to fetch top news headlines for a specific topic.
-7.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
-8.  **Singing a song:** Use the 'SING_SONG' tool when the user provides both a song title and artist. If they ask you to sing without providing these details, you must ask them for the song title and artist.
-9.  **Telling a random fact:** Use the 'RANDOM_FACT' tool to provide an interesting random fact when requested.
-10. **Opening the Code Editor:** Use the 'OPEN_CODE_EDITOR' tool when the user wants to write or edit code.
-11. **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
+7.  **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+8.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
+9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
+10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -338,6 +350,7 @@ const SettingsModal = ({
     theme, setTheme, gender, setGender, 
     greetingMessage, setGreetingMessage, 
     customInstructions, setCustomInstructions, 
+    userBio, setUserBio,
     emotionTuning, setEmotionTuning, 
     apiKeys, setApiKeys, 
     lang, setLang, 
@@ -346,7 +359,8 @@ const SettingsModal = ({
     ambientVolume, setAmbientVolume,
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
-    dailyUsage
+    dailyUsage,
+    user, handleLogin, handleLogout
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -360,6 +374,12 @@ const SettingsModal = ({
     React.useEffect(() => {
         setPreviewingVoice(null);
     }, [activeTab, isOpen]);
+
+    // Robust label getter that uses fallback if translation key is returned (meaning translation missing)
+    const getTabLabel = (key, fallback) => {
+        const val = t(key);
+        return (val === key) ? fallback : val;
+    };
 
     if (!isOpen) return null;
 
@@ -385,10 +405,10 @@ const SettingsModal = ({
         if (!amount) return;
 
         try {
-            // Since firebase auth is removed, we default to guest details
-            const customerId = `guest_${Date.now()}`;
+            // Use authenticated user details if available, else guest
+            const customerId = user ? `user_${user.uid}` : `guest_${Date.now()}`;
             const customerPhone = "9999999999"; 
-            const customerEmail = "guest@example.com";
+            const customerEmail = user ? user.email : "guest@example.com";
 
             const paymentSessionId = await createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail);
             
@@ -437,8 +457,72 @@ const SettingsModal = ({
 
     const renderTabContent = () => {
         switch (activeTab) {
+            case 'account':
+                return h('div', { className: "space-y-6 animate-fade-in" },
+                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 text-center" },
+                        user ? h('div', null,
+                            h('div', { className: "w-20 h-20 bg-gray-700 rounded-full mx-auto mb-4 overflow-hidden border-2 border-cyan-500" },
+                                user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full flex items-center justify-center text-2xl font-bold" }, user.displayName?.[0] || "U")
+                            ),
+                            h('h3', { className: "text-xl font-bold text-white mb-1" }, user.displayName || "User"),
+                            h('p', { className: "text-sm text-gray-400 mb-6" }, user.email),
+                            
+                            h('div', { className: "bg-green-500/10 border border-green-500/30 p-3 rounded-lg mb-6 max-w-xs mx-auto flex items-center justify-center gap-2" },
+                                h(CheckCircleIcon, { className: "w-4 h-4 text-green-400" }),
+                                h('span', { className: "text-sm text-green-300 font-medium" }, "Settings Auto-Sync Active")
+                            ),
+
+                            h('button', {
+                                onClick: handleLogout,
+                                className: "px-6 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 rounded-lg transition-all font-medium"
+                            }, "Sign Out")
+                        ) : h('div', null,
+                             h('div', { className: "w-16 h-16 bg-gray-800 rounded-full mx-auto mb-4 flex items-center justify-center text-gray-400" },
+                                h(UserIcon, { className: "w-8 h-8" })
+                            ),
+                            h('h3', { className: "text-lg font-bold text-white mb-2" }, "Sign In to Sync"),
+                            h('p', { className: "text-sm text-gray-400 mb-6 max-w-sm mx-auto" }, "Sign in with Google to save your persona, API keys, and preferences to the cloud and access them from any device."),
+                            h('button', {
+                                onClick: handleLogin,
+                                className: "px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg transition-all font-bold flex items-center justify-center gap-3 mx-auto shadow-lg"
+                            },
+                                h(GoogleIcon, { className: "w-5 h-5" }),
+                                "Sign in with Google"
+                            )
+                        )
+                     )
+                );
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('div', { className: "mb-6" },
+                            h('h3', { className: "font-semibold text-lg text-cyan-400" }, "Custom Instructions"),
+                            h('p', { className: "text-xs text-gray-500" }, "Personalize how the assistant interacts with you.")
+                        ),
+                        
+                        h('div', { className: "space-y-5" },
+                            h('div', null,
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "What would you like Kaniska to know about you to provide better responses?"),
+                                h('textarea', {
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm leading-relaxed",
+                                    rows: 3,
+                                    value: userBio,
+                                    onChange: (e) => setUserBio(e.target.value),
+                                    placeholder: "E.g., I'm a software developer based in Bangalore. I like concise answers..."
+                                })
+                            ),
+                             h('div', null,
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "How would you like Kaniska to respond?"),
+                                h('textarea', {
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm leading-relaxed",
+                                    rows: 3,
+                                    value: customInstructions,
+                                    onChange: (e) => setCustomInstructions(e.target.value),
+                                    placeholder: "E.g., Be formal, use technical terms, keep it short..."
+                                })
+                            )
+                        )
+                    ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.avatar.title') || "Avatar Customization"),
                         h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."),
@@ -496,18 +580,6 @@ const SettingsModal = ({
                             rows: 2,
                             value: greetingMessage,
                             onChange: (e) => setGreetingMessage(e.target.value)
-                        })
-                    ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
-                        h('div', { className: "mb-3" },
-                            h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.systemPrompt.title') || "Custom Instructions"),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.systemPrompt.description'))
-                        ),
-                        h('textarea', {
-                            className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm font-mono leading-relaxed",
-                            rows: 4,
-                            value: customInstructions,
-                            onChange: (e) => setCustomInstructions(e.target.value)
                         })
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
@@ -706,8 +778,11 @@ const SettingsModal = ({
                         h('p', { className: "text-gray-400 text-sm mb-8 leading-relaxed" }, t('settings.aboutTab.description')),
                         h('div', { className: "text-xs text-gray-600 border-t border-gray-800 pt-6" },
                             h('p', { className: "font-mono mb-4 opacity-70" }, `${t('settings.aboutTab.version')}: 1.0.0 (Beta)`),
-                            h('div', { className: "flex justify-center gap-6" },
+                            h('div', { className: "flex justify-center gap-6 flex-wrap" },
                                 h('a', { href: "#", className: "text-gray-500 hover:text-cyan-400 transition-colors" }, t('settings.aboutTab.privacyPolicy')),
+                                h('span', { className: "text-gray-700" }, "•"),
+                                h('a', { href: "#", className: "text-gray-500 hover:text-cyan-400 transition-colors" }, t('settings.aboutTab.termsOfService')),
+                                h('span', { className: "text-gray-700" }, "•"),
                                 h('a', {
                                     href: "https://github.com/abhi-trainer/kaniska/issues/new?assignees=&labels=bug&template=bug_report.md&title=[BUG]",
                                     target: "_blank",
@@ -753,7 +828,7 @@ const SettingsModal = ({
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
-                                    subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
+                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
                                 h('div', { className: "flex items-baseline gap-1" },
                                     h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
@@ -812,6 +887,7 @@ const SettingsModal = ({
                 ),
                 h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
                     [
+                        { id: 'account', icon: AccountIcon, label: getTabLabel('settings.tabs.account', 'Account') },
                         { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
                         { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
                         { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
@@ -859,7 +935,7 @@ const SettingsModal = ({
                     ),
                     h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)),
                     h('button', { onClick: onClose, className: "p-2 text-gray-400" },
-                        h(XIcon, { className: "w-5 h-5" })
+                        h(XIcon, { className: "w-6 h-6" })
                     )
                 ),
                 h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" },
@@ -875,693 +951,5 @@ const SettingsModal = ({
                 )
             )
         )
-    );
-};
-
-export const App = () => {
-    const { t, lang, setLang } = useTranslation();
-
-    const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
-    const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
-    const [greetingMessage, setGreetingMessage] = usePersistentState(
-        'kaniska-greeting',
-        DEFAULT_FEMALE_GREETING
-    );
-    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-custom-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
-    const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion-tuning', {
-        happiness: 50, empathy: 70, formality: 30, excitement: 50, sadness: 20, curiosity: 60
-    });
-    const [apiKeys, setApiKeys] = usePersistentState('kaniska-api-keys', {
-        weather: '', news: '', youtube: '', auddio: ''
-    });
-    const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Zephyr' });
-    const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Charon' });
-    const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-volume', 0.1);
-    const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar-url', '');
-    const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-subscription-plan', 'free');
-    
-    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-    const [settingsTab, setSettingsTab] = usePersistentState('kaniska-settings-tab', 'persona');
-    // REMOVED: User state (Firebase Auth)
-
-    // --- MAIN APP STATE ---
-    const [activePanel, setActivePanel] = React.useState('chat');
-    const [chatHistory, setChatHistory] = React.useState([]);
-    const [assistantState, setAssistantState] = React.useState('idle'); // idle, listening, thinking, speaking
-    const [mood, setMood] = React.useState('neutral');
-    const [isModelSpeaking, setIsModelSpeaking] = React.useState(false);
-    const [isConnected, setIsConnected] = React.useState(false);
-    const isConnectingRef = React.useRef(false);
-    
-    // Tools State
-    const [weatherData, setWeatherData] = React.useState(null);
-    const [timerData, setTimerData] = React.useState({ remaining: 0, duration: 0 });
-    const [youtubeQueue, setYoutubeQueue] = React.useState([]);
-    const [youtubeVideoDetails, setYoutubeVideoDetails] = React.useState(null);
-    const playerInstanceRef = React.useRef(null); // Ref for the actual YT player object
-
-    const [code, setCode] = React.useState('console.log("Hello World");');
-    const [codeLanguage, setCodeLanguage] = React.useState('javascript');
-    const [codeInstruction, setCodeInstruction] = React.useState('');
-    const [isCodeLoading, setIsCodeLoading] = React.useState(false);
-    
-    // Fixed: Track daily usage with persistence and date reset
-    const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-daily-usage', { date: new Date().toDateString(), seconds: 0 });
-
-    // Live API
-    const [liveSession, setLiveSession] = React.useState(null);
-    const outputAudioContextRef = React.useRef(null);
-    const nextAudioStartTimeRef = React.useRef(0);
-    const audioContextRef = React.useRef(null);
-    const mediaStreamRef = React.useRef(null);
-    const workletNodeRef = React.useRef(null);
-
-    React.useEffect(() => {
-        document.documentElement.className = theme;
-    }, [theme]);
-
-    React.useEffect(() => {
-        let timer;
-        if (timerData.remaining > 0) {
-            timer = setInterval(() => {
-                setTimerData(prev => {
-                    if (prev.remaining <= 1) {
-                        clearInterval(timer);
-                        return { ...prev, remaining: 0 };
-                    }
-                    return { ...prev, remaining: prev.remaining - 1 };
-                });
-            }, 1000);
-        }
-        return () => clearInterval(timer);
-    }, [timerData.remaining]);
-
-    // Usage Tracking Effect
-    React.useEffect(() => {
-        let interval;
-        if (isConnected) {
-            interval = setInterval(() => {
-                setDailyUsage(prev => {
-                    const today = new Date().toDateString();
-                    // Reset if it's a new day
-                    if (prev.date !== today) {
-                         return { date: today, seconds: 1 };
-                    }
-                    return { ...prev, seconds: prev.seconds + 1 };
-                });
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isConnected, setDailyUsage]);
-
-    // Enforce Limit Effect
-    React.useEffect(() => {
-        // 1 Hour Limit (3600 seconds) for Free plan
-        if (subscriptionPlan === 'free' && dailyUsage.seconds >= 3600 && isConnected) {
-            disconnect();
-            alert(t('errors.dailyLimit'));
-        }
-    }, [dailyUsage, subscriptionPlan, isConnected, t]);
-
-    // --- YouTube Player Logic ---
-    React.useEffect(() => {
-        // Load the IFrame Player API code asynchronously.
-        if (!window['YT']) {
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-            
-            // This global callback is required by the YouTube API
-            window['onYouTubeIframeAPIReady'] = () => {
-                console.log("YouTube API Ready");
-            };
-        }
-    }, []);
-
-    // Effect to initialize/update player when panel is active and video details change
-    React.useEffect(() => {
-        if (activePanel === 'youtube' && youtubeVideoDetails && window['YT']) {
-            // Check if player already exists
-            if (playerInstanceRef.current) {
-                if (typeof playerInstanceRef.current.loadVideoById === 'function') {
-                    playerInstanceRef.current.loadVideoById(youtubeVideoDetails.videoId);
-                }
-            } else {
-                // Initialize new player
-                playerInstanceRef.current = new window['YT'].Player('youtube-player', {
-                    height: '100%',
-                    width: '100%',
-                    videoId: youtubeVideoDetails.videoId,
-                    playerVars: {
-                        'autoplay': 1,
-                        'controls': 1,
-                        'enablejsapi': 1
-                    },
-                    events: {
-                        'onReady': (event) => {
-                             event.target.playVideo();
-                        }
-                    }
-                });
-            }
-        } else if (activePanel !== 'youtube' && playerInstanceRef.current) {
-            // Clean up player when leaving panel
-            try {
-                if (typeof playerInstanceRef.current.destroy === 'function') {
-                    playerInstanceRef.current.destroy();
-                }
-            } catch (e) {
-                console.warn("Error destroying player", e);
-            }
-            playerInstanceRef.current = null;
-        }
-    }, [activePanel, youtubeVideoDetails]);
-
-
-    const handleSetupClick = () => {
-        setSettingsTab('apiKeys');
-        setIsSettingsOpen(true);
-    };
-
-    const handleRecognizeSong = async () => {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert(t('errors.micNotAllowed'));
-            return;
-        }
-        setAssistantState('recognizing');
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            const chunks = [];
-            
-            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-            mediaRecorder.onstop = async () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                try {
-                   const song = await recognizeSong(apiKeys.auddio, blob);
-                   if (song) {
-                       const message = t('chat.songRecognized', { title: song.title, artist: song.artist });
-                       setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: message }]);
-                   } else {
-                       setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: t('chat.songNotFound') }]);
-                   }
-                } catch (e) {
-                   setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: e.message, isError: true }]);
-                } finally {
-                   setAssistantState('idle');
-                   stream.getTracks().forEach(track => track.stop());
-                }
-            };
-            
-            mediaRecorder.start();
-            setTimeout(() => mediaRecorder.stop(), 5000); // Record for 5 seconds
-        } catch (e) {
-            console.error(e);
-            setAssistantState('idle');
-            alert(t('errors.auddioRecording'));
-        }
-    };
-
-    const handleCodeCommand = async () => {
-        if (!codeInstruction) return;
-        setIsCodeLoading(true);
-        try {
-             const result = await processCodeCommand(code, codeLanguage, codeInstruction);
-             setCode(result.newCode);
-             setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: result.explanation }]);
-             setCodeInstruction('');
-        } catch (e) {
-             setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: e.message, isError: true }]);
-        } finally {
-             setIsCodeLoading(false);
-        }
-    };
-
-    const disconnect = () => {
-        if (liveSession) {
-            liveSession.then(s => s.close());
-            setLiveSession(null);
-        }
-        if (outputAudioContextRef.current) {
-            outputAudioContextRef.current.close();
-            outputAudioContextRef.current = null;
-        }
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(t => t.stop());
-            mediaStreamRef.current = null;
-        }
-        if (workletNodeRef.current) {
-            workletNodeRef.current.disconnect();
-            workletNodeRef.current = null;
-        }
-        setIsConnected(false);
-        isConnectingRef.current = false;
-        setAssistantState('idle');
-        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'system', text: t('chat.placeholder.info') }]);
-    };
-
-    // --- Live API Integration ---
-    const connect = async () => {
-        if (isConnectingRef.current || isConnected) return;
-        isConnectingRef.current = true;
-        setAssistantState('listening');
-
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaStreamRef.current = stream;
-
-            // Output Audio Context (Reuse for performance)
-            const outputCtx = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 24000 });
-            outputAudioContextRef.current = outputCtx;
-            nextAudioStartTimeRef.current = outputCtx.currentTime;
-
-            const inputAudioContext = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 16000 });
-            audioContextRef.current = inputAudioContext;
-
-            // Tools Definition
-            const getWeatherTool = {
-                name: 'get_weather',
-                parameters: {
-                    type: Type.OBJECT,
-                    properties: { location: { type: Type.STRING } },
-                    required: ['location']
-                }
-            };
-            const searchYoutubeTool = {
-                 name: 'search_youtube',
-                 parameters: {
-                     type: Type.OBJECT,
-                     properties: { query: { type: Type.STRING } },
-                     required: ['query']
-                 }
-            };
-            const controlMediaTool = {
-                name: 'control_media',
-                parameters: {
-                    type: Type.OBJECT,
-                    properties: { 
-                        action: { type: Type.STRING, enum: ['play', 'pause', 'rewind', 'forward', 'stop'] },
-                        amount: { type: Type.NUMBER, description: "Amount of time in seconds to rewind or forward. Default is 10." }
-                    },
-                    required: ['action']
-                }
-            };
-            const setTimerTool = {
-                name: 'set_timer',
-                parameters: {
-                    type: Type.OBJECT,
-                    properties: { seconds: { type: Type.NUMBER } },
-                    required: ['seconds']
-                }
-            };
-
-            const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-                config: {
-                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool] }],
-                    systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {
-                         voiceConfig: { prebuiltVoiceConfig: { voiceName: (gender === 'female' ? femaleVoices.main : maleVoices.main) } }
-                    }
-                },
-                callbacks: {
-                    onopen: async () => {
-                        console.log('Live Session Connected');
-                        setIsConnected(true);
-                        isConnectingRef.current = false;
-                        
-                        // Audio Input Setup
-                        const source = inputAudioContext.createMediaStreamSource(stream);
-                        const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-                        processor.onaudioprocess = (e) => {
-                            const inputData = e.inputBuffer.getChannelData(0);
-                            const pcmBlob = createBlob(inputData);
-                            sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
-                        };
-                        source.connect(processor);
-                        processor.connect(inputAudioContext.destination);
-                        workletNodeRef.current = processor;
-                    },
-                    onmessage: async (msg) => {
-                         // Handle Audio Output
-                         if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
-                             const base64 = msg.serverContent.modelTurn.parts[0].inlineData.data;
-                             const currentOutputCtx = outputAudioContextRef.current;
-                             if (currentOutputCtx) {
-                                const audioBuffer = await decodeAudioData(decode(base64), currentOutputCtx, 24000, 1);
-                                const source = currentOutputCtx.createBufferSource();
-                                source.buffer = audioBuffer;
-                                source.connect(currentOutputCtx.destination);
-                                
-                                // Schedule audio to play without gaps
-                                const startTime = Math.max(currentOutputCtx.currentTime, nextAudioStartTimeRef.current);
-                                source.start(startTime);
-                                nextAudioStartTimeRef.current = startTime + audioBuffer.duration;
-                                
-                                setAssistantState('speaking');
-                                setIsModelSpeaking(true);
-                                
-                                source.onended = () => {
-                                    // Simple check: if current time is past the scheduled end time, we are idle.
-                                    if (currentOutputCtx.currentTime >= nextAudioStartTimeRef.current - 0.1) {
-                                        setAssistantState('idle');
-                                        setIsModelSpeaking(false);
-                                    }
-                                };
-                             }
-                         }
-
-                         // Handle Tool Calls
-                         if (msg.toolCall) {
-                             const responses = [];
-                             for (const call of msg.toolCall.functionCalls) {
-                                 // FIX: Typed result to allow error property
-                                 let result: Record<string, any> = { result: 'ok' };
-                                 try {
-                                     if (call.name === 'get_weather') {
-                                         const data = await fetchWeatherSummary(call.args.location, apiKeys.weather);
-                                         setWeatherData(data);
-                                         setActivePanel('weather');
-                                         result = { result: `Displayed weather for ${data.location}` };
-                                     } else if (call.name === 'search_youtube') {
-                                         const video = await searchYouTube(apiKeys.youtube, call.args.query);
-                                         if (video) {
-                                             setYoutubeQueue([video]);
-                                             setYoutubeVideoDetails(video);
-                                             setActivePanel('youtube');
-                                             result = { result: `Playing ${video.title}` };
-                                         } else {
-                                             result = { result: 'No video found' };
-                                         }
-                                     } else if (call.name === 'control_media') {
-                                        const action = call.args.action;
-                                        const amount = call.args.amount || 10;
-                                        let resultText = 'Command executed';
-
-                                        if (playerInstanceRef.current && typeof playerInstanceRef.current.getPlayerState === 'function') {
-                                            if (action === 'play') {
-                                                playerInstanceRef.current.playVideo();
-                                                resultText = 'Resumed video';
-                                            } else if (action === 'pause') {
-                                                playerInstanceRef.current.pauseVideo();
-                                                resultText = 'Paused video';
-                                            } else if (action === 'stop') {
-                                                playerInstanceRef.current.stopVideo();
-                                                resultText = 'Stopped video';
-                                            } else if (action === 'rewind') {
-                                                const currentTime = playerInstanceRef.current.getCurrentTime();
-                                                playerInstanceRef.current.seekTo(Math.max(0, currentTime - amount), true);
-                                                resultText = `Rewound ${amount} seconds`;
-                                            } else if (action === 'forward') {
-                                                const currentTime = playerInstanceRef.current.getCurrentTime();
-                                                playerInstanceRef.current.seekTo(currentTime + amount, true);
-                                                resultText = `Fast-forwarded ${amount} seconds`;
-                                            }
-                                            result = { result: resultText };
-                                        } else {
-                                            result = { error: 'No video is currently playing.' };
-                                        }
-                                     } else if (call.name === 'set_timer') {
-                                         setTimerData({ remaining: call.args.seconds, duration: call.args.seconds });
-                                         setActivePanel('timer');
-                                         result = { result: 'Timer set' };
-                                     }
-                                 } catch (e) {
-                                     result = { error: e.message };
-                                     setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: e.message, isError: true }]);
-                                 }
-                                 responses.push({
-                                     id: call.id,
-                                     name: call.name,
-                                     response: result
-                                 });
-                             }
-                             sessionPromise.then(session => session.sendToolResponse({ functionResponses: responses }));
-                         }
-                    },
-                    onclose: () => {
-                        console.log('Live Session Closed');
-                        disconnect();
-                    },
-                    onerror: (err) => {
-                        console.error("Live API Error", err);
-                        setChatHistory(prev => [...prev, { id: Date.now(), sender: 'model', text: "Connection error.", isError: true }]);
-                        disconnect();
-                    }
-                }
-            });
-            setLiveSession(sessionPromise);
-
-        } catch (e) {
-            console.error("Connection Failed", e);
-            isConnectingRef.current = false;
-            setAssistantState('idle');
-            alert(t('errors.connection'));
-        }
-    };
-
-    return h('div', { 
-            className: "relative flex flex-col h-screen w-screen overflow-hidden font-sans text-white selection:bg-cyan-500/30 selection:text-cyan-100", 
-            style: { backgroundColor: '#000000' } 
-        },
-        h('header', { className: "flex-shrink-0 h-16 flex items-center justify-between px-6 bg-gradient-to-b from-black/80 to-transparent z-20" },
-            h('div', { className: "flex items-center gap-3" },
-                h('h1', { className: "text-2xl font-bold tracking-wider text-cyan-400 glowing-text header-logo" }, "KANISKA")
-            ),
-            h('div', { className: "flex gap-2" },
-                h('button', { 
-                    onClick: () => setIsSettingsOpen(true), 
-                    className: "p-2 rounded-full hover:bg-white/10 transition-colors relative group" 
-                },
-                    h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" })
-                )
-            )
-        ),
-
-        h('main', { className: "flex-grow flex flex-col items-center justify-center relative p-4 z-10" },
-            // Only show Avatar if settings are CLOSED to prevent overlap
-            !isSettingsOpen && h('div', { className: `mb-24 transition-all duration-700 ease-in-out transform ${(activePanel !== 'chat' && activePanel !== 'idle') ? 'scale-75 opacity-0 blur-lg translate-y-[-10%]' : 'scale-100 opacity-100'}` },
-                h(Avatar, { state: isModelSpeaking ? 'speaking' : assistantState, mood: mood, customUrl: avatarUrl })
-            ),
-
-            activePanel === 'chat' && h('div', { className: "absolute bottom-24 left-0 right-0 mx-auto w-full max-w-3xl h-[40vh] flex flex-col justify-end pointer-events-none px-4" },
-                h('div', { className: "chat-container overflow-y-auto space-y-3 pointer-events-auto px-2 pb-2 mask-image-gradient scrollbar-hide" },
-                    chatHistory.map(msg => 
-                        h('div', { key: msg.id, className: `flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} chat-bubble-animation` },
-                            h('div', { className: `max-w-[80%] rounded-2xl backdrop-blur-md border overflow-hidden ${
-                                msg.sender === 'user' 
-                                    ? 'bg-cyan-900/50 border-cyan-500/30 text-cyan-50 rounded-tr-none px-5 py-3' 
-                                    : msg.isError 
-                                        ? 'error-bubble rounded-tl-none px-5 py-3'
-                                        : 'bg-assistant-bubble-bg border-border-color text-text-color rounded-tl-none shadow-lg'
-                            }` },
-                                // Render text content if available
-                                msg.text && h('p', { className: `leading-relaxed whitespace-pre-wrap ${msg.sender !== 'user' && !msg.isError ? 'px-5 py-3' : ''}` }, msg.text),
-                                
-                                // Render image content if available
-                                msg.image && h('div', { className: "relative group" },
-                                    h('img', { src: msg.image, alt: "Generated content", className: "w-full h-auto max-h-[300px] object-cover rounded-b-xl" }),
-                                    h('a', { href: msg.image, download: "generated-image.png", className: "absolute bottom-2 right-2 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity" },
-                                        h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }), h('polyline', { points: "7 10 12 15 17 10" }), h('line', { x1: "12", y1: "15", x2: "12", y2: "3" }))
-                                    )
-                                ),
-
-                                msg.isApiKeyError && msg.keyType && h('button', { 
-                                    onClick: handleSetupClick,
-                                    className: "mt-2 text-xs font-bold uppercase tracking-wide underline decoration-dotted hover:text-white transition-colors flex items-center gap-1 px-5 pb-3"
-                                },
-                                    h(HelpIcon, { className: "w-3 h-3" }), t('chat.setupInstructions') || 'View Setup Instructions'
-                                )
-                            )
-                        )
-                    ),
-                    h('div', { id: "chat-end" })
-                )
-            ),
-            
-            activePanel === 'youtube' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md animate-panel-enter p-6" },
-                h('div', { className: "w-full max-w-4xl bg-panel-bg rounded-xl overflow-hidden border border-border-color shadow-2xl flex flex-col h-[80vh]" },
-                    h('div', { className: "flex items-center justify-between p-4 border-b border-border-color bg-black/20" },
-                        h('h3', { className: "text-lg font-bold flex items-center gap-2" }, h(YouTubeIcon, { className: "w-5 h-5 text-red-500" }), t('youtubePanel.title')),
-                        h('button', { onClick: () => { setActivePanel('chat'); playerInstanceRef.current?.pauseVideo(); }, className: "p-2 hover:bg-white/10 rounded-full" }, h(XIcon, { className: "w-5 h-5" }))
-                    ),
-                    h('div', { className: "flex-1 flex flex-col lg:flex-row" },
-                        h('div', { className: "flex-1 bg-black relative" },
-                            h('div', { id: "youtube-player", className: "absolute inset-0 w-full h-full" },
-                                // Fallback for YouTube embed
-                                youtubeVideoDetails && h('iframe', {
-                                    width: "100%",
-                                    height: "100%",
-                                    src: `https://www.youtube.com/embed/${youtubeVideoDetails.videoId}?autoplay=1`,
-                                    title: youtubeVideoDetails.title,
-                                    frameBorder: "0",
-                                    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
-                                    allowFullScreen: true
-                                })
-                            )
-                        ),
-                        h('div', { className: "w-full lg:w-80 border-l border-border-color bg-panel-bg flex flex-col" },
-                            h('div', { className: "p-4 border-b border-border-color" },
-                                h('h4', { className: "font-bold text-sm uppercase tracking-wider text-gray-500 mb-2" }, t('youtubePanel.upNext')),
-                                h('div', { className: "space-y-2 max-h-60 overflow-y-auto" },
-                                    youtubeQueue.length === 0 ? h('p', { className: "text-sm text-gray-500 italic" }, "Queue is empty.") : youtubeQueue.map((video, i) => 
-                                        h('div', { key: i, className: "youtube-queue-item flex items-center gap-2 cursor-pointer hover:bg-white/5 p-2 rounded" },
-                                            h('div', { className: "w-16 h-9 bg-gray-800 rounded overflow-hidden flex-shrink-0 relative" },
-                                                h('img', { src: `https://img.youtube.com/vi/${video.videoId}/default.jpg`, alt: "", className: "w-full h-full object-cover opacity-70" }),
-                                                h('div', { className: "absolute inset-0 flex items-center justify-center" }, h(PlayIcon, { className: "w-4 h-4 text-white drop-shadow-md" }))
-                                            ),
-                                            h('div', { className: "flex-1 min-w-0" },
-                                                h('p', { className: "text-sm font-medium truncate" }, video.title),
-                                                h('p', { className: "text-xs text-gray-500 truncate" }, video.channelTitle)
-                                            )
-                                        )
-                                    )
-                                )
-                            ),
-                            youtubeVideoDetails && h('div', { className: "p-4 flex-1 overflow-y-auto" },
-                                h('h4', { className: "font-bold text-lg leading-tight mb-1" }, youtubeVideoDetails.title),
-                                h('p', { className: "text-cyan-400 text-sm font-medium mb-4" }, youtubeVideoDetails.channelTitle),
-                                youtubeVideoDetails.viewCount && h('p', { className: "text-xs text-gray-500 flex items-center gap-1" }, h('span', { className: "w-2 h-2 rounded-full bg-red-500 inline-block" }), t('youtubePanel.views', {count: youtubeVideoDetails.viewCount.toLocaleString()}))
-                            )
-                        )
-                    )
-                )
-            ),
-
-            activePanel === 'weather' && weatherData && h('div', { className: "absolute top-1/4 right-8 z-20 animate-panel-enter" },
-                h('div', { className: "glass-panel bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-72 shadow-2xl" },
-                    h('div', { className: "flex justify-between items-start mb-4" },
-                        h('div', null,
-                            h('h2', { className: "text-2xl font-bold" }, weatherData.location.split(',')[0]),
-                            h('p', { className: "text-gray-400 text-sm" }, new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'}))
-                        ),
-                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
-                    ),
-                    h('div', { className: "flex-1 flex-col justify-end" },
-                        h('div', { className: "flex items-center gap-4 mb-6" },
-                            h('div', { className: "text-5xl font-thin" }, `${weatherData.temp}°`),
-                            h('div', { className: "text-right flex-1" },
-                                h(WeatherIcon, { className: "w-8 h-8 text-yellow-400 mb-1 ml-auto weather-icon-glow" }),
-                                h('p', { className: "text-sm font-medium" }, weatherData.conditions)
-                            )
-                        ),
-                        h('p', { className: "text-sm text-gray-300 border-t border-white/10 pt-4 leading-relaxed" }, weatherData.summary)
-                    )
-                )
-            ),
-            
-            activePanel === 'code' && h('div', { className: "absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-lg animate-panel-enter p-8" },
-                h('div', { className: "w-full max-w-6xl h-[85vh] bg-[#0d1117] rounded-xl border border-border-color shadow-2xl flex flex-col code-editor-container" },
-                    h('div', { className: "editor-controls-pane" },
-                        h('div', { className: "flex items-center gap-2 mr-4" },
-                            h(CodeIcon, { className: "w-5 h-5 text-purple-400" }),
-                            h('span', { className: "font-bold text-sm" }, "Code Editor")
-                        ),
-                        h('div', { className: "editor-control-group" },
-                            h('select', { 
-                                value: codeLanguage, 
-                                onChange: (e) => setCodeLanguage(e.target.value),
-                                className: "editor-language-select text-xs uppercase"
-                            },
-                                h('option', { value: "javascript" }, "JavaScript"),
-                                h('option', { value: "html" }, "HTML"),
-                                h('option', { value: "css" }, "CSS"),
-                                h('option', { value: "python" }, "Python")
-                            )
-                        ),
-                        h('div', { className: "flex-1 mx-4" },
-                            h('input', { 
-                                type: "text", 
-                                value: codeInstruction,
-                                onChange: (e) => setCodeInstruction(e.target.value),
-                                onKeyDown: (e) => e.key === 'Enter' && handleCodeCommand(),
-                                placeholder: "Type instructions to edit code (e.g., 'Fix the bug', 'Add a button')...",
-                                className: "w-full bg-black/30 border border-border-color rounded px-3 py-1.5 text-sm text-white focus:border-purple-500 outline-none transition-colors"
-                            })
-                        ),
-                        h('button', { 
-                            onClick: handleCodeCommand,
-                            disabled: isCodeLoading,
-                            className: "bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900 text-white px-3 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-colors"
-                        },
-                            isCodeLoading ? h(SpinnerIcon, { className: "w-4 h-4" }) : h(SendIcon, { className: "w-4 h-4" }),
-                            "Apply"
-                        ),
-                        h('button', { onClick: () => setActivePanel('chat'), className: "ml-2 p-2 hover:bg-white/10 rounded text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
-                    ),
-                    h('div', { className: "editor-main-pane" },
-                        h('div', { className: "editor-pane" },
-                            h(Editor, {
-                                value: code,
-                                onValueChange: setCode,
-                                highlight: code => window['Prism'].highlight(code, window['Prism'].languages[codeLanguage] || window['Prism'].languages.javascript, codeLanguage),
-                                padding: 20,
-                                style: { fontFamily: '"Fira Code", "Fira Mono", monospace', fontSize: 14, backgroundColor: 'transparent', minHeight: '100%' },
-                                textareaClassName: "focus:outline-none"
-                            })
-                        ),
-                        codeLanguage === 'html' && h('div', { className: "preview-pane" },
-                            h('iframe', { srcDoc: code, title: "preview", sandbox: "allow-scripts" })
-                        )
-                    )
-                )
-            )
-        ),
-        
-        h('footer', { className: "absolute bottom-16 z-30 flex items-center justify-center w-full gap-4 pointer-events-auto" },
-             !isConnected ? h('button', {
-                onClick: connect,
-                disabled: isConnectingRef.current,
-                className: `px-8 py-3 rounded-full font-bold transition-all shadow-lg backdrop-blur-md flex items-center gap-3 bg-cyan-500/80 hover:bg-cyan-400/90 text-white shadow-cyan-900/30`
-            },
-                isConnectingRef.current 
-                    ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" })
-                    : h(ConnectIcon, { className: "w-5 h-5" }),
-                isConnectingRef.current ? "Connecting..." : "Start Conversation"
-            ) : h('div', { className: "flex gap-4" },
-                 h('button', {
-                    onClick: disconnect,
-                    className: `px-6 py-3 rounded-full font-bold transition-all shadow-lg backdrop-blur-md flex items-center gap-2 bg-red-500/80 hover:bg-red-600/90 text-white shadow-red-900/20`
-                },
-                    h(DisconnectIcon, { className: "w-5 h-5" }),
-                    t('footer.disconnect')
-                )
-            ),
-             h('button', {
-                onClick: handleRecognizeSong,
-                disabled: isConnected && assistantState !== 'idle', 
-                className: "p-3 rounded-full bg-black/40 border border-white/10 hover:bg-white/10 text-gray-300 hover:text-white transition-all backdrop-blur-md",
-                title: t('footer.recognizeSong')
-            },
-                h(MusicIcon, { className: "w-5 h-5" })
-            )
-        ),
-
-        h(SettingsModal, { 
-            isOpen: isSettingsOpen, 
-            onClose: () => setIsSettingsOpen(false), 
-            activeTab: settingsTab,
-            setActiveTab: setSettingsTab,
-            theme: theme, setTheme: setTheme,
-            gender: gender, setGender: setGender,
-            greetingMessage: greetingMessage, setGreetingMessage: setGreetingMessage,
-            customInstructions: customInstructions, setCustomInstructions: setCustomInstructions,
-            emotionTuning: emotionTuning, setEmotionTuning: setEmotionTuning,
-            apiKeys: apiKeys, setApiKeys: setApiKeys,
-            lang: lang, setLang: setLang,
-            femaleVoices: femaleVoices, setFemaleVoices: setFemaleVoices,
-            maleVoices: maleVoices, setMaleVoices: setMaleVoices,
-            ambientVolume: ambientVolume, setAmbientVolume: setAmbientVolume,
-            avatarUrl: avatarUrl, setAvatarUrl: setAvatarUrl,
-            subscriptionPlan: subscriptionPlan, setSubscriptionPlan: setSubscriptionPlan,
-            dailyUsage: dailyUsage
-        })
     );
 };

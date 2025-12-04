@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -66,6 +66,29 @@ function handleGeminiError(error, context = 'processing your request') {
     }
     // Generic error for other cases (500 errors, etc.)
     return new ServiceError(`I encountered an unexpected issue while ${context}. The service might be temporarily busy. Please try again in a few moments.`);
+}
+
+export const openSettingsTool: FunctionDeclaration = {
+    name: 'openSettings',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Opens the application settings menu. Use this when the user asks to open settings, configure the app, or change preferences.',
+        properties: {},
+    },
+};
+
+export async function connectLiveSession(callbacks) {
+    return await ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        callbacks,
+        config: {
+            responseModalities: [Modality.AUDIO],
+            tools: [{ functionDeclarations: [openSettingsTool] }],
+            systemInstruction: `You are Kaniska, a friendly and helpful AI assistant. 
+            You can engage in natural voice conversations. 
+            If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.`
+        }
+    });
 }
 
 export async function processUserCommand(

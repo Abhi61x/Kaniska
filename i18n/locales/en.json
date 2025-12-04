@@ -50,6 +50,7 @@
   "settings": {
     "title": "Settings",
     "tabs": {
+      "account": "Account",
       "persona": "Persona",
       "voice": "Voice",
       "apiKeys": "API Keys",
@@ -164,6 +165,7 @@
       },
       "subscribeButton": "Subscribe Now",
       "featuresTitle": "All plans include:",
+      "featureFree": "1 hour of usage per day",
       "feature1": "Higher priority access during peak times",
       "feature2": "Access to advanced and experimental voice models",
       "feature3": "Exclusive avatar packs and visual customizations"
@@ -197,6 +199,7 @@
       "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using the browser's built-in text-to-speech.",
       "version": "Version",
       "privacyPolicy": "Privacy Policy",
+      "termsOfService": "Terms of Service",
       "reportBug": "Report Bug"
     },
     "common": {
