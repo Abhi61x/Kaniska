@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -81,6 +82,8 @@ const usePersistentState = (key, defaultValue) => {
 
     return [state, setState];
 };
+
+const PERSONALITY_MODES = ['Default', 'Professional', 'Friendly', 'Candid', 'Efficient', 'Nerdy', 'Cynical', 'Quirky'];
 
 const DEFAULT_FEMALE_GREETING = "Greetings, user. I am Kaniska. Ready to assist.";
 const DEFAULT_MALE_GREETING = "Greetings, user. I am Kanishk. Ready to assist.";
@@ -318,7 +321,9 @@ const SettingsModal = ({
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
     dailyUsage,
-    user, handleLogin, handleLogout
+    user, handleLogin, handleLogout,
+    nickname, setNickname,
+    personalityMode, setPersonalityMode
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -437,6 +442,39 @@ const SettingsModal = ({
                 );
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
+                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('h3', { className: "font-semibold text-lg text-cyan-400 mb-4" }, "Identity & Personality"),
+                        
+                        // Nickname Input
+                        h('div', { className: "mb-4" },
+                            h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "Your Nickname"),
+                            h('input', {
+                                type: "text",
+                                className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 outline-none transition-all placeholder-gray-600",
+                                value: nickname,
+                                onChange: (e) => setNickname(e.target.value),
+                                placeholder: "What should I call you?"
+                            })
+                        ),
+
+                        // Personality Dropdown
+                        h('div', { className: "mb-4" },
+                            h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "Personality Mode"),
+                            h('div', { className: "relative" },
+                                h('select', {
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 outline-none appearance-none cursor-pointer",
+                                    value: personalityMode,
+                                    onChange: (e) => setPersonalityMode(e.target.value)
+                                },
+                                    PERSONALITY_MODES.map(mode => 
+                                        h('option', { key: mode, value: mode }, mode)
+                                    )
+                                ),
+                                h('div', { className: "absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-500" }, "▼")
+                            )
+                        )
+                    ),
+
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, "Custom Instructions"),
@@ -900,6 +938,8 @@ export const App = () => {
     const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
     const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', '');
     const [userBio, setUserBio] = usePersistentState('kaniska-bio', '');
+    const [nickname, setNickname] = usePersistentState('kaniska-nickname', '');
+    const [personalityMode, setPersonalityMode] = usePersistentState('kaniska-personality-mode', 'Default');
     const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion', {
         happiness: 50, empathy: 50, formality: 50, excitement: 50, sadness: 10, curiosity: 50
     });
@@ -950,6 +990,20 @@ export const App = () => {
         } catch (error) {
             console.error("Logout failed", error);
         }
+    };
+
+    const getSystemInstructions = () => {
+        let instructions = FIXED_SYSTEM_INSTRUCTIONS;
+        if (nickname) {
+            instructions += `\n\n**User Profile:**\n- The user's name is "${nickname}". Address them by this name occasionally in a natural way.`;
+        }
+        if (personalityMode && personalityMode !== 'Default') {
+            instructions += `\n\n**Personality Mode:**\n- Adopt a "${personalityMode}" persona. Adjust your vocabulary, tone, and style to match this archetype.`;
+        }
+        instructions += `\n\n**Emotional Adaptation:**\n- You possess high emotional intelligence. Analyze the user's input (text and audio tone) to detect their mood (e.g., happy, sad, excited, frustrated, joking).\n- **Mirror the emotion:** If the user is sad, be empathetic and soft. If they are happy or laughing, be cheerful and laugh along. If they are serious, be professional.\n- Dynamic Response: Your response must reflect this detected emotion in both text and voice tone.`;
+        
+        instructions += `\n\n${customInstructions}\nUser Bio: ${userBio}`;
+        return instructions;
     };
 
     const toggleLive = async () => {
@@ -1047,7 +1101,7 @@ export const App = () => {
                      setIsLive(false);
                      setStatus('error');
                  }
-             });
+             }, getSystemInstructions());
              
              liveSessionRef.current = sessionPromise;
 
@@ -1070,7 +1124,7 @@ export const App = () => {
         try {
             const response = await processUserCommand(
                 newMessages, 
-                `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}\nUser Bio: ${userBio}`,
+                getSystemInstructions(),
                 0.7,
                 emotionTuning
             );
@@ -1197,7 +1251,9 @@ export const App = () => {
             avatarUrl, setAvatarUrl,
             subscriptionPlan, setSubscriptionPlan,
             dailyUsage,
-            user, handleLogin, handleLogout
+            user, handleLogin, handleLogout,
+            nickname, setNickname,
+            personalityMode, setPersonalityMode
         })
     );
 };

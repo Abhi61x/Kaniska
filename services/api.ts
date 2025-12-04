@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
@@ -77,12 +78,16 @@ export const openSettingsTool: FunctionDeclaration = {
     },
 };
 
-export async function connectLiveSession(callbacks) {
-    const systemInstruction = `You are Kaniska, a friendly and helpful female AI assistant. 
-    Your personality is cheerful, polite, and feminine. 
-    Your behavior should always be like a girl's.
-    You can engage in natural voice conversations.
-    If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.`;
+export async function connectLiveSession(callbacks, customSystemInstruction = null) {
+    let systemInstruction = customSystemInstruction;
+    
+    if (!systemInstruction) {
+        systemInstruction = `You are Kaniska, a friendly and helpful female AI assistant. 
+        Your personality is cheerful, polite, and feminine. 
+        Your behavior should always be like a girl's.
+        You can engage in natural voice conversations.
+        If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.`;
+    }
 
     return await ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
