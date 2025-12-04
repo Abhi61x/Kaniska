@@ -937,6 +937,7 @@ export const App = () => {
     // WhatsApp State
     const [whatsappDraft, setWhatsappDraft] = React.useState({ contact: '', message: '' });
     const [isWhatsappConnected, setIsWhatsappConnected] = React.useState(false);
+    const [isSendingWhatsapp, setIsSendingWhatsapp] = React.useState(false);
 
     // Email State
     const [emailDraft, setEmailDraft] = React.useState({ to: '', subject: '', body: '' });
@@ -1126,16 +1127,18 @@ export const App = () => {
     const handleSendWhatsapp = () => {
         if (!whatsappDraft.contact) return;
         
-        const message = whatsappDraft.message || "";
-        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-        
-        // If we had a number, we could use wa.me/NUMBER
-        const isNumber = /^\d+$/.test(whatsappDraft.contact.replace(/[\s+-]/g, ''));
-        const finalUrl = isNumber 
-            ? `https://wa.me/${whatsappDraft.contact.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
-            : `https://wa.me/?text=${encodeURIComponent(message)}`;
-            
-        window.open(finalUrl, '_blank');
+        setIsSendingWhatsapp(true);
+        setTimeout(() => {
+            const message = whatsappDraft.message || "";
+            // If we had a number, we could use wa.me/NUMBER
+            const isNumber = /^\d+$/.test(whatsappDraft.contact.replace(/[\s+-]/g, ''));
+            const finalUrl = isNumber 
+                ? `https://wa.me/${whatsappDraft.contact.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`
+                : `https://wa.me/?text=${encodeURIComponent(message)}`;
+                
+            window.open(finalUrl, '_blank');
+            setIsSendingWhatsapp(false);
+        }, 1500);
     };
 
     const handleSendEmail = () => {
@@ -1619,7 +1622,13 @@ export const App = () => {
                             h(WhatsAppIcon, { className: "w-8 h-8 text-green-500 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" }),
                             h('span', { className: "font-bold text-lg rgb-text-glow tracking-widest" }, "WHATSAPP")
                         ),
-                        h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
+                        h('div', { className: "flex items-center gap-2"},
+                            isWhatsappConnected && h('button', {
+                                onClick: () => setIsWhatsappConnected(false),
+                                className: "text-xs text-red-400 hover:text-red-300 font-bold uppercase tracking-wider px-2 py-1"
+                            }, "Disconnect"),
+                            h('button', { onClick: () => setActivePanel('chat'), className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
+                        )
                     ),
                     
                     !isWhatsappConnected ? h('div', { className: "flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6" },
@@ -1640,7 +1649,7 @@ export const App = () => {
                                 value: whatsappDraft.contact,
                                 onChange: (e) => setWhatsappDraft(prev => ({...prev, contact: e.target.value})),
                                 placeholder: "Name or Number...",
-                                className: "w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none transition-colors"
+                                className: "w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 focus:shadow-[0_0_15px_rgba(34,197,94,0.3)] outline-none transition-all"
                             })
                         ),
                         h('div', { className: "flex-1 mb-6" },
@@ -1649,16 +1658,16 @@ export const App = () => {
                                 value: whatsappDraft.message,
                                 onChange: (e) => setWhatsappDraft(prev => ({...prev, message: e.target.value})),
                                 placeholder: "Type your message here...",
-                                className: "w-full h-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none transition-colors resize-none"
+                                className: "w-full h-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 focus:shadow-[0_0_15px_rgba(34,197,94,0.3)] outline-none transition-all resize-none"
                             })
                         ),
                         h('button', { 
                             onClick: handleSendWhatsapp,
-                            disabled: !whatsappDraft.contact,
+                            disabled: !whatsappDraft.contact || isSendingWhatsapp,
                             className: "w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.4)] flex items-center justify-center gap-2" 
                         }, 
-                            h(SendIcon, { className: "w-5 h-5" }),
-                            "Send via WhatsApp"
+                            isSendingWhatsapp ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : h(SendIcon, { className: "w-5 h-5" }),
+                            isSendingWhatsapp ? "Opening WhatsApp..." : "Send via WhatsApp"
                         )
                     )
                 )
