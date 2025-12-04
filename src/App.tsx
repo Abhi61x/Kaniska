@@ -1,7 +1,3 @@
-
-
-
-
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -13,6 +9,9 @@ import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
 import { useTranslation, availableLanguages } from './i18n/index';
+import { auth, db, googleProvider } from './firebase';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
@@ -53,6 +52,8 @@ const SpaciousIcon = ({ className }) => h('svg', { className, viewBox: "0 0 24 2
         h('path', { d: "M9.107 5.448c.598-1.75 3.016-1.803 3.725-.159l.06.16l.807 2.36a4 4 0 0 0 2.276 2.411l.217.081l2.36.806c1.75.598 1.803 3.016.16 3.725l-.16.06l-2.36.807a4 4 0 0 0-2.412 2.276l-.081.216l-.806 2.361c-.598 1.75-3.016 1.803-3.724.16l-.062-.16l-.806-2.36a4 4 0 0 0-2.276-2.412l-.216-.081l-2.36-.806c-1.751-.598-1.804-3.016-.16-3.724l.16-.062l2.36-.806A4 4 0 0 0 8.22 8.025l.081-.216zM11 6.094l-.806 2.36a6 6 0 0 1-3.49 3.649l-.25.091l-2.36.806l2.36.806a6 6 0 0 1 3.649 3.49l.091.25l.806 2.36l.806-2.36a6 6 0 0 1 3.49-3.649l.25-.09l2.36-.807l-2.36-.806a6 6 0 0 1-3.649-3.49l-.09-.25M19 2a1 1 0 0 1 .898.56l.048.117l.35 1.026l1.027.35a1 1 0 0 1 .118 1.845l-.118.048l-1.026.35l-.35 1.027a1 1 0 0 1-1.845.117l-.048-.117l-.35-1.026l-1.027-.35a1 1 0 0 1-.118-1.845l.118-.048l1.026-.35l.35-1.027A1 1 0 0 1 19 2", fill: "currentColor" })
     )
 );
+const AccountIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }), h('circle', { cx: "8.5", cy: "7", r: "4" }), h('line', { x1: "20", y1: "8", x2: "20", y2: "14" }), h('line', { x1: "23", y1: "11", x2: "17", y2: "11" }));
+const GoogleIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "24", height: "24" }, h('path', { fill: "#4285F4", d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" }), h('path', { fill: "#34A853", d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" }), h('path', { fill: "#FBBC05", d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" }), h('path', { fill: "#EA4335", d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" }));
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -355,7 +356,8 @@ const SettingsModal = ({
     ambientVolume, setAmbientVolume,
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
-    dailyUsage
+    dailyUsage,
+    user, handleLogin, handleLogout
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -394,10 +396,10 @@ const SettingsModal = ({
         if (!amount) return;
 
         try {
-            // Since firebase auth is removed, we default to guest details
-            const customerId = `guest_${Date.now()}`;
+            // Use authenticated user details if available, else guest
+            const customerId = user ? `user_${user.uid}` : `guest_${Date.now()}`;
             const customerPhone = "9999999999"; 
-            const customerEmail = "guest@example.com";
+            const customerEmail = user ? user.email : "guest@example.com";
 
             const paymentSessionId = await createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail);
             
@@ -446,6 +448,41 @@ const SettingsModal = ({
 
     const renderTabContent = () => {
         switch (activeTab) {
+            case 'account':
+                return h('div', { className: "space-y-6 animate-fade-in" },
+                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 text-center" },
+                        user ? h('div', null,
+                            h('div', { className: "w-20 h-20 bg-gray-700 rounded-full mx-auto mb-4 overflow-hidden border-2 border-cyan-500" },
+                                user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full flex items-center justify-center text-2xl font-bold" }, user.displayName?.[0] || "U")
+                            ),
+                            h('h3', { className: "text-xl font-bold text-white mb-1" }, user.displayName || "User"),
+                            h('p', { className: "text-sm text-gray-400 mb-6" }, user.email),
+                            
+                            h('div', { className: "bg-green-500/10 border border-green-500/30 p-3 rounded-lg mb-6 max-w-xs mx-auto flex items-center justify-center gap-2" },
+                                h(CheckCircleIcon, { className: "w-4 h-4 text-green-400" }),
+                                h('span', { className: "text-sm text-green-300 font-medium" }, "Settings Auto-Sync Active")
+                            ),
+
+                            h('button', {
+                                onClick: handleLogout,
+                                className: "px-6 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 rounded-lg transition-all font-medium"
+                            }, "Sign Out")
+                        ) : h('div', null,
+                             h('div', { className: "w-16 h-16 bg-gray-800 rounded-full mx-auto mb-4 flex items-center justify-center text-gray-400" },
+                                h(UserIcon, { className: "w-8 h-8" })
+                            ),
+                            h('h3', { className: "text-lg font-bold text-white mb-2" }, "Sign In to Sync"),
+                            h('p', { className: "text-sm text-gray-400 mb-6 max-w-sm mx-auto" }, "Sign in with Google to save your persona, API keys, and preferences to the cloud and access them from any device."),
+                            h('button', {
+                                onClick: handleLogin,
+                                className: "px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg transition-all font-bold flex items-center justify-center gap-3 mx-auto shadow-lg"
+                            },
+                                h(GoogleIcon, { className: "w-5 h-5" }),
+                                "Sign in with Google"
+                            )
+                        )
+                     )
+                );
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
@@ -821,6 +858,7 @@ const SettingsModal = ({
                 ),
                 h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
                     [
+                        { id: 'account', icon: AccountIcon, label: 'Account' },
                         { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
                         { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
                         { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
@@ -911,7 +949,73 @@ export const App = () => {
     
     const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
     const [settingsTab, setSettingsTab] = usePersistentState('kaniska-settings-tab', 'persona');
-    // REMOVED: User state (Firebase Auth)
+    
+    // --- AUTH & SYNC STATE ---
+    const [user, setUser] = React.useState(null);
+
+    React.useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setUser(currentUser);
+            if (currentUser) {
+                // Fetch user data from Firestore on login
+                try {
+                    const docSnap = await getDoc(doc(db, "users", currentUser.uid));
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        if (data.theme) setTheme(data.theme);
+                        if (data.gender) setGender(data.gender);
+                        if (data.greetingMessage) setGreetingMessage(data.greetingMessage);
+                        if (data.customInstructions) setCustomInstructions(data.customInstructions);
+                        if (data.emotionTuning) setEmotionTuning(data.emotionTuning);
+                        if (data.apiKeys) setApiKeys(data.apiKeys);
+                        if (data.femaleVoices) setFemaleVoices(data.femaleVoices);
+                        if (data.maleVoices) setMaleVoices(data.maleVoices);
+                        if (data.ambientVolume !== undefined) setAmbientVolume(data.ambientVolume);
+                        if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+                        if (data.subscriptionPlan) setSubscriptionPlan(data.subscriptionPlan);
+                    }
+                } catch (e) {
+                    console.error("Error fetching user data:", e);
+                }
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Auto-Save Effect
+    React.useEffect(() => {
+        if (!user) return;
+        const saveData = setTimeout(async () => {
+            try {
+                await setDoc(doc(db, "users", user.uid), {
+                    theme, gender, greetingMessage, customInstructions, emotionTuning,
+                    apiKeys, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan,
+                    lastUpdated: new Date()
+                }, { merge: true });
+            } catch (e) {
+                console.error("Error saving user data:", e);
+            }
+        }, 2000); // 2 second debounce
+
+        return () => clearTimeout(saveData);
+    }, [user, theme, gender, greetingMessage, customInstructions, emotionTuning, apiKeys, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan]);
+
+    const handleLogin = async () => {
+        try {
+            await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+            console.error("Login failed", error);
+            alert("Login failed: " + error.message);
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Logout failed", error);
+        }
+    };
 
     // --- MAIN APP STATE ---
     const [activePanel, setActivePanel] = React.useState('chat');
@@ -1949,7 +2053,10 @@ export const App = () => {
             ambientVolume: ambientVolume, setAmbientVolume: setAmbientVolume,
             avatarUrl: avatarUrl, setAvatarUrl: setAvatarUrl,
             subscriptionPlan: subscriptionPlan, setSubscriptionPlan: setSubscriptionPlan,
-            dailyUsage: dailyUsage
+            dailyUsage: dailyUsage,
+            user: user,
+            handleLogin: handleLogin,
+            handleLogout: handleLogout
         })
     );
 };
