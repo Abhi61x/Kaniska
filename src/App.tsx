@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -8,9 +7,9 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
-import { useTranslation, availableLanguages } from './i18n/index';
-import { auth, db, googleProvider } from './firebase';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
+import { useTranslation, availableLanguages } from './i18n/index.tsx';
+import { auth, db, googleProvider } from './firebase.ts';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -1688,7 +1687,26 @@ export const App = () => {
             h('div', { className: "flex items-center gap-3" },
                 h('h1', { className: "text-2xl font-bold tracking-wider text-cyan-400 glowing-text header-logo" }, "KANISKA")
             ),
-            h('div', { className: "flex gap-2" },
+            h('div', { className: "flex items-center gap-4" },
+                 // Login / User Button
+                 user 
+                    ? h('button', { 
+                        onClick: () => { setSettingsTab('account'); setIsSettingsOpen(true); },
+                        className: "flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-800/80 hover:bg-gray-700 transition-colors border border-gray-700 hover:border-cyan-500/50"
+                    },
+                        h('div', { className: "w-6 h-6 rounded-full overflow-hidden border border-cyan-500" },
+                             user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full bg-cyan-900 text-xs flex items-center justify-center" }, user.displayName?.[0])
+                        ),
+                        h('span', { className: "text-sm font-medium hidden sm:block" }, user.displayName?.split(' ')[0])
+                    )
+                    : h('button', {
+                        onClick: () => { setSettingsTab('account'); setIsSettingsOpen(true); },
+                        className: "px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-semibold transition-colors flex items-center gap-2"
+                    }, 
+                        h(UserIcon, { className: "w-4 h-4" }),
+                        "Sign In"
+                    ),
+
                 h('button', { 
                     onClick: () => setIsSettingsOpen(true), 
                     className: "p-2 rounded-full hover:bg-white/10 transition-colors relative group" 
