@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -348,6 +349,7 @@ const SettingsModal = ({
     theme, setTheme, gender, setGender, 
     greetingMessage, setGreetingMessage, 
     customInstructions, setCustomInstructions, 
+    userBio, setUserBio,
     emotionTuning, setEmotionTuning, 
     apiKeys, setApiKeys, 
     lang, setLang, 
@@ -486,6 +488,35 @@ const SettingsModal = ({
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('div', { className: "mb-6" },
+                            h('h3', { className: "font-semibold text-lg text-cyan-400" }, "Custom Instructions"),
+                            h('p', { className: "text-xs text-gray-500" }, "Personalize how the assistant interacts with you.")
+                        ),
+                        
+                        h('div', { className: "space-y-5" },
+                            h('div', null,
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "What would you like Kaniska to know about you to provide better responses?"),
+                                h('textarea', {
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm leading-relaxed",
+                                    rows: 3,
+                                    value: userBio,
+                                    onChange: (e) => setUserBio(e.target.value),
+                                    placeholder: "E.g., I'm a software developer based in Bangalore. I like concise answers..."
+                                })
+                            ),
+                             h('div', null,
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "How would you like Kaniska to respond?"),
+                                h('textarea', {
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm leading-relaxed",
+                                    rows: 3,
+                                    value: customInstructions,
+                                    onChange: (e) => setCustomInstructions(e.target.value),
+                                    placeholder: "E.g., Be formal, use technical terms, keep it short..."
+                                })
+                            )
+                        )
+                    ),
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.avatar.title') || "Avatar Customization"),
                         h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.avatar.description') || "Enter a URL for your custom avatar."),
                         h('div', { className: "flex items-center gap-4" },
@@ -542,18 +573,6 @@ const SettingsModal = ({
                             rows: 2,
                             value: greetingMessage,
                             onChange: (e) => setGreetingMessage(e.target.value)
-                        })
-                    ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
-                        h('div', { className: "mb-3" },
-                            h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.systemPrompt.title') || "Custom Instructions"),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.systemPrompt.description'))
-                        ),
-                        h('textarea', {
-                            className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm font-mono leading-relaxed",
-                            rows: 4,
-                            value: customInstructions,
-                            onChange: (e) => setCustomInstructions(e.target.value)
                         })
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
@@ -934,7 +953,11 @@ export const App = () => {
         'kaniska-greeting',
         DEFAULT_FEMALE_GREETING
     );
-    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-custom-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
+    // Renamed state to match the second input box
+    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-custom-instructions', '');
+    // New state for User Bio
+    const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
+
     const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion-tuning', {
         happiness: 50, empathy: 70, formality: 30, excitement: 50, sadness: 20, curiosity: 60
     });
@@ -966,6 +989,7 @@ export const App = () => {
                         if (data.gender) setGender(data.gender);
                         if (data.greetingMessage) setGreetingMessage(data.greetingMessage);
                         if (data.customInstructions) setCustomInstructions(data.customInstructions);
+                        if (data.userBio) setUserBio(data.userBio); // Sync User Bio
                         if (data.emotionTuning) setEmotionTuning(data.emotionTuning);
                         if (data.apiKeys) setApiKeys(data.apiKeys);
                         if (data.femaleVoices) setFemaleVoices(data.femaleVoices);
@@ -988,7 +1012,7 @@ export const App = () => {
         const saveData = setTimeout(async () => {
             try {
                 await setDoc(doc(db, "users", user.uid), {
-                    theme, gender, greetingMessage, customInstructions, emotionTuning,
+                    theme, gender, greetingMessage, customInstructions, userBio, emotionTuning,
                     apiKeys, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan,
                     lastUpdated: new Date()
                 }, { merge: true });
@@ -998,7 +1022,7 @@ export const App = () => {
         }, 2000); // 2 second debounce
 
         return () => clearTimeout(saveData);
-    }, [user, theme, gender, greetingMessage, customInstructions, emotionTuning, apiKeys, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan]);
+    }, [user, theme, gender, greetingMessage, customInstructions, userBio, emotionTuning, apiKeys, femaleVoices, maleVoices, ambientVolume, avatarUrl, subscriptionPlan]);
 
     const handleLogin = async () => {
         try {
@@ -1459,7 +1483,7 @@ export const App = () => {
                 model: 'gemini-2.0-flash-exp',
                 config: {
                     tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool, generateImageTool, randomFactTool] }],
-                    systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
+                    systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n\nUSER BIO:\n${userBio}\n\nRESPONSE PREFERENCES:\n${customInstructions}`,
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {
                          voiceConfig: { prebuiltVoiceConfig: { voiceName: (gender === 'female' ? femaleVoices.main : maleVoices.main) } }
@@ -2045,6 +2069,7 @@ export const App = () => {
             gender: gender, setGender: setGender,
             greetingMessage: greetingMessage, setGreetingMessage: setGreetingMessage,
             customInstructions: customInstructions, setCustomInstructions: setCustomInstructions,
+            userBio: userBio, setUserBio: setUserBio,
             emotionTuning: emotionTuning, setEmotionTuning: setEmotionTuning,
             apiKeys: apiKeys, setApiKeys: setApiKeys,
             lang: lang, setLang: setLang,
