@@ -7,7 +7,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api.ts';
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 
 // Helper for React.createElement to keep code readable
@@ -757,7 +757,7 @@ const SettingsModal = ({
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
-                                    subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
+                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
                                 h('div', { className: "flex items-baseline gap-1" },
                                     h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
@@ -1275,13 +1275,13 @@ export const App = () => {
             };
             const sendWhatsappTool: FunctionDeclaration = {
                 name: 'send_whatsapp',
-                description: 'Draft and send a WhatsApp message to a contact.',
+                description: 'Draft and send a WhatsApp message. Ask for the contact number if not provided, as it is more reliable than a name.',
                 parameters: {
                     type: Type.OBJECT,
                     properties: {
                         contactName: { 
                             type: Type.STRING,
-                            description: 'The name or number of the contact.'
+                            description: 'The name or phone number of the contact.'
                         },
                         message: { 
                             type: Type.STRING,
@@ -1302,13 +1302,13 @@ export const App = () => {
             };
             const sendEmailTool: FunctionDeclaration = {
                 name: 'send_email',
-                description: 'Drafts an email with the provided recipient, subject, and body. Do not call this unless you have all three pieces of information.',
+                description: 'Drafts an email. Requires recipient address, subject, and body. Ask for any missing fields before calling.',
                 parameters: {
                     type: Type.OBJECT,
                     properties: {
                         recipient: { 
                             type: Type.STRING,
-                            description: 'The email address of the recipient (e.g. user@example.com). Must be a valid email format.'
+                            description: 'The email address of the recipient (e.g. user@example.com).'
                         },
                         subject: { 
                             type: Type.STRING,
@@ -1476,7 +1476,8 @@ export const App = () => {
                                             if (win) {
                                                 result = { result: `Opened WhatsApp with drafted message to ${call.args.contactName}` };
                                             } else {
-                                                result = { result: `Drafted message to ${call.args.contactName}. Pop-up blocked, asking user to confirm.` };
+                                                // Inform model so it can tell user about popup blocker
+                                                result = { result: `Drafted message to ${call.args.contactName}. Pop-up was blocked. Please ask the user to click the 'Send via WhatsApp' button.` };
                                             }
                                          } catch(e) {
                                             result = { result: `Drafted message to ${call.args.contactName}` };
@@ -1490,7 +1491,7 @@ export const App = () => {
                                      } else if (call.name === 'send_email') {
                                          setEmailDraft({ to: call.args.recipient, subject: call.args.subject, body: call.args.body });
                                          setActivePanel('email');
-                                         result = { result: `Drafted email to ${call.args.recipient}` };
+                                         result = { result: `Drafted email to ${call.args.recipient}. Please ask the user to confirm sending.` };
                                      } else if (call.name === 'generate_image') {
                                          try {
                                             const imageUrl = await generateImage(call.args.prompt);
