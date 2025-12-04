@@ -1,6 +1,7 @@
 
 
 
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -93,6 +94,7 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 7.  **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
 8.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
 9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
+10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -1339,11 +1341,20 @@ export const App = () => {
                     required: ['prompt']
                 }
             };
+            const randomFactTool: FunctionDeclaration = {
+                name: 'random_fact',
+                description: 'Get a random interesting fact.',
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {},
+                    required: []
+                }
+            };
 
             const sessionPromise = ai.live.connect({
                 model: 'gemini-2.0-flash-exp',
                 config: {
-                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool, generateImageTool] }],
+                    tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool, generateImageTool, randomFactTool] }],
                     systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
                     responseModalities: [Modality.AUDIO],
                     speechConfig: {
@@ -1503,6 +1514,9 @@ export const App = () => {
                                          } catch (imgError) {
                                              result = { error: imgError.message };
                                          }
+                                     } else if (call.name === 'random_fact') {
+                                         const fact = RANDOM_FACTS[Math.floor(Math.random() * RANDOM_FACTS.length)];
+                                         result = { result: fact };
                                      }
                                  } catch (e) {
                                      result = { error: e.message };
