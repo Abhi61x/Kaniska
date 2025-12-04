@@ -1,3 +1,6 @@
+
+
+
 import React from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -8,7 +11,7 @@ import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder } from './services/api';
-import { useTranslation, availableLanguages } from './i18n/index.tsx';
+import { useTranslation, availableLanguages } from './i18n/index';
 
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
@@ -757,7 +760,7 @@ const SettingsModal = ({
                             },
                                 h('div', { className: "flex justify-between items-start mb-2" },
                                     h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
-                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
+                                    subscriptionPlan === planId && h('span', { className: "text-[10px] font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
                                 ),
                                 h('div', { className: "flex items-baseline gap-1" },
                                     h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
@@ -1338,7 +1341,7 @@ export const App = () => {
             };
 
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.0-flash-exp',
                 config: {
                     tools: [{ functionDeclarations: [getWeatherTool, searchYoutubeTool, controlMediaTool, setTimerTool, sendWhatsappTool, openWhatsappTool, sendEmailTool, generateImageTool] }],
                     systemInstruction: `${FIXED_SYSTEM_INSTRUCTIONS}\n${customInstructions}`,
