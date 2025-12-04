@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -540,7 +542,15 @@ const SettingsModal = ({
                                 ['female', 'male'].map((g) => 
                                     h('button', {
                                         key: g,
-                                        onClick: () => setGender(g),
+                                        onClick: () => {
+                                            setGender(g);
+                                            // Auto-update greeting if it's currently on the default for the other gender
+                                            if (g === 'male' && greetingMessage === DEFAULT_FEMALE_GREETING) {
+                                                setGreetingMessage(DEFAULT_MALE_GREETING);
+                                            } else if (g === 'female' && greetingMessage === DEFAULT_MALE_GREETING) {
+                                                setGreetingMessage(DEFAULT_FEMALE_GREETING);
+                                            }
+                                        },
                                         className: `flex-1 py-2 rounded-md text-sm font-medium transition-all ${gender === g ? 'bg-pink-600/80 text-white shadow' : 'text-gray-400 hover:text-white'}`
                                     }, t(`settings.personaTab.gender.${g}`))
                                 )
@@ -1025,6 +1035,9 @@ export const App = () => {
         return instructions;
     };
 
+    // Calculate dynamic voice based on gender
+    const currentVoiceName = gender === 'female' ? femaleVoices.main : maleVoices.main;
+
     const toggleLive = async () => {
         if (isLive) {
             if (audioContextRef.current) audioContextRef.current.close();
@@ -1048,6 +1061,7 @@ export const App = () => {
 
              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
              
+             // Pass currentVoiceName to the session connection
              const sessionPromise = connectLiveSession({
                  onopen: () => {
                      console.log("Live session connected");
@@ -1120,7 +1134,7 @@ export const App = () => {
                      setIsLive(false);
                      setStatus('error');
                  }
-             }, getSystemInstructions());
+             }, getSystemInstructions(), currentVoiceName);
              
              liveSessionRef.current = sessionPromise;
 

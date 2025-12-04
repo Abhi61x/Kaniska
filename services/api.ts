@@ -78,7 +78,7 @@ export const openSettingsTool: FunctionDeclaration = {
     },
 };
 
-export async function connectLiveSession(callbacks, customSystemInstruction = null) {
+export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore') {
     let systemInstruction = customSystemInstruction;
     
     if (!systemInstruction) {
@@ -97,7 +97,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
             tools: [{ functionDeclarations: [openSettingsTool] }],
             systemInstruction: systemInstruction,
             speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
             },
         }
     });
