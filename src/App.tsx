@@ -360,6 +360,11 @@ const SettingsModal = ({
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
     const [previewingVoice, setPreviewingVoice] = React.useState(null);
 
+    // Support Chat State
+    const [supportInput, setSupportInput] = React.useState('');
+    const [supportMessages, setSupportMessages] = React.useState<{sender: string, text: string}[]>([]);
+    const [isSupportLoading, setIsSupportLoading] = React.useState(false);
+
     React.useEffect(() => {
         if (isOpen) setIsMobileMenuOpen(true);
     }, [isOpen]);
@@ -440,6 +445,24 @@ const SettingsModal = ({
         } catch (e) {
             console.error("Preview failed", e);
             setPreviewingVoice(null);
+        }
+    };
+
+    const handleSupportSend = async () => {
+        if (!supportInput.trim()) return;
+        const userMsg = { sender: 'user', text: supportInput };
+        const newHistory = [...supportMessages, userMsg];
+        setSupportMessages(newHistory);
+        setSupportInput('');
+        setIsSupportLoading(true);
+
+        try {
+            const responseText = await getSupportResponse(newHistory);
+            setSupportMessages(prev => [...prev, { sender: 'model', text: responseText }]);
+        } catch (e) {
+            setSupportMessages(prev => [...prev, { sender: 'system', text: "Error connecting to support. Please check your internet." }]);
+        } finally {
+            setIsSupportLoading(false);
         }
     };
 
@@ -704,6 +727,36 @@ const SettingsModal = ({
             case 'help':
                  return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
+                        h('h3', { className: "font-semibold text-lg mb-4 text-cyan-400" }, t('settings.helpTab.aiChat.title')),
+                        h('div', { className: "bg-black/40 rounded-lg p-4 h-48 overflow-y-auto mb-4 border border-gray-700/50 custom-scrollbar space-y-3" },
+                            supportMessages.length === 0 && h('p', { className: "text-gray-500 text-sm text-center mt-12" }, "Ask me anything about Kaniska..."),
+                            supportMessages.map((msg, idx) => 
+                                h('div', { key: idx, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}` },
+                                    h('div', { className: `px-3 py-2 rounded-lg text-sm max-w-[85%] ${msg.sender === 'user' ? 'bg-cyan-900/30 text-cyan-100 border border-cyan-500/30' : 'bg-gray-800 text-gray-300 border border-gray-700'}` }, msg.text)
+                                )
+                            ),
+                            isSupportLoading && h('div', { className: "flex justify-start" },
+                                h('div', { className: "px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" }, h(SpinnerIcon, { className: "w-4 h-4 animate-spin text-gray-500" }))
+                            )
+                        ),
+                        h('div', { className: "flex gap-2" },
+                            h('input', {
+                                type: "text",
+                                value: supportInput,
+                                onChange: (e) => setSupportInput(e.target.value),
+                                onKeyDown: (e) => e.key === 'Enter' && handleSupportSend(),
+                                placeholder: t('settings.helpTab.aiChat.placeholder'),
+                                className: "flex-1 bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+                            }),
+                            h('button', {
+                                onClick: handleSupportSend,
+                                disabled: !supportInput.trim() || isSupportLoading,
+                                className: "bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                            }, h(SendIcon, { className: "w-4 h-4" }))
+                        ),
+                        h('p', { className: "text-xs text-gray-500 mt-2" }, t('settings.helpTab.aiChat.description'))
+                    ),
+                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
                         h('div', { className: "space-y-4" },
                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
@@ -718,7 +771,7 @@ const SettingsModal = ({
                                 )
                             ),
                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
-                                h('details', { className: "group bg-black/40", open: true },
+                                h('details', { className: "group bg-black/40" },
                                     h('summary', { className: "cursor-pointer p-4 text-sm font-medium text-white flex items-center justify-between hover:bg-white/5 transition-colors" },
                                         h('span', { className: "flex items-center gap-3" }, h(ApiKeysIcon, { className: "w-4 h-4 text-cyan-400" }), t('settings.helpTab.q2')),
                                         h('span', { className: "text-gray-500 group-open:rotate-180 transition-transform" }, "▼")
@@ -1082,6 +1135,14 @@ export const App = () => {
     };
 
     const startLive = async () => {
+        // Enforce Subscription Limit for Live Mode
+        if (subscriptionPlan === 'free' && dailyUsage.seconds > 3600) {
+             setMessages(prev => [...prev, { sender: 'system', text: t('settings.errors.dailyLimit') }]);
+             setIsSettingsOpen(true);
+             setActiveTab('subscription');
+             return;
+        }
+
         setStatus('listening');
         setIsLive(true);
         
@@ -1097,7 +1158,6 @@ export const App = () => {
              try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
              } catch (micError) {
-                 // Map specific mic errors
                  if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
                      throw new Error('mic_permission_denied');
                  } else if (micError.name === 'NotFoundError' || micError.name === 'DevicesNotFoundError') {
@@ -1216,7 +1276,6 @@ export const App = () => {
                                     }
                                 } catch (err) {
                                     console.error("YouTube search error", err);
-                                    // Optionally handle error response back to model
                                      sessionPromise.then(session => {
                                             session.sendToolResponse({
                                                 functionResponses: [
@@ -1258,7 +1317,6 @@ export const App = () => {
              }, getSystemInstructions(), currentVoiceName);
              
              liveSessionRef.current = sessionPromise;
-             // Ensure connection is established (re-throws if connection fails immediately)
              await sessionPromise;
 
         } catch (e) {
@@ -1296,12 +1354,27 @@ export const App = () => {
 
     const handleSendMessage = async () => {
         if (!inputText.trim()) return;
+
+        // Enforce Subscription Limit for Chat
+        if (subscriptionPlan === 'free' && dailyUsage.seconds > 3600) {
+            setMessages(prev => [...prev, { sender: 'system', text: t('settings.errors.dailyLimit') }]);
+            setIsSettingsOpen(true);
+            setActiveTab('subscription');
+            return;
+        }
+
         const text = inputText;
         setInputText('');
         
         const newMessages = [...messages, { sender: 'user', text }];
         setMessages(newMessages);
         setStatus('thinking');
+
+        // Increment Usage (Simulated: 5 seconds per interaction)
+        setDailyUsage(prev => ({
+            ...prev,
+            seconds: prev.seconds + 5
+        }));
 
         try {
             const response = await processUserCommand(
@@ -1311,12 +1384,10 @@ export const App = () => {
                 emotionTuning
             );
 
-            // Handle Timer if present
             if (response.timerDurationSeconds > 0) {
                 handleTimer(response.timerDurationSeconds);
             }
 
-            // Handle YouTube Query if present
             if (response.youtubeQuery) {
                 try {
                     const videoResult = await searchYouTube(apiKeys.youtube, response.youtubeQuery);
@@ -1338,6 +1409,8 @@ export const App = () => {
             const stream = await generateSpeech(response.reply, currentVoiceName);
             
             const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
+            // If the user sends another message, previous audio should probably stop?
+            // For now, let's just overlap or standard behavior.
             let nextTime = audioCtx.currentTime;
             
             for await (const chunk of stream) {
@@ -1381,7 +1454,7 @@ export const App = () => {
         ),
 
         // Main Content
-        h('main', { className: "flex-1 flex flex-col items-center justify-start pt-12 md:justify-center md:pt-0 relative" },
+        h('main', { className: "flex-1 flex flex-col items-center justify-start pt-4 md:pt-0 md:justify-center relative" },
             h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
                // Optional background effects
             ),
@@ -1396,10 +1469,10 @@ export const App = () => {
                 t(`main.status.${status}`) || status
             ),
 
-            // Chat Overlay (Simplified for visual clarity)
-            h('div', { className: "absolute bottom-60 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
+            // Chat Overlay (Optimized for Mobile)
+            h('div', { className: "absolute bottom-36 md:bottom-28 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
                 messages.slice(-3).map((msg, i) => 
-                    h('div', { key: i, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}` },
+                    h('div', { key: i, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in` },
                         h('div', { className: `px-4 py-2 rounded-2xl max-w-[80%] backdrop-blur-md border ${msg.sender === 'user' ? 'bg-cyan-900/30 border-cyan-500/30 text-white' : 'bg-gray-900/50 border-gray-700/50 text-gray-200'}` },
                             msg.text
                         )
@@ -1408,8 +1481,8 @@ export const App = () => {
             )
         ),
 
-        // Footer Controls
-        h('footer', { className: "p-4 pb-48 md:pb-4 z-20 w-full max-w-3xl mx-auto" },
+        // Footer Controls (Moved up on mobile to clear system nav)
+        h('footer', { className: "p-4 pb-32 md:pb-4 z-20 w-full max-w-3xl mx-auto" },
             h('div', { className: "flex gap-2 bg-gray-900/80 backdrop-blur-xl p-2 rounded-full border border-gray-700 shadow-2xl" },
                  // Live Mic Button
                 h('button', {

@@ -53,8 +53,8 @@
       .error-bubble { background-color: rgba(127, 29, 29, 0.5); color: #fecaca; border: 1px solid rgba(239, 68, 68, 0.3); }
 
       /* Custom Animations */
-      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-      .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+      @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
       
       /* Smooth Panel Entry */
       @keyframes panel-slide-up {
@@ -99,6 +99,17 @@
         transition: all 0.3s ease;
         filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 10px rgba(var(--avatar-rgb), 0.3));
         opacity: 0.9;
+      }
+      
+      /* Idle Breathing Animation */
+      @keyframes breathe {
+        0% { transform: scale(1); filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 10px rgba(var(--avatar-rgb), 0.3)); }
+        50% { transform: scale(1.02); filter: contrast(1.2) brightness(1.2) drop-shadow(0 0 15px rgba(var(--avatar-rgb), 0.45)); }
+        100% { transform: scale(1); filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 10px rgba(var(--avatar-rgb), 0.3)); }
+      }
+      
+      .avatar-state-idle .avatar-image {
+        animation: breathe 4s ease-in-out infinite;
       }
       
       /* Holographic Overlay Effects */
