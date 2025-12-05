@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -915,7 +913,7 @@ const SettingsModal = ({
                         )
                     )
                 );
-             case 'about':
+            case 'about':
                 return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in py-10" },
                     h('div', { className: "bg-black/20 p-8 rounded-2xl border border-gray-800 max-w-md w-full text-center relative overflow-hidden" },
                         h('div', { className: "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-blue-500" }),
@@ -1133,6 +1131,10 @@ export const App = () => {
     const audioContextRef = useRef(null);
     const outputAudioContextRef = useRef(null);
     const nextStartTimeRef = useRef(0);
+    
+    // Refs for accessing latest state in callbacks
+    const apiKeysRef = useRef(apiKeys);
+    useEffect(() => { apiKeysRef.current = apiKeys; }, [apiKeys]);
 
     // Helper for formatting duration
     const formatDuration = (seconds) => {
@@ -1267,7 +1269,7 @@ export const App = () => {
                                  setAvatarState('processing');
                                  const query = call.args.query;
                                  try {
-                                     const video = await searchYouTube(apiKeys.youtube, query);
+                                     const video = await searchYouTube(apiKeysRef.current.youtube, query);
                                      if (video) {
                                          setVideoData(video);
                                          // Send response back
@@ -1283,12 +1285,19 @@ export const App = () => {
                                              functionResponses: {
                                                  id: call.id,
                                                  name: call.name,
-                                                 response: { result: "No video found." }
+                                                 response: { result: "No video found on YouTube." }
                                              }
                                          }));
                                      }
                                  } catch(e) {
-                                      console.error(e);
+                                      console.error("YouTube Search Error", e);
+                                      sessionRef.current.then(s => s.sendToolResponse({
+                                             functionResponses: {
+                                                 id: call.id,
+                                                 name: call.name,
+                                                 response: { error: e.message || "Failed to search YouTube. Please check the API key." }
+                                             }
+                                         }));
                                  }
                                  setAvatarState('listening');
                              } else if (call.name === 'open_whatsapp') {
