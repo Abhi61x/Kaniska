@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -362,10 +364,11 @@ const SettingsModal = ({
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
     const [previewingVoice, setPreviewingVoice] = React.useState(null);
+    const [previewText, setPreviewText] = React.useState('');
 
     // Support Chat State
     const [supportInput, setSupportInput] = React.useState('');
-    const [supportMessages, setSupportMessages] = React.useState<{sender: string, text: string}[]>([]);
+    const [supportMessages, setSupportMessages] = React.useState([]);
     const [isSupportLoading, setIsSupportLoading] = React.useState(false);
 
     React.useEffect(() => {
@@ -426,11 +429,11 @@ const SettingsModal = ({
         if (previewingVoice) return;
         setPreviewingVoice(voiceName);
         try {
-            const text = t('settings.voiceTab.testVoiceSample') || `This is a preview of the voice ${voiceName}.`;
-            const stream = await generateSpeech(text, voiceName);
+            const textToSpeak = previewText.trim() || t('settings.voiceTab.testVoiceSample') || `This is a preview of the voice ${voiceName}.`;
+            const stream = await generateSpeech(textToSpeak, voiceName);
             
-            const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
-            let nextTime = audioCtx.currentTime;
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            let nextTime = audioCtx.currentTime + 0.1; // Add small buffer for smoothness
             
             for await (const chunk of stream) {
                 const base64 = chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -440,11 +443,20 @@ const SettingsModal = ({
                      const source = audioCtx.createBufferSource();
                      source.buffer = buffer;
                      source.connect(audioCtx.destination);
+                     
+                     if (nextTime < audioCtx.currentTime) nextTime = audioCtx.currentTime;
+
                      source.start(nextTime);
                      nextTime += buffer.duration;
                 }
             }
-            setTimeout(() => setPreviewingVoice(null), 2000);
+            
+            // Allow replay after estimated duration
+            const duration = Math.max((nextTime - audioCtx.currentTime) * 1000, 1000);
+            setTimeout(() => {
+                setPreviewingVoice(null);
+            }, duration + 500);
+
         } catch (e) {
             console.error("Preview failed", e);
             setPreviewingVoice(null);
@@ -606,9 +618,9 @@ const SettingsModal = ({
                                     className: "w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none mb-1",
                                     value: avatarUrl,
                                     onChange: (e) => setAvatarUrl(e.target.value),
-                                    placeholder: "https://example.com/avatar.png"
+                                    placeholder: t('settings.personaTab.avatar.placeholder') || "https://example.com/avatar.png"
                                 }),
-                                h('p', { className: "text-[10px] text-gray-500" }, "Supported: PNG, JPG, GIF URLs.")
+                                h('p', { className: "text-[10px] text-gray-500" }, t('settings.personaTab.avatar.note') || "Supported: PNG, JPG, GIF URLs.")
                             )
                         )
                     ),
@@ -659,6 +671,39 @@ const SettingsModal = ({
                             onChange: (e) => setGreetingMessage(e.target.value)
                         })
                     ),
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
+                        h('div', { className: "absolute top-0 right-0 p-2" },
+                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
+                        ),
+                        h('div', { className: "mb-3" },
+                            h('h3', { className: "font-semibold text-lg text-gray-400" }, t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"),
+                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.coreIdentity.description') || "These are fixed operational rules and identity definitions set by the creator.")
+                        ),
+                        h('textarea', {
+                            className: "w-full bg-black/20 border border-gray-800 rounded-lg px-4 py-3 text-gray-500 outline-none resize-none text-xs font-mono cursor-not-allowed",
+                            rows: 6,
+                            value: FIXED_SYSTEM_INSTRUCTIONS,
+                            disabled: true
+                        })
+                    ),
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('div', { className: "flex justify-between items-center mb-4" },
+                            h('div', null,
+                                h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.ambient.title')),
+                                h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.ambient.description'))
+                            ),
+                            h('span', { className: "text-sm font-mono bg-cyan-900/30 text-cyan-400 px-2 py-1 rounded border border-cyan-900/50" }, `${Math.round(ambientVolume * 100)}%`)
+                        ),
+                        h('input', {
+                            type: "range",
+                            min: "0",
+                            max: "1",
+                            step: "0.01",
+                            value: ambientVolume,
+                            onChange: (e) => setAmbientVolume(parseFloat(e.target.value)),
+                            className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                        })
+                    ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.tuning.title')),
@@ -687,15 +732,33 @@ const SettingsModal = ({
             case 'voice':
                  const currentVoices = gender === 'female' ? femaleVoices : maleVoices;
                  const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
+                 
                  const categories = {
                     "Female Persona": ['Kore', 'Aoede', 'Zephyr'],
                     "Male Persona": ['Fenrir', 'Charon', 'Puck']
                  };
+
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, gender === 'female' ? t('settings.voiceTab.female.title') : t('settings.voiceTab.male.title')),
                             h('p', { className: "text-xs text-gray-500" }, t('settings.voiceTab.description'))
+                        ),
+                        h('div', { className: "mb-6" },
+                             h('label', { className: "block text-xs uppercase font-bold text-gray-500 mb-2 tracking-wider" }, "Preview Text"),
+                             h('div', { className: "relative" },
+                                h('input', {
+                                    type: "text",
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg pl-4 pr-10 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600 text-sm",
+                                    value: previewText,
+                                    onChange: (e) => setPreviewText(e.target.value),
+                                    placeholder: "Type something to hear how it sounds..."
+                                }),
+                                previewText && h('button', {
+                                     onClick: () => setPreviewText(''),
+                                     className: "absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                }, h(XCircleIcon, { className: "w-4 h-4" }))
+                             )
                         ),
                         h('div', { className: "space-y-8" },
                             h('div', null,
@@ -768,34 +831,50 @@ const SettingsModal = ({
             case 'help':
                  return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
-                        h('h3', { className: "font-semibold text-lg mb-4 text-cyan-400" }, t('settings.helpTab.aiChat.title')),
-                        h('div', { className: "bg-black/40 rounded-lg p-4 h-48 overflow-y-auto mb-4 border border-gray-700/50 custom-scrollbar space-y-3" },
-                            supportMessages.length === 0 && h('p', { className: "text-gray-500 text-sm text-center mt-12" }, "Ask me anything about Kaniska..."),
-                            supportMessages.map((msg, idx) => 
-                                h('div', { key: idx, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}` },
-                                    h('div', { className: `px-3 py-2 rounded-lg text-sm max-w-[85%] ${msg.sender === 'user' ? 'bg-cyan-900/30 text-cyan-100 border border-cyan-500/30' : 'bg-gray-800 text-gray-300 border border-gray-700'}` }, msg.text)
+                        h('h3', { className: "font-semibold text-lg text-cyan-400 mb-2" }, t('settings.helpTab.aiChat.title')),
+                        h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.helpTab.aiChat.description')),
+                        
+                        h('div', { className: "bg-black/40 rounded-lg border border-gray-700/50 h-80 flex flex-col overflow-hidden relative" },
+                            h('div', { className: "flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar" },
+                                supportMessages.length === 0 && h('div', { className: "flex flex-col items-center justify-center h-full text-gray-600 text-sm opacity-50" },
+                                    h(ChatIcon, { className: "w-8 h-8 mb-2" }),
+                                    h('p', null, "Ask me anything about Kaniska...")
+                                ),
+                                supportMessages.map((msg, i) => 
+                                    h('div', { key: i, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}` },
+                                        h('div', { className: `max-w-[85%] px-4 py-2 rounded-2xl text-sm leading-relaxed ${
+                                            msg.sender === 'user' 
+                                            ? 'bg-cyan-600 text-white rounded-br-none' 
+                                            : msg.sender === 'system'
+                                            ? 'bg-red-900/40 text-red-200 border border-red-500/30'
+                                            : 'bg-gray-800 text-gray-200 rounded-bl-none'
+                                        }` }, msg.text)
+                                    )
+                                ),
+                                isSupportLoading && h('div', { className: "flex justify-start" },
+                                     h('div', { className: "bg-gray-800 text-gray-200 px-4 py-3 rounded-2xl rounded-bl-none text-sm flex gap-1.5 items-center" },
+                                        h('span', { className: "w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" }),
+                                        h('span', { className: "w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-75" }),
+                                        h('span', { className: "w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce delay-150" })
+                                     )
                                 )
                             ),
-                            isSupportLoading && h('div', { className: "flex justify-start" },
-                                h('div', { className: "px-3 py-2 rounded-lg bg-gray-800 border border-gray-700" }, h(SpinnerIcon, { className: "w-4 h-4 animate-spin text-gray-500" }))
+                            h('div', { className: "p-3 bg-gray-900/80 border-t border-gray-700/50 flex gap-2 backdrop-blur-sm" },
+                                h('input', {
+                                    type: "text",
+                                    className: "flex-1 bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500 outline-none placeholder-gray-600 transition-all focus:bg-black/60",
+                                    placeholder: t('settings.helpTab.aiChat.placeholder'),
+                                    value: supportInput,
+                                    onChange: (e) => setSupportInput(e.target.value),
+                                    onKeyDown: (e) => e.key === 'Enter' && handleSupportSend()
+                                }),
+                                h('button', {
+                                    onClick: handleSupportSend,
+                                    disabled: isSupportLoading || !supportInput.trim(),
+                                    className: "p-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-lg transition-all shadow-lg shadow-cyan-900/20"
+                                }, h(SendIcon, { className: "w-4 h-4" }))
                             )
-                        ),
-                        h('div', { className: "flex gap-2" },
-                            h('input', {
-                                type: "text",
-                                value: supportInput,
-                                onChange: (e) => setSupportInput(e.target.value),
-                                onKeyDown: (e) => e.key === 'Enter' && handleSupportSend(),
-                                placeholder: t('settings.helpTab.aiChat.placeholder'),
-                                className: "flex-1 bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
-                            }),
-                            h('button', {
-                                onClick: handleSupportSend,
-                                disabled: !supportInput.trim() || isSupportLoading,
-                                className: "bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
-                            }, h(SendIcon, { className: "w-4 h-4" }))
-                        ),
-                        h('p', { className: "text-xs text-gray-500 mt-2" }, t('settings.helpTab.aiChat.description'))
+                        )
                     ),
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
@@ -812,7 +891,7 @@ const SettingsModal = ({
                                 )
                             ),
                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
-                                h('details', { className: "group bg-black/40" },
+                                h('details', { className: "group bg-black/40", open: true },
                                     h('summary', { className: "cursor-pointer p-4 text-sm font-medium text-white flex items-center justify-between hover:bg-white/5 transition-colors" },
                                         h('span', { className: "flex items-center gap-3" }, h(ApiKeysIcon, { className: "w-4 h-4 text-cyan-400" }), t('settings.helpTab.q2')),
                                         h('span', { className: "text-gray-500 group-open:rotate-180 transition-transform" }, "▼")
@@ -980,16 +1059,17 @@ const SettingsModal = ({
                 ),
                 h('div', { className: "p-4 border-t border-border-color bg-gray-900" },
                     h('label', { className: "text-xs text-gray-500 uppercase font-semibold mb-2 block px-1" }, "Language"),
-                    h('div', { className: "flex gap-2" },
-                        availableLanguages.map(l => 
-                            h('button', {
-                                key: l.code,
-                                onClick: () => setLang(l.code),
-                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                                    lang === l.code ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-border-color text-gray-500 hover:border-gray-600'
-                                }`
-                            }, l.name)
-                        )
+                    h('div', { className: "relative" },
+                        h('select', {
+                            value: lang,
+                            onChange: (e) => setLang(e.target.value),
+                            className: "w-full bg-black/40 border border-border-color rounded-lg px-3 py-2 text-sm text-gray-300 focus:border-cyan-500 outline-none appearance-none"
+                        },
+                            availableLanguages.map(l => 
+                                h('option', { key: l.code, value: l.code }, l.name)
+                            )
+                        ),
+                        h('div', { className: "absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500" }, "▼")
                     )
                 )
             ),
@@ -1021,76 +1101,56 @@ const SettingsModal = ({
 };
 
 export const App = () => {
-    const { lang, setLang, t } = useTranslation();
-    const [user, setUser] = React.useState(null);
-    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-    const [activeTab, setActiveTab] = React.useState('account');
-    
-    // Persistent Settings
+    const { t, setLang, lang } = useTranslation();
+    const [user, setUser] = useState(null);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState('persona');
+    const [avatarState, setAvatarState] = useState('idle');
+    const [videoData, setVideoData] = useState(null);
+
+    // Persistent State
     const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
     const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
     const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
-    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', '');
-    const [userBio, setUserBio] = usePersistentState('kaniska-bio', '');
-    const [nickname, setNickname] = usePersistentState('kaniska-nickname', '');
-    const [personalityMode, setPersonalityMode] = usePersistentState('kaniska-personality-mode', 'Default');
-    const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion', {
-        happiness: 50, empathy: 50, formality: 50, excitement: 50, sadness: 10, curiosity: 50
-    });
-    const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', {
-        weather: '', news: '', youtube: '', auddio: ''
-    });
+    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-custom-instructions', '');
+    const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
+    const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion', { happiness: 50, empathy: 50, formality: 30, excitement: 50, sadness: 10, curiosity: 60 });
+    const [apiKeys, setApiKeys] = usePersistentState('kaniska-api-keys', { weather: '', news: '', youtube: '', auddio: '' });
     const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
     const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
-    const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient', 0.1);
-    const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '');
-    const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free');
-    
-    // New Assistant Persona Settings
+    const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-volume', 0.5);
+    const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar-url', '');
+    const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-subscription', 'free');
+    const [nickname, setNickname] = usePersistentState('kaniska-nickname', '');
+    const [personalityMode, setPersonalityMode] = usePersistentState('kaniska-personality-mode', 'Default');
     const [assistantName, setAssistantName] = usePersistentState('kaniska-assistant-name', '');
     const [assistantBackground, setAssistantBackground] = usePersistentState('kaniska-assistant-background', '');
     const [assistantTraits, setAssistantTraits] = usePersistentState('kaniska-assistant-traits', '');
-
-    // App State
-    const [status, setStatus] = React.useState('idle');
-    const [messages, setMessages] = React.useState([]);
-    const [inputText, setInputText] = React.useState('');
-    const [dailyUsage, setDailyUsage] = React.useState({ seconds: 0, date: new Date().toDateString() });
     
-    // Video State
-    const [playingVideo, setPlayingVideo] = React.useState(null);
-
     // Live Session State
-    const [isLive, setIsLive] = React.useState(false);
-    const liveSessionRef = React.useRef(null);
-    const audioContextRef = React.useRef(null);
-    const inputContextRef = React.useRef(null);
-    const nextStartTimeRef = React.useRef(0);
+    const [connected, setConnected] = useState(false);
+    const sessionRef = useRef(null);
+    const audioContextRef = useRef(null);
+    const outputAudioContextRef = useRef(null);
+    const nextStartTimeRef = useRef(0);
 
-    // Dynamic Voice Calculation
-    const currentVoiceName = gender === 'female' ? femaleVoices.main : maleVoices.main;
+    // Helper for formatting duration
+    const formatDuration = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        const parts = [];
+        if (m > 0) parts.push(`${m} minute${m !== 1 ? 's' : ''}`);
+        if (s > 0) parts.push(`${s} second${s !== 1 ? 's' : ''}`);
+        return parts.join(' and ');
+    };
 
+    // Auth
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
-            if (currentUser) {
-                // Sync logic could go here
-            }
         });
         return () => unsubscribe();
     }, []);
-
-    // Effect: Reconnect Live Session when Gender/Voice changes
-    useEffect(() => {
-        if (isLive) {
-            console.log("Gender/Voice changed, reconnecting live session...");
-            stopLive();
-            // Short delay to allow cleanup before reconnecting with new voice config
-            setTimeout(() => {
-                startLive();
-            }, 500);
-        }
-    }, [gender, currentVoiceName]);
 
     const handleLogin = async () => {
         try {
@@ -1108,479 +1168,263 @@ export const App = () => {
         }
     };
 
-    const getSystemInstructions = () => {
-        let instructions = FIXED_SYSTEM_INSTRUCTIONS;
-        
-        // Assistant Name
-        const name = assistantName || (gender === 'male' ? 'Kanishk' : 'Kaniska');
-        
-        instructions += `\n\n**Persona:**\nYou are an AI assistant named ${name}.`;
-        
-        // Background
-        if (assistantBackground) {
-             instructions += `\n**Background:** ${assistantBackground}`;
-        } else {
-             instructions += `\nYou have a slightly sci-fi, futuristic personality.`;
-        }
-        
-        // Traits
-        if (assistantTraits) {
-             instructions += `\n**Core Traits:** ${assistantTraits}`;
-        }
-
-        // Gender & Voice Tone
-        if (gender === 'male') {
-             instructions += `\nYou are a male AI assistant. Your behavior, voice, and tone should be distinctly masculine, polite, and helpful.`;
-        } else {
-             instructions += `\nYou are a female AI assistant. Your behavior, voice, and tone should be distinctly feminine, polite, and helpful.`;
-        }
-
-        // Dynamic User Identity
-        if (nickname) {
-            instructions += `\n\n**USER IDENTITY:**\nThe user's chosen nickname is "${nickname}". You MUST address the user by this name naturally in the conversation. Do not ask for their name again.`;
-        }
-
-        // Dynamic Personality Mode
-        if (personalityMode && personalityMode !== 'Default') {
-            instructions += `\n\n**PERSONALITY MODE: ${personalityMode}**\n`;
-            switch (personalityMode) {
-                case 'Professional': instructions += "Maintain a formal, polite, and efficient tone. Avoid slang."; break;
-                case 'Friendly': instructions += "Be warm, cheerful, and casual. Use emoticons in text if applicable."; break;
-                case 'Candid': instructions += "Be direct, honest, and straightforward. Don't sugarcoat things."; break;
-                case 'Efficient': instructions += "Be concise and to the point. Minimize small talk."; break;
-                case 'Nerdy': instructions += "Use technical terminology, make geeky references, and show enthusiasm for science/tech."; break;
-                case 'Cynical': instructions += "Be slightly sarcastic, skeptical, and dry. Dark humor is allowed."; break;
-                case 'Quirky': instructions += "Be unpredictable, fun, and use colorful metaphors. Act a bit like a sci-fi character."; break;
-            }
-        }
-
-        // Emotion Detection & Response
-        instructions += `\n\n**EMOTIONAL INTELLIGENCE & ADAPTATION:**\n1.  **Detect:** Continuously analyze the user's voice tone and text for emotions (Happy, Sad, Angry, Excited, Tired, Anxious, Neutral).\n2.  **Adapt:** Instantly mirror or complement the user's emotion.\n    -   If User is **Sad/Tired**: Respond with high **Empathy** and a softer, slower, comforting tone.\n    -   If User is **Happy/Excited**: Respond with high **Happiness/Excitement** and an energetic tone.\n    -   If User is **Angry/Frustrated**: Respond with **Calmness** and patience to de-escalate.\n3.  **Voice Tone:** Your voice output MUST reflect this emotion. If the text implies sadness, the voice should sound sad.`;
-        
-        instructions += `\n\n${customInstructions}\nUser Bio: ${userBio}`;
-        return instructions;
-    };
-
-    const handleTimer = (duration: number) => {
-        setTimeout(async () => {
-            const alertMsg = "Your timer is up!";
-            setMessages(prev => [...prev, { sender: 'model', text: alertMsg }]);
-            try {
-                // Play announcement
-                const stream = await generateSpeech(alertMsg, currentVoiceName);
-                const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
-                let nextTime = audioCtx.currentTime;
-                for await (const chunk of stream) {
-                    const base64 = chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                    if (base64) {
-                         const bytes = decode(base64);
-                         const buffer = await decodeAudioData(bytes, audioCtx, 24000, 1);
-                         const source = audioCtx.createBufferSource();
-                         source.buffer = buffer;
-                         source.connect(audioCtx.destination);
-                         source.start(nextTime);
-                         nextTime += buffer.duration;
-                    }
-                }
-            } catch (e) {
-                console.error("Timer notification failed", e);
-            }
-        }, duration * 1000);
-    };
-
-    const stopLive = () => {
-        if (audioContextRef.current) audioContextRef.current.close();
-        if (inputContextRef.current) inputContextRef.current.close();
-        
-        setIsLive(false);
-        setStatus('idle');
-        liveSessionRef.current = null;
-    };
-
-    const startLive = async () => {
-        // Enforce Subscription Limit for Live Mode
-        if (subscriptionPlan === 'free' && dailyUsage.seconds > 3600) {
-             setMessages(prev => [...prev, { sender: 'system', text: t('settings.errors.dailyLimit') }]);
-             setIsSettingsOpen(true);
-             setActiveTab('subscription');
+    const handleConnect = async () => {
+        if (connected) {
+             setConnected(false);
+             setAvatarState('idle');
+             
+             if (sessionRef.current) {
+                 sessionRef.current.then(s => {
+                     try { s.close(); } catch(e) {}
+                 });
+                 sessionRef.current = null;
+             }
+             
+             if (audioContextRef.current) {
+                 audioContextRef.current.close();
+                 audioContextRef.current = null;
+             }
+             if (outputAudioContextRef.current) {
+                 outputAudioContextRef.current.close();
+                 outputAudioContextRef.current = null;
+             }
              return;
         }
 
-        setStatus('listening');
-        setIsLive(true);
-        
         try {
-             const inputAudioContext = new (window.AudioContext || window['webkitAudioContext'])({sampleRate: 16000});
-             const outputAudioContext = new (window.AudioContext || window['webkitAudioContext'])({sampleRate: 24000});
-             inputContextRef.current = inputAudioContext;
-             audioContextRef.current = outputAudioContext;
-             nextStartTimeRef.current = 0;
+             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Browser does not support audio input");
+            }
 
-             // Request Microphone Permission
-             let stream;
-             try {
-                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-             } catch (micError) {
-                 if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
-                     throw new Error('mic_permission_denied');
-                 } else if (micError.name === 'NotFoundError' || micError.name === 'DevicesNotFoundError') {
-                     throw new Error('mic_not_found');
-                 } else {
-                     throw micError;
-                 }
-             }
-             
-             // Pass currentVoiceName to the session connection
-             const sessionPromise = connectLiveSession({
-                 onopen: () => {
-                     console.log("Live session connected");
-                     setStatus('live');
-                     
-                     // Input Pipeline
-                     const source = inputAudioContext.createMediaStreamSource(stream);
-                     const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-                     scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-                         const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-                         const pcmBlob = createBlob(inputData);
-                         sessionPromise.then((session) => {
-                             session.sendRealtimeInput({ media: pcmBlob });
-                         });
-                     };
-                     source.connect(scriptProcessor);
-                     scriptProcessor.connect(inputAudioContext.destination);
-                 },
-                 onmessage: async (message: LiveServerMessage) => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            nextStartTimeRef.current = 0;
+            
+            const callbacks = {
+                onopen: () => {
+                    setConnected(true);
+                    setAvatarState('listening');
+                    
+                    // Input Audio Processing
+                    const source = audioContextRef.current.createMediaStreamSource(stream);
+                    const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+                    
+                    processor.onaudioprocess = (e) => {
+                        if (!sessionRef.current) return;
+                        
+                        const inputData = e.inputBuffer.getChannelData(0);
+                        const blob = createBlob(inputData);
+                        sessionRef.current.then(session => {
+                            try {
+                                session.sendRealtimeInput({ media: blob });
+                            } catch(err) {
+                                // Session might be closed or closing
+                            }
+                        });
+                    };
+                    
+                    source.connect(processor);
+                    processor.connect(audioContextRef.current.destination);
+                },
+                onmessage: async (msg) => {
                      // Handle Audio Output
-                     const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-                     if (base64Audio) {
-                         try {
-                            const buffer = await decodeAudioData(decode(base64Audio), outputAudioContext, 24000, 1);
-                            
-                            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContext.currentTime);
-                            const source = outputAudioContext.createBufferSource();
-                            source.buffer = buffer;
-                            source.connect(outputAudioContext.destination);
-                            source.start(nextStartTimeRef.current);
-                            nextStartTimeRef.current += buffer.duration;
-                         } catch (e) {
-                             console.error("Audio decode error", e);
-                         }
+                     if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
+                         setAvatarState('speaking');
+                         const base64 = msg.serverContent.modelTurn.parts[0].inlineData.data;
+                         const ctx = outputAudioContextRef.current;
+                         if (!ctx) return;
+                         
+                         const audioBuffer = await decodeAudioData(decode(base64), ctx, 24000, 1);
+                         const source = ctx.createBufferSource();
+                         source.buffer = audioBuffer;
+                         source.connect(ctx.destination);
+                         
+                         const currentTime = ctx.currentTime;
+                         const startTime = Math.max(currentTime, nextStartTimeRef.current);
+                         
+                         source.start(startTime);
+                         nextStartTimeRef.current = startTime + audioBuffer.duration;
                      }
                      
-                     const interrupted = message.serverContent?.interrupted;
-                     if (interrupted) {
-                         nextStartTimeRef.current = 0;
+                     if (msg.serverContent?.turnComplete) {
+                         // Check periodically if we are done speaking
+                         const checkSpeaking = () => {
+                             const ctx = outputAudioContextRef.current;
+                             if (ctx && ctx.currentTime >= nextStartTimeRef.current) {
+                                 setAvatarState('listening');
+                             } else {
+                                 setTimeout(checkSpeaking, 100);
+                             }
+                         };
+                         checkSpeaking();
                      }
-
-                     // Handle Tool Calls
-                     if (message.toolCall) {
-                         for (const fc of message.toolCall.functionCalls) {
-                             if (fc.name === 'openSettings') {
-                                 console.log("Opening settings via tool call");
-                                 setIsSettingsOpen(true);
-                                 sessionPromise.then(session => {
-                                    session.sendToolResponse({
-                                        functionResponses: [
-                                            {
-                                                id: fc.id,
-                                                name: fc.name,
-                                                response: { result: { success: true } }
-                                            }
-                                        ]
-                                    });
-                                 });
-                             } else if (fc.name === 'setTimer') {
-                                 const duration = fc.args.duration;
-                                 if (duration) {
-                                     console.log(`Setting timer for ${duration} seconds via Live tool`);
-                                     handleTimer(duration);
-                                     sessionPromise.then(session => {
-                                         session.sendToolResponse({
-                                             functionResponses: [
-                                                 {
-                                                     id: fc.id,
-                                                     name: fc.name,
-                                                     response: { result: { success: true, message: `Timer set for ${duration} seconds` } }
-                                                 }
-                                             ]
-                                         });
-                                     });
+                     
+                     // Handle Tool Calls (e.g. YouTube, WhatsApp, Timer)
+                     if (msg.toolCall?.functionCalls) {
+                         for (const call of msg.toolCall.functionCalls) {
+                             if (call.name === 'searchYouTube') {
+                                 setAvatarState('processing');
+                                 const query = call.args.query;
+                                 try {
+                                     const video = await searchYouTube(apiKeys.youtube, query);
+                                     if (video) {
+                                         setVideoData(video);
+                                         // Send response back
+                                         sessionRef.current.then(s => s.sendToolResponse({
+                                             functionResponses: {
+                                                 id: call.id,
+                                                 name: call.name,
+                                                 response: { result: `Playing ${video.title}` }
+                                             }
+                                         }));
+                                     } else {
+                                          sessionRef.current.then(s => s.sendToolResponse({
+                                             functionResponses: {
+                                                 id: call.id,
+                                                 name: call.name,
+                                                 response: { result: "No video found." }
+                                             }
+                                         }));
+                                     }
+                                 } catch(e) {
+                                      console.error(e);
                                  }
-                             } else if (fc.name === 'searchYouTube') {
-                                const query = fc.args.query;
-                                console.log(`Searching YouTube for: ${query}`);
-                                try {
-                                    const result = await searchYouTube(apiKeys.youtube, query);
-                                    if (result) {
-                                        setPlayingVideo(result);
-                                        sessionPromise.then(session => {
-                                            session.sendToolResponse({
-                                                functionResponses: [
-                                                    {
-                                                        id: fc.id,
-                                                        name: fc.name,
-                                                        response: { result: { success: true, title: result.title } }
-                                                    }
-                                                ]
-                                            });
-                                        });
-                                    } else {
-                                         sessionPromise.then(session => {
-                                            session.sendToolResponse({
-                                                functionResponses: [
-                                                    {
-                                                        id: fc.id,
-                                                        name: fc.name,
-                                                        response: { result: { success: false, message: "No video found" } }
-                                                    }
-                                                ]
-                                            });
-                                        });
+                                 setAvatarState('listening');
+                             } else if (call.name === 'open_whatsapp') {
+                                 window.open('https://web.whatsapp.com', '_blank');
+                                 sessionRef.current.then(s => s.sendToolResponse({
+                                     functionResponses: {
+                                         id: call.id,
+                                         name: call.name,
+                                         response: { result: "WhatsApp opened." }
+                                     }
+                                 }));
+                             } else if (call.name === 'send_whatsapp') {
+                                const { message, contact } = call.args;
+                                let url = 'https://web.whatsapp.com/send';
+                                const params = new URLSearchParams();
+                                if (message) params.append('text', message);
+                                if (contact && /^\d+$/.test(contact)) params.append('phone', contact);
+
+                                window.open(`${url}?${params.toString()}`, '_blank');
+                                sessionRef.current.then(s => s.sendToolResponse({
+                                    functionResponses: {
+                                        id: call.id,
+                                        name: call.name,
+                                        response: { result: `Drafted message to ${contact || 'contact'}` }
                                     }
-                                } catch (err) {
-                                    console.error("YouTube search error", err);
-                                     sessionPromise.then(session => {
-                                            session.sendToolResponse({
-                                                functionResponses: [
-                                                    {
-                                                        id: fc.id,
-                                                        name: fc.name,
-                                                        response: { result: { success: false, message: err.message } }
-                                                    }
-                                                ]
-                                            });
-                                        });
-                                }
+                                }));
+                             } else if (call.name === 'setTimer') {
+                                const duration = Number(call.args.duration);
+                                const timeString = formatDuration(duration);
+                                
+                                setTimeout(() => {
+                                    alert("Timer finished!");
+                                }, duration * 1000);
+
+                                sessionRef.current.then(s => s.sendToolResponse({
+                                    functionResponses: {
+                                        id: call.id,
+                                        name: call.name,
+                                        response: { result: `Timer successfully set for ${timeString}` }
+                                    }
+                                }));
                              }
                          }
                      }
-                 },
-                 onclose: () => {
-                     console.log("Live session closed");
-                     setIsLive(false);
-                     setStatus('idle');
-                 },
-                 onerror: (err) => {
-                     console.error("Live session error", err);
-                     setIsLive(false);
-                     setStatus('error');
-                     
-                     // Handle Async Session Errors
-                     let errorText = t('errors.speechRecognitionGeneric');
-                     if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
-                         errorText = t('errors.apiKeyInvalid');
-                     } else if (err.message && err.message.includes('503')) {
-                         errorText = t('errors.serviceUnavailable');
-                     } else if (err.message && err.message.includes('network')) {
-                         errorText = t('errors.network');
-                     }
-                     
-                     setMessages(prev => [...prev, { sender: 'system', text: errorText }]);
-                 }
-             }, getSystemInstructions(), currentVoiceName);
-             
-             liveSessionRef.current = sessionPromise;
-             await sessionPromise;
+                },
+                onclose: () => {
+                    setConnected(false);
+                    setAvatarState('idle');
+                },
+                onerror: (e) => {
+                    console.error(e);
+                    alert(t('errors.connection'));
+                    setConnected(false);
+                    setAvatarState('idle');
+                }
+            };
+
+            const currentVoice = gender === 'female' ? femaleVoices.main : maleVoices.main;
+            sessionRef.current = connectLiveSession(callbacks, customInstructions, currentVoice);
 
         } catch (e) {
-            console.error("Failed to start live session", e);
-            setStatus('error');
-            setIsLive(false);
+            console.error("Connection failed", e);
+            setConnected(false);
+            setAvatarState('idle');
 
-            let errorMessage = t('errors.speechRecognitionGeneric');
-
-            if (e.message === 'mic_permission_denied') {
-                errorMessage = t('errors.micNotAllowed');
-            } else if (e.message === 'mic_not_found') {
-                errorMessage = "Microphone not found on this device.";
-            } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-                 errorMessage = t('errors.micNotAllowed');
-            } else if (e.message.includes('401') || e.message.includes('403') || e.message.includes('API key')) {
-                errorMessage = t('errors.apiKeyInvalid');
-            } else if (e.message.includes('503') || e.message.includes('Overloaded')) {
-                errorMessage = t('errors.serviceUnavailable');
-            } else if (e.message.includes('Failed to fetch') || e.message.includes('Network')) {
-                 errorMessage = t('errors.network');
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                alert(t('errors.micNotAllowed'));
+            } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                alert("No microphone found. Please check your devices.");
+            } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+                 alert("Microphone is already in use by another application.");
+            } else {
+                alert(t('errors.speechRecognitionGeneric'));
             }
-            
-            setMessages(prev => [...prev, { sender: 'system', text: errorMessage }]);
         }
     };
 
-    const toggleLive = () => {
-        if (isLive) {
-            stopLive();
-        } else {
-            startLive();
-        }
-    };
-
-    const handleSendMessage = async () => {
-        if (!inputText.trim()) return;
-
-        // Enforce Subscription Limit for Chat
-        if (subscriptionPlan === 'free' && dailyUsage.seconds > 3600) {
-            setMessages(prev => [...prev, { sender: 'system', text: t('settings.errors.dailyLimit') }]);
-            setIsSettingsOpen(true);
-            setActiveTab('subscription');
-            return;
-        }
-
-        const text = inputText;
-        setInputText('');
-        
-        const newMessages = [...messages, { sender: 'user', text }];
-        setMessages(newMessages);
-        setStatus('thinking');
-
-        // Increment Usage (Simulated: 5 seconds per interaction)
-        setDailyUsage(prev => ({
-            ...prev,
-            seconds: prev.seconds + 5
-        }));
-
-        try {
-            const response = await processUserCommand(
-                newMessages, 
-                getSystemInstructions(),
-                0.7,
-                emotionTuning
-            );
-
-            if (response.timerDurationSeconds > 0) {
-                handleTimer(response.timerDurationSeconds);
-            }
-
-            if (response.youtubeQuery) {
-                try {
-                    const videoResult = await searchYouTube(apiKeys.youtube, response.youtubeQuery);
-                    if (videoResult) {
-                        setPlayingVideo(videoResult);
-                        setMessages(prev => [...prev, { sender: 'system', text: `Playing: ${videoResult.title}` }]);
-                    } else {
-                        setMessages(prev => [...prev, { sender: 'system', text: "I couldn't find a video for that." }]);
-                    }
-                } catch (err) {
-                     setMessages(prev => [...prev, { sender: 'system', text: `YouTube Error: ${err.message}` }]);
-                }
-            }
-
-            setStatus('speaking');
-            setMessages(prev => [...prev, { sender: 'model', text: response.reply }]);
-
-            // Generate Speech
-            const stream = await generateSpeech(response.reply, currentVoiceName);
-            
-            const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
-            // If the user sends another message, previous audio should probably stop?
-            // For now, let's just overlap or standard behavior.
-            let nextTime = audioCtx.currentTime;
-            
-            for await (const chunk of stream) {
-                 const base64 = chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                 if (base64) {
-                      const bytes = decode(base64);
-                      const buffer = await decodeAudioData(bytes, audioCtx, 24000, 1);
-                      const source = audioCtx.createBufferSource();
-                      source.buffer = buffer;
-                      source.connect(audioCtx.destination);
-                      source.onended = () => {
-                          if (audioCtx.state === 'running' && audioCtx.currentTime >= nextTime) {
-                              setStatus('idle');
-                          }
-                      }
-                      source.start(nextTime);
-                      nextTime += buffer.duration;
-                 }
-            }
-
-        } catch (error) {
-            console.error("Error processing command:", error);
-            setStatus('error');
-            setMessages(prev => [...prev, { sender: 'system', text: `Error: ${error.message}` }]);
-        }
-    };
-
-    return h('div', { className: "flex flex-col h-[100dvh] w-full bg-black text-white overflow-hidden relative" },
+    return h('div', { className: `flex flex-col h-screen w-full bg-black text-white overflow-hidden font-sans ${theme === 'light' ? 'light-mode' : ''}` },
         // Header
-        h('header', { className: "flex items-center justify-between p-4 z-10" },
-            h('div', { className: "flex items-center gap-2" },
-                h('div', { className: "w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center border border-cyan-500/50" },
-                    h('span', { className: "text-lg" }, "🤖")
+        h('header', { className: "flex justify-between items-center p-4 md:px-8 absolute top-0 w-full z-20 pointer-events-none" },
+            h('div', { className: "flex items-center gap-3 pointer-events-auto" },
+                h('div', { className: "w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.5)]" },
+                    h('span', { className: "text-xl font-bold" }, "K")
                 ),
-                h('span', { className: "font-bold text-lg tracking-wider" }, t('appName'))
+                h('h1', { className: "font-bold text-xl tracking-wide hidden md:block" }, 
+                    t('appName'),
+                    h('span', { className: "text-xs font-normal text-cyan-400 ml-2 px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-900/20" }, "BETA")
+                )
             ),
-            h('button', {
-                onClick: () => setIsSettingsOpen(true),
-                className: "p-2 rounded-full hover:bg-white/10 transition-colors"
-            }, h(SettingsIcon, { className: "w-6 h-6 text-cyan-400" }))
-        ),
-
-        // Main Content
-        h('main', { className: "flex-1 flex flex-col items-center justify-start pt-4 md:pt-0 md:justify-center relative" },
-            h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
-               // Optional background effects
-            ),
-            
-            // Avatar Centerpiece
-            h('div', { className: "mb-4 z-10 transform scale-110 md:scale-125 transition-transform duration-500" },
-                h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl })
-            ),
-
-            // Status Text
-            h('div', { className: "text-cyan-400 font-mono text-sm tracking-widest uppercase mb-8 animate-pulse" },
-                t(`main.status.${status}`) || status
-            ),
-
-            // Chat Overlay (Optimized for Mobile)
-            h('div', { className: "absolute bottom-36 md:bottom-28 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
-                messages.slice(-3).map((msg, i) => 
-                    h('div', { key: i, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in` },
-                        h('div', { className: `px-4 py-2 rounded-2xl max-w-[80%] backdrop-blur-md border ${msg.sender === 'user' ? 'bg-cyan-900/30 border-cyan-500/30 text-white' : 'bg-gray-900/50 border-gray-700/50 text-gray-200'}` },
-                            msg.text
-                        )
-                    )
+            h('div', { className: "pointer-events-auto" },
+                h('button', { 
+                    onClick: () => setIsSettingsOpen(true),
+                    className: "p-2 rounded-full hover:bg-white/10 transition-colors text-cyan-400 hover:text-white"
+                },
+                    h(SettingsIcon, { className: "w-6 h-6" })
                 )
             )
         ),
-
-        // Footer Controls (Moved up on mobile to clear system nav)
-        h('footer', { className: "p-4 pb-32 md:pb-4 z-20 w-full max-w-3xl mx-auto" },
-            h('div', { className: "flex gap-2 bg-gray-900/80 backdrop-blur-xl p-2 rounded-full border border-gray-700 shadow-2xl" },
-                 // Live Mic Button
-                h('button', {
-                    onClick: toggleLive,
-                    className: `p-3 rounded-full transition-all duration-300 ${isLive ? 'bg-red-600 hover:bg-red-500 animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'}`
-                }, isLive ? h(MicIcon, { className: "w-5 h-5 text-white" }) : h(MicOffIcon, { className: "w-5 h-5" })),
-                
-                h('input', {
-                    type: "text",
-                    value: inputText,
-                    onChange: (e) => setInputText(e.target.value),
-                    onKeyDown: (e) => e.key === 'Enter' && handleSendMessage(),
-                    placeholder: "Type a command...",
-                    className: "flex-1 bg-transparent px-4 py-2 outline-none text-white placeholder-gray-500"
-                }),
-                h('button', {
-                    onClick: handleSendMessage,
-                    className: "p-3 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-                    disabled: !inputText.trim() || status === 'thinking'
-                }, h(SendIcon, { className: "w-5 h-5" }))
-            )
+        
+        // Main Avatar Area
+        h('main', { className: "flex-1 flex flex-col items-center justify-center relative" },
+             h(Avatar, { state: avatarState, customUrl: avatarUrl }),
+             !connected && h('div', { className: "mt-8 text-center animate-fade-in" },
+                 h('p', { className: "text-gray-400 text-sm mb-4" }, "Ready to connect"),
+                 h('button', {
+                     onClick: handleConnect,
+                     className: "flex items-center gap-2 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(8,145,178,0.4)] hover:scale-105"
+                 },
+                     h(ConnectIcon, { className: "w-5 h-5" }),
+                     "Start Conversation"
+                 )
+             )
+        ),
+        
+        // Footer Controls
+        connected && h('footer', { className: "p-6 flex justify-center z-20" },
+             h('button', {
+                 onClick: handleConnect,
+                 className: "p-4 bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 rounded-full text-red-400 hover:text-white transition-all hover:scale-110"
+             },
+                 h(DisconnectIcon, { className: "w-6 h-6" })
+             )
         ),
 
-        // YouTube Player Overlay
-        h(YouTubePlayer, {
-            videoId: playingVideo?.videoId,
-            title: playingVideo?.title,
-            onClose: () => setPlayingVideo(null)
+        // Overlays
+        videoData && h(YouTubePlayer, { 
+            videoId: videoData.videoId, 
+            title: videoData.title, 
+            onClose: () => setVideoData(null) 
         }),
-
-        // Settings Modal
+        
         h(SettingsModal, {
             isOpen: isSettingsOpen,
             onClose: () => setIsSettingsOpen(false),
-            activeTab, setActiveTab,
+            activeTab: settingsTab,
+            setActiveTab: setSettingsTab,
             theme, setTheme,
             gender, setGender,
             greetingMessage, setGreetingMessage,
@@ -1594,7 +1438,7 @@ export const App = () => {
             ambientVolume, setAmbientVolume,
             avatarUrl, setAvatarUrl,
             subscriptionPlan, setSubscriptionPlan,
-            dailyUsage,
+            dailyUsage: { seconds: 0 },
             user, handleLogin, handleLogout,
             nickname, setNickname,
             personalityMode, setPersonalityMode,

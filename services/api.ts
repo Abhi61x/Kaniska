@@ -108,6 +108,28 @@ export const searchYouTubeTool: FunctionDeclaration = {
     },
 };
 
+export const openWhatsAppTool: FunctionDeclaration = {
+    name: 'open_whatsapp',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Opens the WhatsApp application or website. Use this when the user asks to open WhatsApp.',
+        properties: {},
+    },
+};
+
+export const sendWhatsAppTool: FunctionDeclaration = {
+    name: 'send_whatsapp',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Drafts a WhatsApp message to a specific contact or number. Use this when the user asks to send a message via WhatsApp.',
+        properties: {
+            message: { type: Type.STRING, description: 'The message content to send.' },
+            contact: { type: Type.STRING, description: 'The phone number or contact name (optional).' },
+        },
+        required: ['message'],
+    },
+};
+
 export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore') {
     let systemInstruction = customSystemInstruction;
     
@@ -131,6 +153,8 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         - If the user asks to open settings, call 'openSettings'.
         - If the user asks to set a timer, call 'setTimer'.
         - If the user asks to play a video or song, call 'searchYouTube'.
+        - If the user asks to open WhatsApp, call 'open_whatsapp'.
+        - If the user asks to send a WhatsApp message, call 'send_whatsapp'.
         `;
     }
 
@@ -139,7 +163,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
-            tools: [{ functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool] }],
+            tools: [{ functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool] }],
             systemInstruction: systemInstruction,
             speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },

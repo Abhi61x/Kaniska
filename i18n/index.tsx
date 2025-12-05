@@ -76,6 +76,12 @@ const en = {
         "background": "Background Story",
         "traits": "Core Traits"
       },
+      "avatar": {
+        "title": "Avatar Customization",
+        "description": "Enter a URL for your custom avatar image (JPG, PNG, GIF).",
+        "placeholder": "https://example.com/avatar.png",
+        "note": "Supported formats: PNG, JPG, GIF."
+      },
       "greeting": {
         "title": "Greeting Message",
         "description": "This is what the assistant says when you first connect."
@@ -168,7 +174,11 @@ const en = {
     "subscriptionTab": {
       "title": "Subscription",
       "description": "Choose the plan that suits you best.",
+      "usage": "Daily Usage",
+      "active": "Active",
+      "upgrade": "Upgrade",
       "plans": {
+        "free": { "name": "Free", "price": "₹0", "duration": "/ forever" },
         "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" },
         "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" },
         "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" },
@@ -299,6 +309,12 @@ const hi = {
         "description": "चुनें कि एप्लिकेशन कैसा दिखता है।",
         "light": "रोशनी",
         "dark": "अंधेरा"
+      },
+      "avatar": {
+        "title": "अवतार अनुकूलन",
+        "description": "अपने कस्टम अवतार छवि (जेपीजी, पीएनजी, जीआईएफ) के लिए एक यूआरएल दर्ज करें।",
+        "placeholder": "https://example.com/avatar.png",
+        "note": "समर्थित प्रारूप: PNG, JPG, GIF."
       },
       "greeting": {
         "title": "अभिवादन संदेश",
@@ -495,7 +511,7 @@ const bn = {
   "youtubePanel": {
     "title": "ইউটিউব প্লেয়ার",
     "recentSearches": "সাম্প্রতিক অনুসন্ধান",
-    "views": "{{count}} বার দেখা হয়েছে"
+    "views": "{{count}} বার देखा হয়েছে"
   },
   "settings": {
     "title": "সেটিংস",
@@ -528,7 +544,7 @@ const mr = {
   "header": { "settings": "सेटिंग्ज", "toggleTheme": "थीम" },
   "main": {
     "status": {
-      "offline": "ऑफलाइन",
+      "offline": "ऐकत आहे...",
       "listening": "ऐकत आहे...",
       "thinking": "विचार करत आहे...",
       "speaking": "बोलत आहे...",
