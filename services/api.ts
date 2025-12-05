@@ -93,35 +93,53 @@ export const setTimerTool: FunctionDeclaration = {
     },
 };
 
+export const searchYouTubeTool: FunctionDeclaration = {
+    name: 'searchYouTube',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Search for a video on YouTube and play it. Use this when the user asks to play a specific video, song, or asks for music.',
+        properties: {
+            query: {
+                type: Type.STRING,
+                description: 'The search query for the video.',
+            },
+        },
+        required: ['query'],
+    },
+};
+
 export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore') {
     let systemInstruction = customSystemInstruction;
     
     if (!systemInstruction) {
-        systemInstruction = `You are Kaniska, a friendly and helpful female AI assistant. 
-        Your personality is cheerful, polite, and feminine. 
-        Your behavior should always be like a girl's.
-        You can engage in natural voice conversations.
-        If the user asks to open the settings or configure the app, call the "openSettings" tool immediately.
-        If the user asks to set a timer, call the "setTimer" tool.
+        systemInstruction = `You are Kaniska, a friendly and helpful AI assistant. 
+        Your personality is cheerful, polite, and helpful.
         
         LANGUAGE PROTOCOLS:
-        - If the user speaks Hindi, reply in a mix of Hindi and English (Hinglish).
-        - If the user speaks English, reply entirely in English.
-        - If the user speaks Bengali, Marathi, Gujarati, Kannada, or Tamil, reply in that SAME language.
+        - If the user speaks Hindi or English, reply in a mix of Hindi and English (Hinglish).
+        - If the user speaks English only, reply entirely in English.
+        - If the user speaks Tamil, reply in Tamil.
+        - If the user speaks Bengali, Marathi, Gujarati, or Kannada, reply in that SAME language.
         
         EMOTIONAL PROTOCOLS:
         - Add emotion to your voice and text.
-        - If the topic is humorous, sound amused and happy (laugh if appropriate, e.g., "Haha").
+        - If the topic is humorous, sound amused and happy. You can use laughter (e.g., "Haha") in your speech.
         - If the topic is sad, sound empathetic and sad.
+        - Match the user's energy and emotional tone.
+        
+        TOOLS:
+        - If the user asks to open settings, call 'openSettings'.
+        - If the user asks to set a timer, call 'setTimer'.
+        - If the user asks to play a video or song, call 'searchYouTube'.
         `;
     }
 
     return await ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        model: 'gemini-2.0-flash-exp', // Updated to 2.0 Flash Exp for reliable Live API support
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
-            tools: [{ functionDeclarations: [openSettingsTool, setTimerTool] }],
+            tools: [{ functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool] }],
             systemInstruction: systemInstruction,
             speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
@@ -149,14 +167,19 @@ export async function processUserCommand(
 
     const emotionInstruction = `
 PERSONALITY TUNING:
-When formulating your 'reply', first analyze the emotional tone of the user's most recent message. Adapt your 'emotion' value and the tone of your 'reply' to be appropriate to the user's detected emotion. For example, if the user sounds frustrated, adopt an 'empathetic' and helpful tone. If they are excited, share their excitement with a 'happy' or 'excited' tone. While doing this, still generally adhere to your core personality traits defined below on a scale of 0 to 100.
-- Happiness: ${emotionTuning.happiness}. (0 is melancholic, 100 is extremely joyful).
-- Empathy: ${emotionTuning.empathy}. (0 is clinical and detached, 100 is deeply compassionate).
-- Formality: ${emotionTuning.formality}. (0 is very casual and uses slang, 100 is extremely formal and professional).
-- Excitement: ${emotionTuning.excitement}. (0 is calm and monotonous, 100 is highly energetic and expressive).
-- Sadness: ${emotionTuning.sadness}. (0 is optimistic, 100 is sorrowful and somber).
-- Curiosity: ${emotionTuning.curiosity}. (0 is passive, 100 is inquisitive and might ask clarifying questions).
-Your 'emotion' value in the JSON output must reflect this adaptive process.
+When formulating your 'reply', first analyze the emotional tone of the user's most recent message. Adapt your 'emotion' value and the tone of your 'reply' to be appropriate to the user's detected emotion.
+- If the user is humorous, reply with laughter and amusement.
+- If the user is sad, reply with sadness and empathy.
+- If the user speaks in Hindi/English mix, reply in Hinglish.
+- If the user speaks in Tamil, Bengali, Marathi, Gujarati, or Kannada, reply in that language.
+
+Core Traits (0-100):
+- Happiness: ${emotionTuning.happiness}
+- Empathy: ${emotionTuning.empathy}
+- Formality: ${emotionTuning.formality}
+- Excitement: ${emotionTuning.excitement}
+- Sadness: ${emotionTuning.sadness}
+- Curiosity: ${emotionTuning.curiosity}
 `;
 
     const response = await ai.models.generateContent({
@@ -389,6 +412,15 @@ export async function validateWeatherKey(apiKey) {
         if (response.ok) {
             return { success: true, message: "Weather key is valid." };
         }
+        
+        // Specific status code handling
+        if (response.status === 401) {
+             return { success: false, message: "The provided API key is invalid." };
+        }
+        if (response.status === 429) {
+             return { success: false, message: "This API key has exceeded its daily query limit." };
+        }
+
         const errorText = await response.text();
         if (errorText.toLowerCase().includes('invalid api key')) {
             return { success: false, message: "The provided API key is invalid." };
@@ -396,7 +428,7 @@ export async function validateWeatherKey(apiKey) {
         if (errorText.toLowerCase().includes('exceeded')) {
              return { success: false, message: "This API key has exceeded its daily query limit." };
         }
-        return { success: false, message: errorText || "Could not validate the key. The service may be temporarily unavailable." };
+        return { success: false, message: errorText || `Validation failed with status ${response.status}.` };
     } catch (e) {
         return { success: false, message: "A network error occurred while trying to validate the key." };
     }
@@ -412,13 +444,22 @@ export async function validateNewsKey(apiKey) {
         if (response.ok) {
             return { success: true, message: "News key is valid." };
         }
+
+        const status = response.status;
+        if (status === 401 || status === 403) {
+            return { success: false, message: "The provided API key is invalid or unauthorized." };
+        }
+        if (status === 429) {
+            return { success: false, message: "This API key has exceeded its request limit." };
+        }
+
         const data = await response.json().catch(() => ({}));
         return { success: false, message: data.errors?.[0] || `Invalid API key (Status: ${response.status}).` };
     } catch (e) {
         // GNews API often returns 403 Forbidden without CORS headers if the key is invalid,
         // causing a browser Network Error instead of a readable response.
         if (e instanceof TypeError && e.message === 'Failed to fetch') {
-             return { success: false, message: "Validation failed. The GNews API rejected the request. This usually means the API Key is invalid." };
+             return { success: false, message: "Validation failed. The GNews API rejected the request (likely invalid key)." };
         }
         return { success: false, message: "Network error during validation. Please check your internet connection." };
     }
@@ -431,11 +472,26 @@ export async function validateYouTubeKey(apiKey) {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=music&maxResults=1&key=${apiKey}`;
     try {
         const response = await fetch(url);
+        const data = await response.json();
+
         if (response.ok) {
             return { success: true, message: "YouTube key is valid." };
         }
-        const data = await response.json();
-        return { success: false, message: data.error?.message || "Invalid API key." };
+        
+        const error = data.error;
+        const reason = error?.errors?.[0]?.reason;
+        
+        if (reason === 'keyInvalid') {
+             return { success: false, message: "The provided API key is invalid." };
+        }
+        if (reason === 'quotaExceeded') {
+             return { success: false, message: "This API key has exceeded its daily quota." };
+        }
+        if (reason === 'accessNotConfigured') {
+             return { success: false, message: "YouTube Data API v3 is not enabled for this key." };
+        }
+
+        return { success: false, message: error?.message || "Invalid API key." };
     } catch (e) {
         return { success: false, message: "Network error during validation. Check your connection or key." };
     }
@@ -455,10 +511,23 @@ export async function validateAuddioKey(apiKey) {
             body: formData,
         });
         const data = await response.json();
+        
         if (data.status === 'success') {
             return { success: true, message: "Audd.io key is valid." };
         }
-        return { success: false, message: data.error?.error_message || "Invalid API key." };
+        
+        if (data.status === 'error') {
+            const code = data.error?.error_code;
+            if (code === 900 || code === 901) {
+                return { success: false, message: "The provided API token is invalid." };
+            }
+            if (code === 500 && data.error?.error_message?.toLowerCase().includes('limit')) {
+                 return { success: false, message: "This API key has exceeded its rate limit." };
+            }
+            return { success: false, message: data.error?.error_message || "Invalid API key." };
+        }
+        
+        return { success: false, message: "Unknown response from validation service." };
     } catch (e) {
         return { success: false, message: "Network error during validation." };
     }

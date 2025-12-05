@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -43,12 +41,12 @@ const ArrowLeftIcon = ({ className }) => h('svg', { className, xmlns: "http://ww
 const BugIcon = ({ className }) => h('svg', { className: className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { width: "8", height: "14", x: "8", y: "6", rx: "4" }), h('path', { d: "m19 7-3 3" }), h('path', { d: "m5 7 3 3" }), h('path', { d: "m19 19-3-3" }), h('path', { d: "m5 19 3-3" }), h('path', { d: "M2 12h4" }), h('path', { d: "M18 12h4" }));
 const MenuIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('line', { x1: "4", y1: "12", x2: "20", y2: "12" }), h('line', { x1: "4", y1: "6", x2: "20", y2: "6" }), h('line', { x1: "4", y1: "18", x2: "20", y2: "18" }));
 const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), h('circle', { cx: "12", cy: "7", r: "4" }));
+const AccountIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }), h('circle', { cx: "8.5", cy: "7", r: "4" }), h('line', { x1: "20", y1: "8", x2: "20", y2: "14" }), h('line', { x1: "23", y1: "11", x2: "17", y2: "11" }));
 const ImageIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }), h('circle', { cx: "8.5", cy: "8.5", r: "1.5" }), h('polyline', { points: "21 15 16 10 5 21" }));
 const SearchIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "11", cy: "11", r: "8" }), h('line', { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }));
 const WhatsAppIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" }));
 const MailIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), h('polyline', { points: "22,6 12,13 2,6" }));
 const GoogleIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "24", height: "24" }, h('path', { fill: "#4285F4", d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" }), h('path', { fill: "#34A853", d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" }), h('path', { fill: "#FBBC05", d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" }), h('path', { fill: "#EA4335", d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" }));
-const AccountIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }), h('circle', { cx: "8.5", cy: "7", r: "4" }), h('line', { x1: "20", y1: "8", x2: "20", y2: "14" }), h('line', { x1: "23", y1: "11", x2: "17", y2: "11" }));
 const SpaciousIcon = ({ className }) => h('svg', { className, viewBox: "0 0 24 24", height: "24", width: "24", xmlns: "http://www.w3.org/2000/svg" },
     h('g', { fill: "none" },
         h('path', { d: "m12.594 23.258l-.012.002l-.071.035l-.02.004l-.014-.004l-.071-.036q-.016-.004-.024.006l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.016-.018m.264-.113l-.014.002l-.184.093l-.01.01l-.003.011l.018.43l.005.012l.008.008l.201.092q.019.005.029-.008l.004-.014l-.034-.614q-.005-.019-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.003-.011l.018-.43l-.003-.012l-.01-.01z", fill: "currentColor" }),
@@ -102,11 +100,14 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
 10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
 
-**LANGUAGE & EMOTION PROTOCOLS:**
-- **Emotion:** Add emotion to your replies. If the topic is humorous, include laughter (e.g., "Haha"). If it is sad, use a sad tone.
-- **Hindi/English Mix:** If the user speaks Hindi, reply in a mix of Hindi and English (Hinglish).
+**LANGUAGE PROTOCOLS:**
+- **Hinglish:** If the user speaks Hindi, reply in a mix of Hindi and English (Hinglish).
 - **English:** If the user speaks English, reply entirely in English.
-- **Regional Languages:** If the user speaks Bengali, Marathi, Gujarati, Kannada, or Tamil, reply in that SAME language.
+- **Regional:** If the user speaks Bengali, Marathi, Gujarati, Kannada, or Tamil, reply in that SAME language.
+
+**EMOTION PROTOCOLS:**
+- **Add Emotion:** Use laughter ("Haha") for humor, or sadness for sad topics.
+- **Match Tone:** Mirror the user's emotional state (Excited -> Excited, Sad -> Empathetic).
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -157,6 +158,33 @@ async function decodeAudioData(data, ctx, sampleRate, numChannels) {
   }
   return buffer;
 }
+
+// YouTube Player Overlay Component
+const YouTubePlayer = ({ videoId, title, onClose }) => {
+    if (!videoId) return null;
+    return h('div', { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in" },
+        h('div', { className: "bg-gray-900 rounded-xl overflow-hidden shadow-2xl w-full max-w-4xl border border-gray-700 flex flex-col" },
+            h('div', { className: "flex justify-between items-center p-4 bg-gray-800 border-b border-gray-700" },
+                h('div', { className: "flex items-center gap-3" },
+                    h(YouTubeIcon, { className: "w-6 h-6 text-red-500" }),
+                    h('span', { className: "font-semibold text-white truncate max-w-[200px] md:max-w-md" }, title || 'YouTube Player')
+                ),
+                h('button', { onClick: onClose, className: "p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors" },
+                    h(XIcon, { className: "w-6 h-6" })
+                )
+            ),
+            h('div', { className: "relative w-full", style: { paddingBottom: "56.25%" } },
+                h('iframe', {
+                    className: "absolute top-0 left-0 w-full h-full",
+                    src: `https://www.youtube.com/embed/${videoId}?autoplay=1`,
+                    title: "YouTube video player",
+                    allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+                    allowFullScreen: true
+                })
+            )
+        )
+    );
+};
 
 // Real-Girl Holographic Avatar Implementation
 const Avatar = ({ state, mood = 'neutral', customUrl }) => {
@@ -447,8 +475,6 @@ const SettingsModal = ({
                 return h('div', { className: "space-y-6 animate-fade-in" },
                      h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('h3', { className: "font-semibold text-lg text-cyan-400 mb-4" }, "Identity & Personality"),
-                        
-                        // Nickname Input
                         h('div', { className: "mb-4" },
                             h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "Your Nickname"),
                             h('input', {
@@ -459,8 +485,6 @@ const SettingsModal = ({
                                 placeholder: "What should I call you?"
                             })
                         ),
-
-                        // Personality Dropdown
                         h('div', { className: "mb-4" },
                             h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "Personality Mode"),
                             h('div', { className: "relative" },
@@ -477,7 +501,6 @@ const SettingsModal = ({
                             )
                         )
                     ),
-
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, "Custom Instructions"),
@@ -485,7 +508,7 @@ const SettingsModal = ({
                         ),
                         h('div', { className: "space-y-5" },
                             h('div', null,
-                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "What would you like Kaniska to know about you to provide better responses?"),
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "What would you like Kaniska to know about you?"),
                                 h('textarea', {
                                     className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all resize-none text-sm leading-relaxed",
                                     rows: 3,
@@ -548,7 +571,6 @@ const SettingsModal = ({
                                         key: g,
                                         onClick: () => {
                                             setGender(g);
-                                            // Auto-update greeting if it's currently on the default for the other gender
                                             if (g === 'male' && greetingMessage === DEFAULT_FEMALE_GREETING) {
                                                 setGreetingMessage(DEFAULT_MALE_GREETING);
                                             } else if (g === 'female' && greetingMessage === DEFAULT_MALE_GREETING) {
@@ -571,39 +593,6 @@ const SettingsModal = ({
                             rows: 2,
                             value: greetingMessage,
                             onChange: (e) => setGreetingMessage(e.target.value)
-                        })
-                    ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
-                        h('div', { className: "absolute top-0 right-0 p-2" },
-                            h('span', { className: "text-[10px] font-bold uppercase tracking-widest text-gray-600 border border-gray-700 px-2 py-1 rounded bg-black/50" }, "Read Only")
-                        ),
-                        h('div', { className: "mb-3" },
-                            h('h3', { className: "font-semibold text-lg text-gray-400" }, t('settings.personaTab.coreIdentity.title') || "Core Identity & Protocols"),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.coreIdentity.description') || "These are fixed operational rules and identity definitions set by the creator.")
-                        ),
-                        h('textarea', {
-                            className: "w-full bg-black/20 border border-gray-800 rounded-lg px-4 py-3 text-gray-500 outline-none resize-none text-xs font-mono cursor-not-allowed",
-                            rows: 6,
-                            value: FIXED_SYSTEM_INSTRUCTIONS,
-                            disabled: true
-                        })
-                    ),
-                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
-                        h('div', { className: "flex justify-between items-center mb-4" },
-                            h('div', null,
-                                h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.ambient.title')),
-                                h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.ambient.description'))
-                            ),
-                            h('span', { className: "text-sm font-mono bg-cyan-900/30 text-cyan-400 px-2 py-1 rounded border border-cyan-900/50" }, `${Math.round(ambientVolume * 100)}%`)
-                        ),
-                        h('input', {
-                            type: "range",
-                            min: "0",
-                            max: "1",
-                            step: "0.01",
-                            value: ambientVolume,
-                            onChange: (e) => setAmbientVolume(parseFloat(e.target.value)),
-                            className: "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                         })
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
@@ -968,6 +957,9 @@ export const App = () => {
     const [messages, setMessages] = React.useState([]);
     const [inputText, setInputText] = React.useState('');
     const [dailyUsage, setDailyUsage] = React.useState({ seconds: 0, date: new Date().toDateString() });
+    
+    // Video State
+    const [playingVideo, setPlayingVideo] = React.useState(null);
 
     // Live Session State
     const [isLive, setIsLive] = React.useState(false);
@@ -975,7 +967,9 @@ export const App = () => {
     const audioContextRef = React.useRef(null);
     const inputContextRef = React.useRef(null);
     const nextStartTimeRef = React.useRef(0);
-    const audioQueueRef = React.useRef<any[]>([]);
+
+    // Dynamic Voice Calculation
+    const currentVoiceName = gender === 'female' ? femaleVoices.main : maleVoices.main;
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -986,6 +980,18 @@ export const App = () => {
         });
         return () => unsubscribe();
     }, []);
+
+    // Effect: Reconnect Live Session when Gender/Voice changes
+    useEffect(() => {
+        if (isLive) {
+            console.log("Gender/Voice changed, reconnecting live session...");
+            stopLive();
+            // Short delay to allow cleanup before reconnecting with new voice config
+            setTimeout(() => {
+                startLive();
+            }, 500);
+        }
+    }, [gender, currentVoiceName]);
 
     const handleLogin = async () => {
         try {
@@ -1039,9 +1045,6 @@ export const App = () => {
         return instructions;
     };
 
-    // Calculate dynamic voice based on gender
-    const currentVoiceName = gender === 'female' ? femaleVoices.main : maleVoices.main;
-
     const handleTimer = (duration: number) => {
         setTimeout(async () => {
             const alertMsg = "Your timer is up!";
@@ -1069,17 +1072,16 @@ export const App = () => {
         }, duration * 1000);
     };
 
-    const toggleLive = async () => {
-        if (isLive) {
-            if (audioContextRef.current) audioContextRef.current.close();
-            if (inputContextRef.current) inputContextRef.current.close();
-            
-            setIsLive(false);
-            setStatus('idle');
-            liveSessionRef.current = null;
-            return;
-        }
+    const stopLive = () => {
+        if (audioContextRef.current) audioContextRef.current.close();
+        if (inputContextRef.current) inputContextRef.current.close();
+        
+        setIsLive(false);
+        setStatus('idle');
+        liveSessionRef.current = null;
+    };
 
+    const startLive = async () => {
         setStatus('listening');
         setIsLive(true);
         
@@ -1090,7 +1092,20 @@ export const App = () => {
              audioContextRef.current = outputAudioContext;
              nextStartTimeRef.current = 0;
 
-             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+             // Request Microphone Permission
+             let stream;
+             try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+             } catch (micError) {
+                 // Map specific mic errors
+                 if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+                     throw new Error('mic_permission_denied');
+                 } else if (micError.name === 'NotFoundError' || micError.name === 'DevicesNotFoundError') {
+                     throw new Error('mic_not_found');
+                 } else {
+                     throw micError;
+                 }
+             }
              
              // Pass currentVoiceName to the session connection
              const sessionPromise = connectLiveSession({
@@ -1168,6 +1183,52 @@ export const App = () => {
                                          });
                                      });
                                  }
+                             } else if (fc.name === 'searchYouTube') {
+                                const query = fc.args.query;
+                                console.log(`Searching YouTube for: ${query}`);
+                                try {
+                                    const result = await searchYouTube(apiKeys.youtube, query);
+                                    if (result) {
+                                        setPlayingVideo(result);
+                                        sessionPromise.then(session => {
+                                            session.sendToolResponse({
+                                                functionResponses: [
+                                                    {
+                                                        id: fc.id,
+                                                        name: fc.name,
+                                                        response: { result: { success: true, title: result.title } }
+                                                    }
+                                                ]
+                                            });
+                                        });
+                                    } else {
+                                         sessionPromise.then(session => {
+                                            session.sendToolResponse({
+                                                functionResponses: [
+                                                    {
+                                                        id: fc.id,
+                                                        name: fc.name,
+                                                        response: { result: { success: false, message: "No video found" } }
+                                                    }
+                                                ]
+                                            });
+                                        });
+                                    }
+                                } catch (err) {
+                                    console.error("YouTube search error", err);
+                                    // Optionally handle error response back to model
+                                     sessionPromise.then(session => {
+                                            session.sendToolResponse({
+                                                functionResponses: [
+                                                    {
+                                                        id: fc.id,
+                                                        name: fc.name,
+                                                        response: { result: { success: false, message: err.message } }
+                                                    }
+                                                ]
+                                            });
+                                        });
+                                }
                              }
                          }
                      }
@@ -1181,15 +1242,55 @@ export const App = () => {
                      console.error("Live session error", err);
                      setIsLive(false);
                      setStatus('error');
+                     
+                     // Handle Async Session Errors
+                     let errorText = t('errors.speechRecognitionGeneric');
+                     if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
+                         errorText = t('errors.apiKeyInvalid');
+                     } else if (err.message && err.message.includes('503')) {
+                         errorText = t('errors.serviceUnavailable');
+                     } else if (err.message && err.message.includes('network')) {
+                         errorText = t('errors.network');
+                     }
+                     
+                     setMessages(prev => [...prev, { sender: 'system', text: errorText }]);
                  }
              }, getSystemInstructions(), currentVoiceName);
              
              liveSessionRef.current = sessionPromise;
+             // Ensure connection is established (re-throws if connection fails immediately)
+             await sessionPromise;
 
         } catch (e) {
             console.error("Failed to start live session", e);
             setStatus('error');
             setIsLive(false);
+
+            let errorMessage = t('errors.speechRecognitionGeneric');
+
+            if (e.message === 'mic_permission_denied') {
+                errorMessage = t('errors.micNotAllowed');
+            } else if (e.message === 'mic_not_found') {
+                errorMessage = "Microphone not found on this device.";
+            } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                 errorMessage = t('errors.micNotAllowed');
+            } else if (e.message.includes('401') || e.message.includes('403') || e.message.includes('API key')) {
+                errorMessage = t('errors.apiKeyInvalid');
+            } else if (e.message.includes('503') || e.message.includes('Overloaded')) {
+                errorMessage = t('errors.serviceUnavailable');
+            } else if (e.message.includes('Failed to fetch') || e.message.includes('Network')) {
+                 errorMessage = t('errors.network');
+            }
+            
+            setMessages(prev => [...prev, { sender: 'system', text: errorMessage }]);
+        }
+    };
+
+    const toggleLive = () => {
+        if (isLive) {
+            stopLive();
+        } else {
+            startLive();
         }
     };
 
@@ -1215,12 +1316,26 @@ export const App = () => {
                 handleTimer(response.timerDurationSeconds);
             }
 
+            // Handle YouTube Query if present
+            if (response.youtubeQuery) {
+                try {
+                    const videoResult = await searchYouTube(apiKeys.youtube, response.youtubeQuery);
+                    if (videoResult) {
+                        setPlayingVideo(videoResult);
+                        setMessages(prev => [...prev, { sender: 'system', text: `Playing: ${videoResult.title}` }]);
+                    } else {
+                        setMessages(prev => [...prev, { sender: 'system', text: "I couldn't find a video for that." }]);
+                    }
+                } catch (err) {
+                     setMessages(prev => [...prev, { sender: 'system', text: `YouTube Error: ${err.message}` }]);
+                }
+            }
+
             setStatus('speaking');
             setMessages(prev => [...prev, { sender: 'model', text: response.reply }]);
 
             // Generate Speech
-            const voiceName = gender === 'female' ? femaleVoices.main : maleVoices.main;
-            const stream = await generateSpeech(response.reply, voiceName);
+            const stream = await generateSpeech(response.reply, currentVoiceName);
             
             const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
             let nextTime = audioCtx.currentTime;
@@ -1266,13 +1381,13 @@ export const App = () => {
         ),
 
         // Main Content
-        h('main', { className: "flex-1 flex flex-col items-center justify-start pt-4 md:justify-center md:pt-0 relative" },
+        h('main', { className: "flex-1 flex flex-col items-center justify-start pt-12 md:justify-center md:pt-0 relative" },
             h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
                // Optional background effects
             ),
             
             // Avatar Centerpiece
-            h('div', { className: "mb-8 z-10 transform scale-110 md:scale-125 transition-transform duration-500 pt-4 md:pt-0" },
+            h('div', { className: "mb-4 z-10 transform scale-110 md:scale-125 transition-transform duration-500" },
                 h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl })
             ),
 
@@ -1282,7 +1397,7 @@ export const App = () => {
             ),
 
             // Chat Overlay (Simplified for visual clarity)
-            h('div', { className: "absolute bottom-44 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
+            h('div', { className: "absolute bottom-60 w-full max-w-2xl px-4 max-h-[30vh] overflow-y-auto custom-scrollbar space-y-3 mask-image-gradient" },
                 messages.slice(-3).map((msg, i) => 
                     h('div', { key: i, className: `flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}` },
                         h('div', { className: `px-4 py-2 rounded-2xl max-w-[80%] backdrop-blur-md border ${msg.sender === 'user' ? 'bg-cyan-900/30 border-cyan-500/30 text-white' : 'bg-gray-900/50 border-gray-700/50 text-gray-200'}` },
@@ -1294,7 +1409,7 @@ export const App = () => {
         ),
 
         // Footer Controls
-        h('footer', { className: "p-4 pb-36 md:pb-4 z-20 w-full max-w-3xl mx-auto" },
+        h('footer', { className: "p-4 pb-48 md:pb-4 z-20 w-full max-w-3xl mx-auto" },
             h('div', { className: "flex gap-2 bg-gray-900/80 backdrop-blur-xl p-2 rounded-full border border-gray-700 shadow-2xl" },
                  // Live Mic Button
                 h('button', {
@@ -1317,6 +1432,13 @@ export const App = () => {
                 }, h(SendIcon, { className: "w-5 h-5" }))
             )
         ),
+
+        // YouTube Player Overlay
+        h(YouTubePlayer, {
+            videoId: playingVideo?.videoId,
+            title: playingVideo?.title,
+            onClose: () => setPlayingVideo(null)
+        }),
 
         // Settings Modal
         h(SettingsModal, {
