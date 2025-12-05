@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const en = {
@@ -53,6 +54,7 @@ const en = {
   "settings": {
     "title": "Settings",
     "tabs": {
+      "account": "Account",
       "persona": "Persona",
       "voice": "Voice",
       "apiKeys": "API Keys",
@@ -66,6 +68,13 @@ const en = {
         "description": "Choose how the application looks.",
         "light": "Light",
         "dark": "Dark"
+      },
+      "assistantProfile": {
+        "title": "Assistant Profile",
+        "description": "Define the identity, background, and traits of your AI assistant.",
+        "name": "Name",
+        "background": "Background Story",
+        "traits": "Core Traits"
       },
       "greeting": {
         "title": "Greeting Message",
@@ -94,9 +103,13 @@ const en = {
         "remove": "Remove"
       },
       "systemPrompt": {
-        "title": "Custom System Prompt",
-        "description": "Define the core personality and instructions. A restart is needed for changes to take full effect.",
+        "title": "Custom Instructions",
+        "description": "Define the persona and behavioral instructions. This acts as the variable part of the system prompt.",
         "save": "Save Prompt"
+      },
+      "coreIdentity": {
+        "title": "Core Identity & Protocols",
+        "description": "These are fixed operational rules and identity definitions set by the creator."
       },
        "gender": {
         "title": "Gender Persona",
@@ -134,7 +147,7 @@ const en = {
     "apiKeysTab": {
       "gemini": {
         "title": "Gemini API Key (Required)",
-        "description": "The core key for AI functionality. Managed by the environment.",
+        "description": "The core key for AI functionality. This is managed by the application's environment and cannot be changed here.",
         "envSet": "Environment Set"
       },
       "optional": {
@@ -154,22 +167,17 @@ const en = {
     },
     "subscriptionTab": {
       "title": "Subscription",
-      "description": "Choose the plan that suits you best. Usage is limited on the Free plan.",
-      "currentPlan": "Current Plan",
-      "upgrade": "Upgrade",
-      "active": "Active",
-      "usage": "Daily Usage",
+      "description": "Choose the plan that suits you best.",
       "plans": {
-        "free": { "name": "Free", "price": "₹0", "duration": "/ day" },
         "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" },
         "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" },
         "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" },
         "yearly": { "name": "Yearly", "price": "₹500", "duration": "/ year" }
       },
-      "subscribeButton": "Select Plan",
-      "featuresTitle": "Plan Features:",
+      "subscribeButton": "Subscribe Now",
+      "featuresTitle": "All plans include:",
       "featureFree": "1 hour of usage per day",
-      "feature1": "Unlimited access & higher priority",
+      "feature1": "Higher priority access during peak times",
       "feature2": "Access to advanced and experimental voice models",
       "feature3": "Exclusive avatar packs and visual customizations"
     },
@@ -189,6 +197,10 @@ const en = {
         "weatherSteps": "1. Go to the <1>Visual Crossing Weather Data</1> website.\n2. Click 'Sign Up' to create a free account.\n3. After signing in, click your account name in the top-right corner and select 'Account' from the dropdown menu.\n4. Your API Key will be visible on this page. Copy it.",
         "youtubeTitle": "Google Cloud API Key (for YouTube)",
         "youtubeSteps": "1. Go to the <1>Google Cloud Console</1> and sign in.\n2. In the top bar, click the project selector dropdown (it might say 'Select a project') and click 'NEW PROJECT'.\n3. Give your project a name (e.g., 'Kaniska YouTube Key') and click 'CREATE'.\n4. Ensure your new project is selected in the top bar.\n5. In the top search bar, type 'YouTube Data API v3' and select it.\n6. Click the blue 'ENABLE' button.\n7. After it's enabled, open the navigation menu (☰) in the top-left, go to 'APIs & Services', then 'Credentials'.\n8. Click '+ CREATE CREDENTIALS' at the top and select 'API key'.\n9. A pop-up will show your new API key. Copy it.",
+        "newsTitle": "GNews API Key",
+        "newsSteps": "1. Go to the <1>GNews</1> website.\n2. Click 'Get a Free API Key' and register for an account.\n3. Your API key will be available on your account dashboard.",
+        "auddioTitle": "Audd.io API Key",
+        "auddioSteps": "1. Go to the <1>Audd.io</1> website and sign up.\n2. You will get a free trial key upon registration.\n3. Find your API token in your account dashboard.",
         "inputTitle": "Where do I input the keys?",
         "inputSteps": "1. In this app, click the Settings icon (⚙️) in the top-right corner.\n2. Go to the 'API Keys' tab.\n3. Paste your copied key into the correct input field.\n4. Click 'Save & Validate Keys'."
       }
@@ -198,6 +210,7 @@ const en = {
       "description": "Kaniska, a sci-fi inspired female voice assistant that uses Gemini to understand commands in Hindi, search YouTube, and provide voice replies using the browser's built-in text-to-speech.",
       "version": "Version",
       "privacyPolicy": "Privacy Policy",
+      "termsOfService": "Terms of Service",
       "reportBug": "Report Bug"
     },
     "common": {
@@ -211,15 +224,11 @@ const en = {
       "micNotAllowed": "Microphone access is not allowed. Please enable it in your browser settings to continue.",
       "speechRecognitionGeneric": "An unexpected error occurred with speech recognition. Please try again. If it continues, try refreshing the page.",
       "speechRecognitionNetwork": "A network error prevented speech recognition. Please check your connection.",
-      "connection": "Live connection failed. Please check your internet and try again. The service might be temporarily unavailable.",
+      "connection": "The live connection to my core services failed. Please check your internet connection. If the problem persists, the service may be temporarily down.",
       "youtubePlayback": "I'm sorry, but there was an error playing that video. It might be private, deleted, or restricted from being embedded. Please try a different search.",
       "auddioKeyMissing": "Please set your Audd.io API key in the settings to use song recognition.",
       "auddioRecording": "I couldn't start recording for song recognition. Please ensure microphone permissions are granted in your browser settings and try again.",
-      "dailyLimit": "You have reached your daily usage limit of 1 hour on the Free plan. Please upgrade your subscription to continue.",
-      "apiKeyInvalid": "Connection refused. Please check your API Key.",
-      "rateLimit": "Service is busy (Rate Limit Exceeded). Please try again later.",
-      "network": "Network error. Please check your connection.",
-      "serviceUnavailable": "Service temporarily unavailable. Please try again."
+      "dailyLimit": "To continue, you need to subscribe. Please upgrade your plan."
     }
   }
 };
@@ -268,11 +277,15 @@ const hi = {
   "youtubePanel": {
     "title": "यूट्यूब प्लेयर",
     "recentSearches": "हाल की खोजें",
-    "views": "{{count}} बार देखा गया"
+    "views": "{{count}} बार देखा गया",
+    "upNext": "अगला",
+    "clearQueue": "सूची साफ़ करें",
+    "searchPlaceholder": "शुरू करने के लिए एक वीडियो खोजें।"
   },
   "settings": {
     "title": "सेटिंग्स",
     "tabs": {
+      "account": "खाता",
       "persona": " व्यक्तित्व",
       "voice": "आवाज़",
       "apiKeys": "एपीआई कुंजी",
@@ -314,9 +327,13 @@ const hi = {
         "remove": "हटाएं"
       },
       "systemPrompt": {
-        "title": "कस्टम सिस्टम प्रॉम्प्ट",
-        "description": "मूल व्यक्तित्व और निर्देशों को परिभाषित करें। परिवर्तनों को पूरी तरह से प्रभावी होने के लिए पुनरारंभ की आवश्यकता है।",
+        "title": "कस्टम निर्देश",
+        "description": "व्यक्तित्व और व्यवहार संबंधी निर्देशों को परिभाषित करें। यह सिस्टम प्रॉम्प्ट के परिवर्तनीय भाग के रूप में कार्य करता है।",
         "save": "प्रॉम्प्ट सहेजें"
+      },
+      "coreIdentity": {
+        "title": "मूल पहचान और प्रोटोकॉल",
+        "description": "ये निर्माता द्वारा निर्धारित निश्चित परिचालन नियम और पहचान परिभाषाएँ हैं।"
       },
       "gender": {
         "title": "लिंग व्यक्तित्व",
@@ -354,7 +371,7 @@ const hi = {
     "apiKeysTab": {
       "gemini": {
         "title": "जेमिनी एपीआई कुंजी (आवश्यक)",
-        "description": "एआई कार्यक्षमता के लिए मुख्य कुंजी। पर्यावरण द्वारा प्रबंधित।",
+        "description": "एआई कार्यक्षमता के लिए मुख्य कुंजी। यह एप्लिकेशन के परिवेश द्वारा प्रबंधित है और इसे यहां बदला नहीं जा सकता।",
         "envSet": "पर्यावरण सेट"
       },
       "optional": {
@@ -374,22 +391,16 @@ const hi = {
     },
     "subscriptionTab": {
       "title": "सदस्यता",
-      "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो। नि:शुल्क योजना पर उपयोग सीमित है।",
-      "currentPlan": "वर्तमान योजना",
-      "upgrade": "अपग्रेड करें",
-      "active": "सक्रिय",
-      "usage": "दैनिक उपयोग",
+      "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो।",
       "plans": {
-        "free": { "name": "नि:शुल्क", "price": "₹0", "duration": "/ दिन" },
         "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" },
         "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" },
         "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" },
         "yearly": { "name": "वार्षिक", "price": "₹500", "duration": "/ वर्ष" }
       },
-      "subscribeButton": "योजना चुनें",
-      "featuresTitle": "योजना विशेषताएं:",
-      "featureFree": "प्रति दिन 1 घंटे का उपयोग",
-      "feature1": "असीमित पहुंच और उच्च प्राथमिकता",
+      "subscribeButton": "अभी सदस्यता लें",
+      "featuresTitle": "सभी योजनाओं में शामिल हैं:",
+      "feature1": "व्यस्त समय के दौरान उच्च प्राथमिकता वाली पहुंच",
       "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच",
       "feature3": "विशेष अवतार पैक और दृश्य अनुकूलन"
     },
@@ -409,6 +420,10 @@ const hi = {
         "weatherSteps": "1. <1>विज़ुअल क्रॉसिंग वेदर डेटा</1> वेबसाइट पर जाएं।\n2. एक निःशुल्क खाता बनाने के लिए 'साइन अप करें' पर क्लिक करें।\n3. साइन इन करने के बाद, ऊपर-दाएं कोने में अपने खाते के नाम पर क्लिक करें और ड्रॉपडाउन मेनू से 'अकाउंट' चुनें।\n4. आपकी एपीआई कुंजी इस पृष्ठ पर दिखाई देगी। इसे कॉपी करें।",
         "youtubeTitle": "गूगल क्लाउड एपीआई कुंजी (यूट्यूब के लिए)",
         "youtubeSteps": "1. <1>गूगल क्लाउड कंसोल</1> पर जाएं और साइन इन करें।\n2. ऊपरी बार में, प्रोजेक्ट चयनकर्ता ड्रॉपडाउन पर क्लिक करें (यह 'एक प्रोजेक्ट चुनें' कह सकता है) और 'नया प्रोजेक्ट' पर क्लिक करें।\n3. अपने प्रोजेक्ट को एक नाम दें (जैसे, 'कनिष्का यूट्यूब कुंजी') और 'बनाएं' पर क्लिक करें।\n4. सुनिश्चित करें कि आपका नया प्रोजेक्ट ऊपरी बार में चुना गया है।\n5. ऊपरी खोज बार में, 'YouTube Data API v3' टाइप करें और इसे चुनें।\n6. नीले 'सक्षम करें' बटन पर क्लिक करें।\n7. सक्षम होने के बाद, ऊपर-बाईं ओर नेविगेशन मेनू (☰) खोलें, 'एपीआई और सेवाएं' पर जाएं, फिर 'क्रेडेंशियल' पर जाएं।\n8. शीर्ष पर '+ क्रेडेंशियल बनाएं' पर क्लिक करें और 'एपीआई कुंजी' चुनें।\n9. एक पॉप-अप आपकी नई एपीआई कुंजी दिखाएगा। इसे कॉपी करें।",
+        "newsTitle": "जीन्यूज एपीआई कुंजी",
+        "newsSteps": "1. <1>जीन्यूज</1> वेबसाइट पर जाएं।\n2. 'एक मुफ्त एपीआई कुंजी प्राप्त करें' पर क्लिक करें और एक खाते के लिए पंजीकरण करें।\n3. आपकी एपीआई कुंजी आपके खाता डैशबोर्ड पर उपलब्ध होगी।",
+        "auddioTitle": "Audd.io API कुंजी",
+        "auddioSteps": "1. <1>Audd.io</1> वेबसाइट पर जाएं और साइन अप करें।\n2. पंजीकरण पर आपको एक मुफ्त परीक्षण कुंजी मिलेगी।\n3. अपने खाता डैशबोर्ड में अपना एपीआई टोकन खोजें।",
         "inputTitle": "मैं कुंजियाँ कहाँ दर्ज करूँ?",
         "inputSteps": "1. इस ऐप में, ऊपर-दाएं कोने में सेटिंग्स आइकन (⚙️) पर क्लिक करें।\n2. 'एपीआई कुंजी' टैब पर जाएं।\n3. अपनी कॉपी की गई कुंजी को सही इनपुट फ़ील्ड में पेस्ट करें।\n4. 'कुंजी सहेजें और मान्य करें' पर क्लिक करें।"
       }
@@ -418,6 +433,7 @@ const hi = {
       "description": "कनिष्का, एक विज्ञान-कथा से प्रेरित महिला वॉयस असिस्टेंट है जो जेमिनी का उपयोग करके हिंदी में कमांड समझने, यूट्यूब पर खोजने और ब्राउज़र के अंतर्निहित टेक्स्ट-टू-स्पीच का उपयोग करके वॉयस रिप्लाई प्रदान करती है।",
       "version": "संस्करण",
       "privacyPolicy": "गोपनीयता नीति",
+      "termsOfService": "सेवा की शर्तें",
       "reportBug": "बग रिपोर्ट करें"
     },
     "common": {
@@ -435,16 +451,481 @@ const hi = {
       "youtubePlayback": "मुझे खेद है, लेकिन उस वीडियो को चलाने में एक त्रुटि हुई। यह निजी, हटा दिया गया, या एम्बेड करने से प्रतिबंधित हो सकता है। कृपया एक अलग खोज का प्रयास करें।",
       "auddioKeyMissing": "गाना पहचानने की सुविधा का उपयोग करने के लिए कृपया सेटिंग्स में अपनी Audd.io API कुंजी सेट करें।",
       "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।",
-      "dailyLimit": "नि:शुल्क योजना पर आप 1 घंटे की दैनिक उपयोग सीमा तक पहुँच गए हैं। जारी रखने के लिए कृपया अपनी सदस्यता अपग्रेड करें।",
-      "apiKeyInvalid": "कनेक्शन अस्वीकृत। कृपया अपनी एपीआई कुंजी की जाँच करें।",
-      "rateLimit": "सेवा व्यस्त है (दर सीमा पार हो गई)। कृपया बाद में पुनः प्रयास करें।",
-      "network": "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें।",
-      "serviceUnavailable": "सेवा अस्थायी रूप से अनुपलब्ध है। कृपया पुन: प्रयास करें।"
+      "dailyLimit": "जारी रखने के लिए, आपको सदस्यता लेनी होगी। कृपया अपनी योजना अपग्रेड करें।"
     }
   }
 };
 
-const translationsData = { en, hi };
+const bn = {
+  "appName": "কনিষ্কা",
+  "header": { "settings": "সেটিংস", "toggleTheme": "থিম টগল" },
+  "main": {
+    "status": {
+      "offline": "অফलाइन",
+      "listening": "শুনছি...",
+      "thinking": "ভাবছি...",
+      "speaking": "বলছি...",
+      "singing": "গাইছি...",
+      "error": "ত্রুটি",
+      "idle": "অলস",
+      "live": "লাইভ",
+      "recognizing": "সনাক্ত করা হচ্ছে..."
+    },
+    "noSpeechHint": "কিছু শুনতে পাইনি।",
+    "lowConfidenceHint": "বুঝতে পারিনি। আবার বলুন?"
+  },
+  "footer": {
+    "connect": "সংযুক্ত",
+    "disconnect": "বিচ্ছিন্ন",
+    "record": "রেকর্ড",
+    "stop": "থামুন",
+    "recognizeSong": "গান চিনুন"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "আপনার কথোপকথন এখানে প্রদর্শিত হবে।",
+      "info": "[তথ্য] সংযোগ বিচ্ছিন্ন।"
+    },
+    "sources": "উত্স:",
+    "goToApiSettings": "API সেটিংসে যান",
+    "songRecognized": "এটি \"{{title}}\" - {{artist}}।",
+    "songNotFound": "গানটি চিনতে পারিনি।"
+  },
+  "timer": { "title": "টাইমার" },
+  "youtubePanel": {
+    "title": "ইউটিউব প্লেয়ার",
+    "recentSearches": "সাম্প্রতিক অনুসন্ধান",
+    "views": "{{count}} বার দেখা হয়েছে"
+  },
+  "settings": {
+    "title": "সেটিংস",
+    "tabs": {
+      "account": "অ্যাকাউন্ট",
+      "persona": "ব্যক্তিত্ব",
+      "voice": "কণ্ঠ",
+      "apiKeys": "API কি",
+      "subscription": "সাবস্ক্রিপশন",
+      "help": "সাহায্য",
+      "about": "সম্পর্কে"
+    },
+    "common": {
+      "save": "সংরক্ষণ",
+      "saved": "সংরক্ষিত!",
+      "copy": "কপি",
+      "copied": "কপি হয়েছে!",
+      "retry": "পুনরায় চেষ্টা"
+    },
+    "errors": {
+      "micNotAllowed": "মাইক্রোফোন অ্যাক্সেসের অনুমতি নেই।",
+      "network": "নেটওয়ার্ক ত্রুটি।",
+      "dailyLimit": "দৈনিক সীমা অতিক্রান্ত।"
+    }
+  }
+};
+
+const mr = {
+  "appName": "कनिष्का",
+  "header": { "settings": "सेटिंग्ज", "toggleTheme": "थीम" },
+  "main": {
+    "status": {
+      "offline": "ऑफलाइन",
+      "listening": "ऐकत आहे...",
+      "thinking": "विचार करत आहे...",
+      "speaking": "बोलत आहे...",
+      "singing": "गात आहे...",
+      "error": "त्रुटी",
+      "idle": "निष्क्रिय",
+      "live": "लाइव्ह",
+      "recognizing": "गाणे ओळखत आहे..."
+    },
+    "noSpeechHint": "काहीही ऐकू आले नाही.",
+    "lowConfidenceHint": "समजले नाही. पुन्हा सांगा?"
+  },
+  "footer": {
+    "connect": "जोडा",
+    "disconnect": "तोडा",
+    "record": "रेकॉर्ड",
+    "stop": "थांबा",
+    "recognizeSong": "गाणे ओळखा"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "तुमचे संभाषण येथे दिसेल.",
+      "info": "[माहिती] कनेक्शन बंद."
+    },
+    "sources": "स्त्रोत:",
+    "goToApiSettings": "API सेटिंग्जवर जा",
+    "songRecognized": "मला वाटते हे \"{{title}}\" आहे - {{artist}}.",
+    "songNotFound": "गाणे ओळखू शकलो नाही."
+  },
+  "timer": { "title": "टाइमर" },
+  "youtubePanel": {
+    "title": "यूट्यूब प्लेयर",
+    "recentSearches": "अलीकडील शोध",
+    "views": "{{count}} दृश्ये"
+  },
+  "settings": {
+    "title": "सेटिंग्ज",
+    "tabs": {
+      "account": "खाते",
+      "persona": "व्यक्तिमत्व",
+      "voice": "आवाज",
+      "apiKeys": "API की",
+      "subscription": "सबस्क्रिप्शन",
+      "help": "मदत",
+      "about": "बद्दल"
+    },
+    "common": {
+      "save": "जतन करा",
+      "saved": "जतन केले!",
+      "copy": "कॉपी",
+      "copied": "कॉपी केले!",
+      "retry": "पुन्हा प्रयत्न"
+    },
+    "errors": {
+      "micNotAllowed": "मायक्रोफोन परवानगी नाही.",
+      "network": "नेटवर्क त्रुटी.",
+      "dailyLimit": "दैनिक मर्यादा संपली."
+    }
+  }
+};
+
+const gu = {
+  "appName": "કનિષ્કા",
+  "header": { "settings": "સેટિંગ્સ", "toggleTheme": "થીમ" },
+  "main": {
+    "status": {
+      "offline": "ઓફલાઇન",
+      "listening": "સાંભળી રહ્યું છે...",
+      "thinking": "વિચારી રહ્યું છે...",
+      "speaking": "બોલી રહ્યું છે...",
+      "singing": "ગાઇ રહ્યું છે...",
+      "error": "ભૂલ",
+      "idle": "નિષ્ક્રિય",
+      "live": "લાઇવ",
+      "recognizing": "ઓળખી રહ્યું છે..."
+    },
+    "noSpeechHint": "કંઈ સંભળાયું નહીં.",
+    "lowConfidenceHint": "સમજાયું નહીં. ફરીથી કહો?"
+  },
+  "footer": {
+    "connect": "જોડાવો",
+    "disconnect": "ડિસ્કનેક્ટ",
+    "record": "રેકોર્ડ",
+    "stop": "બંધ",
+    "recognizeSong": "ગીત ઓળખો"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "તમારી વાતચીત અહીં દેખાશે.",
+      "info": "[માહિતી] કનેક્શન બંધ."
+    },
+    "sources": "સ્ત્રોત:",
+    "goToApiSettings": "API સેટિંગ્સ પર જાઓ",
+    "songRecognized": "આ \"{{title}}\" છે - {{artist}}.",
+    "songNotFound": "ગીત ઓળખી શકાયું નથી."
+  },
+  "timer": { "title": "ટાઈમર" },
+  "youtubePanel": {
+    "title": "યુટ્યુબ પ્લેયર",
+    "recentSearches": "તાજેતરની શોધ",
+    "views": "{{count}} દૃશ્યો"
+  },
+  "settings": {
+    "title": "સેટિંગ્સ",
+    "tabs": {
+      "account": "ખાતું",
+      "persona": "વ્યક્તિત્વ",
+      "voice": "અવાજ",
+      "apiKeys": "API કી",
+      "subscription": "સબસ્ક્રિપ્શન",
+      "help": "મદદ",
+      "about": "વિશે"
+    },
+    "common": {
+      "save": "સાચવો",
+      "saved": "સાચવ્યું!",
+      "copy": "કોપી",
+      "copied": "કોપી કર્યું!",
+      "retry": "ફરી પ્રયાસ"
+    },
+    "errors": {
+      "micNotAllowed": "માઇક્રોફોન પરવાનગી નથી.",
+      "network": "નેટવર્ક ભૂલ.",
+      "dailyLimit": "દૈનિક મર્યાદા સમાપ્ત."
+    }
+  }
+};
+
+const ta = {
+  "appName": "கனிஷ்கா",
+  "header": { "settings": "அமைப்புகள்", "toggleTheme": "தீம்" },
+  "main": {
+    "status": {
+      "offline": "ஆஃப்லைன்",
+      "listening": "கேட்கிறது...",
+      "thinking": "யோசிக்கிறது...",
+      "speaking": "பேசுகிறது...",
+      "singing": "பாடுகிறது...",
+      "error": "பிழை",
+      "idle": "இலவச",
+      "live": "நேரலை",
+      "recognizing": "கண்டறிகிறது..."
+    },
+    "noSpeechHint": "எதுவும் கேட்கவில்லை.",
+    "lowConfidenceHint": "புரியவில்லை. மீண்டும் சொல்லுங்கள்?"
+  },
+  "footer": {
+    "connect": "இணை",
+    "disconnect": "துண்டி",
+    "record": "பதிவு",
+    "stop": "நிறுத்து",
+    "recognizeSong": "பாடல் அறி"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "உங்கள் உரையாடல் இங்கே தோன்றும்.",
+      "info": "[தகவல்] இணைப்பு மூடப்பட்டது."
+    },
+    "sources": "ஆதாரங்கள்:",
+    "goToApiSettings": "API அமைப்புகளுக்குச் செல்லவும்",
+    "songRecognized": "இது \"{{title}}\" - {{artist}}.",
+    "songNotFound": "பாடலை அறிய முடியவில்லை."
+  },
+  "timer": { "title": "டைமர்" },
+  "youtubePanel": {
+    "title": "யூடியூப் பிளேயர்",
+    "recentSearches": "சமீபத்திய தேடல்கள்",
+    "views": "{{count}} பார்வைகள்"
+  },
+  "settings": {
+    "title": "அமைப்புகள்",
+    "tabs": {
+      "account": "கணக்கு",
+      "persona": "ஆளுமை",
+      "voice": "குரல்",
+      "apiKeys": "API சாவி",
+      "subscription": "சந்தா",
+      "help": "உதவி",
+      "about": "பற்றி"
+    },
+    "common": {
+      "save": "சேமி",
+      "saved": "சேமிக்கப்பட்டது!",
+      "copy": "நகல்",
+      "copied": "நகலெடுக்கப்பட்டது!",
+      "retry": "மீண்டும் முயற்சி"
+    },
+    "errors": {
+      "micNotAllowed": "மைக்ரோஃபோன் அனுமதி இல்லை.",
+      "network": "நெட்வொர்க் பிழை.",
+      "dailyLimit": "தினசரி வரம்பு முடிந்தது."
+    }
+  }
+};
+
+const te = {
+  "appName": "కనిష్క",
+  "header": { "settings": "సెట్టింగ్‌లు", "toggleTheme": "థీమ్" },
+  "main": {
+    "status": {
+      "offline": "ఆఫ్‌లైన్",
+      "listening": "వింటున్నాను...",
+      "thinking": "ఆలోచిస్తున్నాను...",
+      "speaking": "మాట్లాడుతున్నాను...",
+      "singing": "పాడుతున్నాను...",
+      "error": "లోపం",
+      "idle": "నిష్క్రియ",
+      "live": "లైవ్",
+      "recognizing": "గుర్తిస్తున్నాను..."
+    },
+    "noSpeechHint": "ఏమీ వినపడలేదు.",
+    "lowConfidenceHint": "అర్థం కాలేదు. మళ్ళీ చెప్పండి?"
+  },
+  "footer": {
+    "connect": "కనెక్ట్",
+    "disconnect": "డిస్‌కనెక్ట్",
+    "record": "రికార్డ్",
+    "stop": "ఆపు",
+    "recognizeSong": "పాటను గుర్తించు"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "మీ సంభాషణ ఇక్కడ కనిపిస్తుంది.",
+      "info": "[సమాచారం] కనెక్షన్ మూసివేయబడింది."
+    },
+    "sources": "మూలాలు:",
+    "goToApiSettings": "API సెట్టింగ్‌లకు వెళ్లండి",
+    "songRecognized": "ఇది \"{{title}}\" - {{artist}} అని అనుకుంటున్నాను.",
+    "songNotFound": "పాటను గుర్తించలేకపోయాను."
+  },
+  "timer": { "title": "టైమర్" },
+  "youtubePanel": {
+    "title": "యూట్యూబ్ ప్లేయర్",
+    "recentSearches": "ఇటీవల శోధనలు",
+    "views": "{{count}} వీక్షణలు"
+  },
+  "settings": {
+    "title": "సెట్టింగ్‌లు",
+    "tabs": {
+      "account": "ఖాతా",
+      "persona": "వ్యక్తిత్వం",
+      "voice": "గొంతు",
+      "apiKeys": "API కీలు",
+      "subscription": "చందా",
+      "help": "సహాయం",
+      "about": "గురించి"
+    },
+    "common": {
+      "save": "సేవ్",
+      "saved": "సేవ్ చేయబడింది!",
+      "copy": "కాపీ",
+      "copied": "కాపీ చేయబడింది!",
+      "retry": "మళ్ళీ ప్రయత్నించు"
+    },
+    "errors": {
+      "micNotAllowed": "మైక్రోఫోన్ అనుమతి లేదు.",
+      "network": "నెట్‌వర్క్ లోపం.",
+      "dailyLimit": "రోజువారీ పరిమితి ముగిసింది."
+    }
+  }
+};
+
+const kn = {
+  "appName": "ಕನಿಷ್ಕಾ",
+  "header": { "settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು", "toggleTheme": "ಥೀಮ್" },
+  "main": {
+    "status": {
+      "offline": "ಆಫ್‌ಲೈನ್",
+      "listening": "ಕೇಳುತ್ತಿದ್ದೇನೆ...",
+      "thinking": "ಯೋಚಿಸುತ್ತಿದ್ದೇನೆ...",
+      "speaking": "ಮಾತನಾಡುತ್ತಿದ್ದೇನೆ...",
+      "singing": "ಹಾಡುತ್ತಿದ್ದೇನೆ...",
+      "error": "ದೋಷ",
+      "idle": "ನಿಷ್ಕ್ರಿಯ",
+      "live": "ಲೈವ್",
+      "recognizing": "ಗುರುತಿಸುತ್ತಿದ್ದೇನೆ..."
+    },
+    "noSpeechHint": "ಏನೂ ಕೇಳಿಸಲಿಲ್ಲ.",
+    "lowConfidenceHint": "ಅರ್ಥವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಹೇಳಿ?"
+  },
+  "footer": {
+    "connect": "ಸಂಪರ್ಕಿಸಿ",
+    "disconnect": "ಕಡಿತಗೊಳಿಸಿ",
+    "record": "ರೆಕಾರ್ಡ್",
+    "stop": "ನಿಲ್ಲಿಸಿ",
+    "recognizeSong": "ಹಾಡು ಗುರುತಿಸಿ"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "ನಿಮ್ಮ ಸಂಭಾಷಣೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.",
+      "info": "[ಮಾಹಿತಿ] ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ."
+    },
+    "sources": "ಮೂಲಗಳು:",
+    "goToApiSettings": "API ಸೆಟ್ಟಿಂಗ್‌ಗಳಿಗೆ ಹೋಗಿ",
+    "songRecognized": "ಇದು \"{{title}}\" - {{artist}} ಇರಬಹುದು.",
+    "songNotFound": "ಹಾಡು ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+  },
+  "timer": { "title": "ಟೈಮರ್" },
+  "youtubePanel": {
+    "title": "ಯೂಟ್ಯೂಬ್ ಪ್ಲೇಯರ್",
+    "recentSearches": "ಇತ್ತೀಚಿನ ಹುಡುಕಾಟಗಳು",
+    "views": "{{count}} ವೀಕ್ಷಣೆಗಳು"
+  },
+  "settings": {
+    "title": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+    "tabs": {
+      "account": "ಖಾತೆ",
+      "persona": "ವ್ಯಕ್ತಿತ್ವ",
+      "voice": "ದನಿ",
+      "apiKeys": "API ಕೀಗಳು",
+      "subscription": "ಚಂದಾದಾರಿಕೆ",
+      "help": "ಸಹಾಯ",
+      "about": "ಬಗ್ಗೆ"
+    },
+    "common": {
+      "save": "ಉಳಿಸಿ",
+      "saved": "ಉಳಿಸಲಾಗಿದೆ!",
+      "copy": "ನಕಲಿಸಿ",
+      "copied": "ನಕಲಿಸಲಾಗಿದೆ!",
+      "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ"
+    },
+    "errors": {
+      "micNotAllowed": "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಇಲ್ಲ.",
+      "network": "ನೆಟ್‌ವರ್ಕ್ ದೋಷ.",
+      "dailyLimit": "ದೈನಂದಿನ ಮಿತಿ ಮೀರಿದೆ."
+    }
+  }
+};
+
+const ml = {
+  "appName": "കനിഷ്ക",
+  "header": { "settings": "ക്രമീകരണങ്ങൾ", "toggleTheme": "തീം" },
+  "main": {
+    "status": {
+      "offline": "ഓഫ്‌ലൈൻ",
+      "listening": "ശ്രദ്ധിക്കുന്നു...",
+      "thinking": "ചിന്തിക്കുന്നു...",
+      "speaking": "സംസാരിക്കുന്നു...",
+      "singing": "പാടുന്നു...",
+      "error": "പിശക്",
+      "idle": "നിഷ്ക്രിയ",
+      "live": "ലൈവ്",
+      "recognizing": "തിരിച്ചറിയുന്നു..."
+    },
+    "noSpeechHint": "ഒന്നും കേട്ടില്ല.",
+    "lowConfidenceHint": "മനസ്സിലായില്ല. ഒന്നുകൂടി പറയുമോ?"
+  },
+  "footer": {
+    "connect": "ബന്ധിപ്പിക്കുക",
+    "disconnect": "വിച്ഛേദിക്കുക",
+    "record": "റെക്കോർഡ്",
+    "stop": "നിർത്തുക",
+    "recognizeSong": "ഗാനം തിരിച്ചറിയുക"
+  },
+  "chat": {
+    "placeholder": {
+      "title": "നിങ്ങളുടെ സംഭാഷണം ഇവിടെ കാണാം.",
+      "info": "[വിവരം] കണക്ഷൻ വിച്ഛേദിച്ചു."
+    },
+    "sources": "ഉറവിടങ്ങൾ:",
+    "goToApiSettings": "API ക്രമീകരണങ്ങളിലേക്ക് പോകുക",
+    "songRecognized": "ഇത് \"{{title}}\" - {{artist}} ആണെന്ന് തോന്നുന്നു.",
+    "songNotFound": "ഗാനം തിരിച്ചറിയാൻ കഴിഞ്ഞില്ല."
+  },
+  "timer": { "title": "ടൈമർ" },
+  "youtubePanel": {
+    "title": "യൂട്യൂബ് പ്ലെയർ",
+    "recentSearches": "സമീപകാല തിരയലുകൾ",
+    "views": "{{count}} കാഴ്‌ചകൾ"
+  },
+  "settings": {
+    "title": "ക്രമീകരണങ്ങൾ",
+    "tabs": {
+      "account": "അക്കൗണ്ട്",
+      "persona": "വ്യക്തിത്വം",
+      "voice": "ശബ്ദം",
+      "apiKeys": "API കീകൾ",
+      "subscription": "വരിക്കാരാകുക",
+      "help": "സഹായം",
+      "about": "കുറിച്ച്"
+    },
+    "common": {
+      "save": "സംരക്ഷിക്കുക",
+      "saved": "സംരക്ഷിച്ചു!",
+      "copy": "പകർപ്പ്",
+      "copied": "പകർത്തി!",
+      "retry": "വീണ്ടും ശ്രമിക്കുക"
+    },
+    "errors": {
+      "micNotAllowed": "മൈക്രോഫോൺ അനുമതിയില്ല.",
+      "network": "നെറ്റ്‌വർക്ക് പിശക്.",
+      "dailyLimit": "പ്രതിദിന പരിധി കഴിഞ്ഞു."
+    }
+  }
+};
+
+const translationsData = { en, hi, bn, mr, gu, ta, te, kn, ml };
 
 const TranslationContext = createContext(undefined);
 
@@ -495,5 +976,11 @@ export const useTranslation = () => {
 export const availableLanguages = [
     { code: 'en', name: 'English (India)', bcp47: 'en-IN' },
     { code: 'hi', name: 'हिंदी (Hindi)', bcp47: 'hi-IN' },
+    { code: 'bn', name: 'বাংলা (Bengali)', bcp47: 'bn-IN' },
+    { code: 'mr', name: 'मराठी (Marathi)', bcp47: 'mr-IN' },
+    { code: 'gu', name: 'ગુજરાતી (Gujarati)', bcp47: 'gu-IN' },
+    { code: 'ta', name: 'தமிழ் (Tamil)', bcp47: 'ta-IN' },
+    { code: 'te', name: 'తెలుగు (Telugu)', bcp47: 'te-IN' },
+    { code: 'kn', name: 'ಕನ್ನಡ (Kannada)', bcp47: 'kn-IN' },
+    { code: 'ml', name: 'മലയാളം (Malayalam)', bcp47: 'ml-IN' }
 ];
-    
