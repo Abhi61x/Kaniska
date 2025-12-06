@@ -359,7 +359,8 @@ const SettingsModal = ({
     personalityMode, setPersonalityMode,
     assistantName, setAssistantName,
     assistantBackground, setAssistantBackground,
-    assistantTraits, setAssistantTraits
+    assistantTraits, setAssistantTraits,
+    voiceTuning, setVoiceTuning
 }) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
@@ -444,10 +445,17 @@ const SettingsModal = ({
                      source.buffer = buffer;
                      source.connect(audioCtx.destination);
                      
+                     // Apply voice tuning (speed/pitch) to preview as well
+                     if (voiceTuning) {
+                        source.playbackRate.value = voiceTuning.speed;
+                        source.detune.value = voiceTuning.pitch;
+                     }
+
                      if (nextTime < audioCtx.currentTime) nextTime = audioCtx.currentTime;
 
                      source.start(nextTime);
-                     nextTime += buffer.duration;
+                     // Calculate next start time based on playback rate
+                     nextTime += buffer.duration / (voiceTuning?.speed || 1.0);
                 }
             }
             
@@ -758,6 +766,46 @@ const SettingsModal = ({
                                      onClick: () => setPreviewText(''),
                                      className: "absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
                                 }, h(XCircleIcon, { className: "w-4 h-4" }))
+                             )
+                        ),
+                        h('div', { className: "bg-black/40 p-4 rounded-lg border border-gray-700/50 mb-6" },
+                             h('div', { className: "flex justify-between items-center mb-4" },
+                                 h('div', null,
+                                     h('h4', { className: "text-sm font-semibold text-gray-300" }, t('settings.voiceTab.tuning.title') || "Voice Tuning"),
+                                     h('p', { className: "text-xs text-gray-500" }, t('settings.voiceTab.tuning.description') || "Adjust speed and pitch.")
+                                 )
+                             ),
+                             h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-4" },
+                                 h('div', null,
+                                     h('div', { className: "flex justify-between mb-1" },
+                                         h('label', { className: "text-xs font-medium text-gray-400" }, t('settings.voiceTab.tuning.speed') || "Speed"),
+                                         h('span', { className: "text-xs text-gray-500" }, `${voiceTuning.speed.toFixed(2)}x`)
+                                     ),
+                                     h('input', {
+                                         type: "range",
+                                         min: "0.5",
+                                         max: "2.0",
+                                         step: "0.1",
+                                         value: voiceTuning.speed,
+                                         onChange: (e) => setVoiceTuning({...voiceTuning, speed: parseFloat(e.target.value)}),
+                                         className: "w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                                     })
+                                 ),
+                                 h('div', null,
+                                     h('div', { className: "flex justify-between mb-1" },
+                                         h('label', { className: "text-xs font-medium text-gray-400" }, t('settings.voiceTab.tuning.pitch') || "Pitch"),
+                                         h('span', { className: "text-xs text-gray-500" }, `${voiceTuning.pitch > 0 ? '+' : ''}${voiceTuning.pitch}`)
+                                     ),
+                                     h('input', {
+                                         type: "range",
+                                         min: "-1200",
+                                         max: "1200",
+                                         step: "100",
+                                         value: voiceTuning.pitch,
+                                         onChange: (e) => setVoiceTuning({...voiceTuning, pitch: parseInt(e.target.value)}),
+                                         className: "w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                                     })
+                                 )
                              )
                         ),
                         h('div', { className: "space-y-8" },
@@ -1118,6 +1166,7 @@ export const App = () => {
     const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-custom-instructions', '');
     const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
     const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion', { happiness: 50, empathy: 50, formality: 30, excitement: 50, sadness: 10, curiosity: 60 });
+    const [voiceTuning, setVoiceTuning] = usePersistentState('kaniska-voice-tuning', { speed: 1.0, pitch: 0 });
     const [apiKeys, setApiKeys] = usePersistentState('kaniska-api-keys', { weather: '', news: '', youtube: '', auddio: '' });
     const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
     const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
@@ -1140,6 +1189,9 @@ export const App = () => {
     // Refs for accessing latest state in callbacks
     const apiKeysRef = useRef(apiKeys);
     useEffect(() => { apiKeysRef.current = apiKeys; }, [apiKeys]);
+    
+    const voiceTuningRef = useRef(voiceTuning);
+    useEffect(() => { voiceTuningRef.current = voiceTuning; }, [voiceTuning]);
 
     // Helper for formatting duration
     const formatDuration = (seconds) => {
@@ -1206,6 +1258,9 @@ export const App = () => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            // Ensure context is running (fixes issues where browser suspends audio context until gesture)
+            await outputAudioContextRef.current.resume();
+
             nextStartTimeRef.current = 0;
             
             const callbacks = {
@@ -1247,11 +1302,25 @@ export const App = () => {
                          source.buffer = audioBuffer;
                          source.connect(ctx.destination);
                          
+                         // Apply voice tuning (speed/pitch)
+                         const tuning = voiceTuningRef.current;
+                         if (tuning) {
+                             source.playbackRate.value = tuning.speed;
+                             source.detune.value = tuning.pitch;
+                         }
+
                          const currentTime = ctx.currentTime;
-                         const startTime = Math.max(currentTime, nextStartTimeRef.current);
+                         // If nextStartTime is way behind, reset it to now to avoid huge lag/silence gaps
+                         if (nextStartTimeRef.current < currentTime) {
+                             nextStartTimeRef.current = currentTime;
+                         }
                          
+                         const startTime = Math.max(currentTime, nextStartTimeRef.current);
                          source.start(startTime);
-                         nextStartTimeRef.current = startTime + audioBuffer.duration;
+                         
+                         // Adjust duration based on playback rate
+                         const realDuration = audioBuffer.duration / (tuning?.speed || 1.0);
+                         nextStartTimeRef.current = startTime + realDuration;
                      }
                      
                      if (msg.serverContent?.turnComplete) {
@@ -1459,7 +1528,8 @@ export const App = () => {
             personalityMode, setPersonalityMode,
             assistantName, setAssistantName,
             assistantBackground, setAssistantBackground,
-            assistantTraits, setAssistantTraits
+            assistantTraits, setAssistantTraits,
+            voiceTuning, setVoiceTuning
         })
     );
 };

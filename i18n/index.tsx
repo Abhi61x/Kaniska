@@ -145,6 +145,12 @@ const en = {
       "male": {
         "title": "Male Persona (Kanishk)"
       },
+      "tuning": {
+        "title": "Voice Tuning",
+        "description": "Adjust the pitch and speed to make the voice sound more natural to your ears.",
+        "speed": "Speed",
+        "pitch": "Pitch"
+      },
       "mainVoiceLabel": "Main Voice",
       "greetingVoiceLabel": "Greeting Voice",
       "test": "Test",
@@ -379,6 +385,12 @@ const hi = {
       "male": {
         "title": "पुरुष व्यक्तित्व (कनिष्क)"
       },
+      "tuning": {
+        "title": "वॉयस ट्यूनिंग",
+        "description": "आवाज को अधिक स्वाभाविक बनाने के लिए पिच और गति को समायोजित करें।",
+        "speed": "गति",
+        "pitch": "पिच"
+      },
       "mainVoiceLabel": "मुख्य आवाज़",
       "greetingVoiceLabel": "अभिवादन की आवाज़",
       "test": "परीक्षण",
@@ -408,11 +420,7 @@ const hi = {
     "subscriptionTab": {
       "title": "सदस्यता",
       "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो।",
-      "usage": "दैनिक उपयोग",
-      "active": "सक्रिय",
-      "upgrade": "अपग्रेड",
       "plans": {
-        "free": { "name": "फ्री", "price": "₹0", "duration": "/ हमेशा" },
         "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" },
         "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" },
         "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" },
