@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -945,6 +947,7 @@ const SettingsModal = ({
                         h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')),
                         h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))
                     ),
+
                     subscriptionPlan === 'free' && dailyUsage && h('div', { className: "mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto" },
                         h('div', { className: "flex justify-between text-sm mb-2" },
                             h('span', { className: "text-gray-300" }, t('settings.subscriptionTab.usage')),
@@ -959,6 +962,7 @@ const SettingsModal = ({
                             })
                         )
                     ),
+
                     h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
                         ['free', 'monthly', 'quarterly', 'halfYearly', 'yearly'].map((planId) => 
                             h('button', {
@@ -983,6 +987,7 @@ const SettingsModal = ({
                             )
                         )
                     ),
+
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 mt-2" },
                         h('h4', { className: "text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2" }, t('settings.subscriptionTab.featuresTitle')),
                         h('div', { className: "space-y-3" },
@@ -1370,7 +1375,8 @@ export const App = () => {
             } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
                  alert("Microphone is already in use by another application.");
             } else {
-                alert(t('errors.speechRecognitionGeneric'));
+                // Show the specific error message if available (e.g. Network Error), otherwise generic
+                alert(e.message || t('errors.speechRecognitionGeneric'));
             }
         }
     };

@@ -408,7 +408,11 @@ const hi = {
     "subscriptionTab": {
       "title": "सदस्यता",
       "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो।",
+      "usage": "दैनिक उपयोग",
+      "active": "सक्रिय",
+      "upgrade": "अपग्रेड",
       "plans": {
+        "free": { "name": "फ्री", "price": "₹0", "duration": "/ हमेशा" },
         "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" },
         "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" },
         "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" },
