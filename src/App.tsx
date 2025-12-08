@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -84,31 +85,6 @@ const DEFAULT_ASSISTANT_NAME_FEMALE = "Kaniska";
 const DEFAULT_ASSISTANT_NAME_MALE = "Kanishk";
 const DEFAULT_FEMALE_GREETING = "Greetings. I am Kaniska. Ready to assist.";
 const DEFAULT_MALE_GREETING = "Greetings. I am Kanishk. Ready to assist.";
-
-const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
-You were created by "Abhi" (also known as Abhi trainer). You are a developer.
-If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
-
-**Interaction Protocol:**
-- **Speak only when asked.** Do not initiate conversation on your own after the initial greeting. Wait for the user to speak.
-- If asked what you do, state that you are a developer.
-
-**Operational Capabilities:**
-1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
-2.  **Responding to queries:** Answer questions conversationally.
-3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
-4.  **Controlling YouTube playback:** Use the 'CONTROL_MEDIA' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
-5.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
-6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
-7.  **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
-8.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
-9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
-10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
-
-**Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
-
-**Post-Tool Interaction Rule:** After a tool is used, you will receive a status update. Your task is to clearly and conversationally relay this information to the user. For example, if a timer is set successfully, you should confirm it by saying something like "Okay, I've set your timer." If there's an error, like a missing API key, you must inform the user about the problem, for instance, "I couldn't do that because the API key is missing." Always report the outcome of the action back to the user.
-`;
 
 const DEFAULT_CUSTOM_INSTRUCTIONS = `You are a sophisticated and friendly AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
 
@@ -276,6 +252,30 @@ const Avatar = ({ state, mood = 'neutral', customUrl }) => {
     );
 };
 
+// YouTube Player Component
+const YouTubePlayer = ({ video, onClose }) => {
+    if (!video) return null;
+    return h('div', { className: "absolute bottom-24 right-8 w-80 bg-gray-900 border border-cyan-500/30 rounded-xl overflow-hidden shadow-2xl z-50 animate-fade-in" },
+        h('div', { className: "relative pt-[56.25%] bg-black" },
+             h('iframe', {
+                className: "absolute top-0 left-0 w-full h-full",
+                src: `https://www.youtube.com/embed/${video.videoId}?autoplay=1`,
+                title: video.title,
+                allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+                allowFullScreen: true
+             })
+        ),
+        h('div', { className: "p-4" },
+             h('h3', { className: "text-sm font-bold text-white truncate" }, video.title),
+             h('p', { className: "text-xs text-gray-400" }, video.channelTitle),
+             h('button', { 
+                 onClick: onClose,
+                 className: "mt-2 text-xs text-red-400 hover:text-red-300 font-medium" 
+             }, "Close Player")
+        )
+    );
+};
+
 // Separated component to prevent "Rendered more hooks than during the previous render" error
 const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
@@ -307,14 +307,14 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
     };
 
     return h('div', { className: "space-y-6 animate-fade-in" },
-        h('div', { className: "bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10" },
+        h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
             h('div', { className: "flex items-center gap-3 mb-4" },
                 h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" },
                     h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })
                 ),
                 h('div', null,
                     h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.apiKeysTab.optional.title')),
-                    h('p', { className: "text-xs text-gray-500" }, t('settings.apiKeysTab.optional.description'))
+                    h('p', { className: "text-xs text-gray-300" }, t('settings.apiKeysTab.optional.description'))
                 )
             ),
             
@@ -335,7 +335,7 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
                         ),
                         h('input', {
                             type: "password",
-                            className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600",
+                            className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-500",
                             value: localKeys[keyType] || '',
                             onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
                             placeholder: keyType === 'gemini' ? "Optional: Override default API key..." : "Enter your API key here..."
@@ -476,7 +476,7 @@ const SettingsModal = ({
         switch (activeTab) {
             case 'account':
                 return h('div', { className: "space-y-6 animate-fade-in" },
-                     h('div', { className: "bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10 text-center" },
+                     h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10 text-center" },
                         user ? h('div', null,
                             h('div', { className: "w-20 h-20 bg-gray-700 rounded-full mx-auto mb-4 overflow-hidden border-2 border-cyan-500" },
                                 user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full flex items-center justify-center text-2xl font-bold" }, user.displayName?.[0] || "U")
@@ -515,7 +515,7 @@ const SettingsModal = ({
                     // SECTION 1: IDENTITY CONFIGURATION
                     h('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-6" },
                         // Assistant Identity Card
-                        h('div', { className: "relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gray-900/40 backdrop-blur-xl group hover:border-cyan-500/40 transition-all duration-300" },
+                        h('div', { className: "relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gray-900/60 backdrop-blur-xl group hover:border-cyan-500/40 transition-all duration-300" },
                             // Header
                             h('div', { className: "bg-gradient-to-r from-cyan-500/10 to-transparent p-4 border-b border-cyan-500/10 flex items-center gap-3" },
                                 h('div', { className: "p-2 rounded-lg bg-cyan-500/20 text-cyan-400" }, h(PersonaIcon, { className: "w-5 h-5" })),
@@ -587,7 +587,7 @@ const SettingsModal = ({
                         ),
 
                         // User Profile Card
-                        h('div', { className: "relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gray-900/40 backdrop-blur-xl group hover:border-purple-500/40 transition-all duration-300" },
+                        h('div', { className: "relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gray-900/60 backdrop-blur-xl group hover:border-purple-500/40 transition-all duration-300" },
                             // Header
                             h('div', { className: "bg-gradient-to-r from-purple-500/10 to-transparent p-4 border-b border-purple-500/10 flex items-center gap-3" },
                                 h('div', { className: "p-2 rounded-lg bg-purple-500/20 text-purple-400" }, h(AccountIcon, { className: "w-5 h-5" })),
@@ -619,7 +619,7 @@ const SettingsModal = ({
                     ),
 
                     // SECTION 2: BEHAVIORAL MATRIX
-                    h('div', { className: "relative overflow-hidden rounded-2xl border border-green-500/20 bg-gray-900/40 backdrop-blur-xl" },
+                    h('div', { className: "relative overflow-hidden rounded-2xl border border-green-500/20 bg-gray-900/60 backdrop-blur-xl" },
                          h('div', { className: "bg-gradient-to-r from-green-500/10 to-transparent p-4 border-b border-green-500/10 flex items-center gap-3" },
                             h('div', { className: "p-2 rounded-lg bg-green-500/20 text-green-400" }, h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" }))),
                             h('h3', { className: "font-bold text-green-100 tracking-wide text-sm uppercase" }, "Behavioral Matrix")
@@ -682,7 +682,7 @@ const SettingsModal = ({
                     // SECTION 3: SYSTEM & AUDIO
                     h('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
                         // Audio Config
-                        h('div', { className: "relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900/40 backdrop-blur-xl" },
+                        h('div', { className: "relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900/60 backdrop-blur-xl" },
                              h('div', { className: "p-4 border-b border-gray-800 flex items-center gap-2" },
                                 h('span', { className: "w-2 h-2 rounded-full bg-yellow-500" }),
                                 h('h3', { className: "font-bold text-gray-300 text-xs uppercase tracking-wider" }, "Audio Configuration")
@@ -729,40 +729,30 @@ const SettingsModal = ({
                                         connectionSound && h('button', {
                                             onClick: () => setConnectionSound(null),
                                             className: "px-2 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded hover:bg-red-500/20"
-                                        }, h(XIcon, { className: "w-3 h-3" }))
+                                        }, "X")
                                     )
                                 )
                             )
                         ),
-
-                        // Prime Directives (Read Only)
-                        h('div', { className: "relative overflow-hidden rounded-xl border border-red-900/30 bg-gray-900/40 backdrop-blur-xl opacity-75" },
-                            h('div', { className: "p-4 border-b border-red-900/30 flex items-center justify-between" },
-                                h('div', { className: "flex items-center gap-2" },
-                                    h('span', { className: "w-2 h-2 rounded-full bg-red-500 animate-pulse" }),
-                                    h('h3', { className: "font-bold text-red-400 text-xs uppercase tracking-wider" }, "Prime Directives")
-                                ),
-                                h('span', { className: "text-[9px] font-bold uppercase tracking-widest text-red-500 border border-red-900/50 px-1.5 py-0.5 rounded bg-red-900/20" }, "LOCKED")
+                        
+                        // Theme Config
+                        h('div', { className: "relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900/60 backdrop-blur-xl" },
+                            h('div', { className: "p-4 border-b border-gray-800 flex items-center gap-2" },
+                                h('span', { className: "w-2 h-2 rounded-full bg-blue-500" }),
+                                h('h3', { className: "font-bold text-gray-300 text-xs uppercase tracking-wider" }, "System Appearance")
                             ),
-                            h('textarea', {
-                                className: "w-full bg-black/20 p-4 border-none text-red-300/70 outline-none resize-none text-[10px] font-mono h-32 leading-relaxed",
-                                value: FIXED_SYSTEM_INSTRUCTIONS,
-                                disabled: true
-                            })
+                            h('div', { className: "p-5" },
+                                h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
+                                    ['light', 'dark'].map((mode) => 
+                                        h('button', {
+                                            key: mode,
+                                            onClick: () => setTheme(mode),
+                                            className: `flex-1 py-2 rounded-md text-xs font-bold uppercase transition-all ${theme === mode ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`
+                                        }, t(`settings.personaTab.appearance.${mode}`))
+                                    )
+                                )
+                            )
                         )
-                    ),
-                    
-                    // Data Management
-                    h('div', { className: "flex justify-end pt-4 border-t border-gray-800" },
-                        h('button', {
-                            onClick: () => {
-                                if(confirm('Are you sure? This will clear all local settings and reload the app.')) {
-                                    localStorage.clear();
-                                    window.location.reload();
-                                }
-                            },
-                            className: "px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold uppercase transition-all tracking-wider flex items-center gap-2"
-                        }, h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M3 6h18" }), h('path', { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }), h('path', { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" })), "Factory Reset")
                     )
                 );
             case 'voice':
@@ -775,10 +765,10 @@ const SettingsModal = ({
                  };
 
                 return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10" },
+                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, gender === 'female' ? t('settings.voiceTab.female.title') : t('settings.voiceTab.male.title')),
-                            h('p', { className: "text-xs text-gray-500" }, t('settings.voiceTab.description'))
+                            h('p', { className: "text-xs text-gray-300" }, t('settings.voiceTab.description'))
                         ),
                         h('div', { className: "space-y-8" },
                             // Main Voice Section
@@ -853,7 +843,7 @@ const SettingsModal = ({
                  return h(ApiKeysTab, { apiKeys, setApiKeys, t });
             case 'help':
                  return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10" },
+                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
                         h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
                         h('div', { className: "space-y-4" },
                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
@@ -894,7 +884,7 @@ const SettingsModal = ({
                 );
              case 'about':
                 return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in py-10" },
-                    h('div', { className: "bg-black/40 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-md w-full text-center relative overflow-hidden" },
+                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-md w-full text-center relative overflow-hidden" },
                         h('div', { className: "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-blue-500" }),
                         h('div', { className: "w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-full mx-auto mb-6 flex items-center justify-center border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.1)]" },
                             h('span', { className: "text-4xl filter drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" }, "🤖")
@@ -965,7 +955,7 @@ const SettingsModal = ({
                         )
                     ),
 
-                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 mt-2" },
+                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10 mt-2" },
                         h('h4', { className: "text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2" }, t('settings.subscriptionTab.featuresTitle')),
                         h('div', { className: "space-y-3" },
                             h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
@@ -997,11 +987,11 @@ const SettingsModal = ({
         onClick: onClose 
     },
         h('div', {
-            className: "bg-black md:bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
+            className: "bg-black md:bg-gray-900 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
             onClick: e => e.stopPropagation()
         },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
-                h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-white/10 h-full absolute md:relative z-20` },
+                h('div', { className: "p-6 border-b border-white/10 flex justify-between items-center" },
                     h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
                         h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }),
                         t('settings.title')
@@ -1037,23 +1027,26 @@ const SettingsModal = ({
                         )
                     )
                 ),
-                h('div', { className: "p-4 border-t border-border-color bg-gray-900" },
+                h('div', { className: "p-4 border-t border-white/10 bg-black/40" },
                     h('label', { className: "text-xs text-gray-500 uppercase font-semibold mb-2 block px-1" }, "Language"),
-                    h('div', { className: "flex gap-2" },
-                        availableLanguages.map(l => 
-                            h('button', {
-                                key: l.code,
-                                onClick: () => setLang(l.code),
-                                className: `flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                                    lang === l.code ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'border-border-color text-gray-500 hover:border-gray-600'
-                                }`
-                            }, l.name)
+                    h('div', { className: "relative" },
+                         h('select', {
+                            value: lang,
+                            onChange: (e) => setLang(e.target.value),
+                            className: "w-full bg-gray-900 border border-gray-700 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5 appearance-none cursor-pointer hover:bg-gray-800 transition-colors"
+                         },
+                            availableLanguages.map(l => 
+                                h('option', { key: l.code, value: l.code }, l.name)
+                            )
+                        ),
+                        h('div', { className: "absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-400" },
+                             h('svg', { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" }, h('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M19 9l-7 7-7-7" }))
                         )
                     )
                 )
             ),
-            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-panel-bg relative` },
-                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-border-color" },
+            h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-gray-900 relative` },
+                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-white/10" },
                     h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" },
                         h(ArrowLeftIcon, { className: "w-5 h-5" }),
                         h('span', { className: "text-sm font-medium" }, "Back")
@@ -1068,7 +1061,7 @@ const SettingsModal = ({
                 ),
                 h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
                     h('div', { className: "max-w-3xl mx-auto" },
-                        h('div', { className: "hidden md:block mb-8 pb-4 border-b border-border-color" },
+                        h('div', { className: "hidden md:block mb-8 pb-4 border-b border-white/10" },
                             h('h2', { className: "text-2xl font-bold text-white" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`))
                         ),
                         renderTabContent()
@@ -1080,125 +1073,288 @@ const SettingsModal = ({
 };
 
 export const App = () => {
-    const { t, lang, setLang } = useTranslation();
-    const [user, setUser] = useState(null);
+  const { t, lang, setLang } = useTranslation();
+  
+  // -- State Definitions --
+  const [user, setUser] = React.useState(null);
+  const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
+  const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
+  const [assistantName, setAssistantName] = usePersistentState('kaniska-name', DEFAULT_ASSISTANT_NAME_FEMALE);
+  const [userName, setUserName] = usePersistentState('kaniska-user-name', '');
+  const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
+  const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
+  const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
+  const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 50, empathy: 50, formality: 50, excitement: 50, sadness: 10, curiosity: 50 });
+  const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' });
+  const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
+  const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
+  const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-vol', 0.2);
+  const [connectionSound, setConnectionSound] = usePersistentState('kaniska-sfx-connect', null);
+  const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '');
+  const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free');
+  
+  const [isConnected, setIsConnected] = React.useState(false);
+  const [status, setStatus] = React.useState('idle');
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('account');
+  const [currentVideo, setCurrentVideo] = React.useState(null);
+  const [dailyUsage, setDailyUsage] = React.useState({ seconds: 0, date: new Date().toDateString() });
 
-    // Persistent State
-    const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
-    const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
-    const [assistantName, setAssistantName] = usePersistentState('kaniska-name', DEFAULT_ASSISTANT_NAME_FEMALE);
-    const [userName, setUserName] = usePersistentState('kaniska-username', '');
-    const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
-    const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
-    const [userBio, setUserBio] = usePersistentState('kaniska-bio', '');
-    const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 50, empathy: 50, formality: 30, excitement: 40, sadness: 10, curiosity: 60 });
-    const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' });
-    const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
-    const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
-    const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient', 0.2);
-    const [connectionSound, setConnectionSound] = usePersistentState('kaniska-sfx', null);
-    const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '');
-    const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free');
-    const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-usage', { date: new Date().toDateString(), seconds: 0 });
+  const sessionRef = React.useRef(null);
+  
+  // Audio Refs
+  const inputAudioContextRef = useRef(null);
+  const outputAudioContextRef = useRef(null);
+  const scriptProcessorRef = useRef(null);
+  const audioSourceRef = useRef(null);
+  const nextStartTimeRef = useRef(0);
+  const scheduledSourcesRef = useRef([]);
 
-    // UI State
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [activeSettingsTab, setActiveSettingsTab] = useState('account');
-    const [appState, setAppState] = useState('idle'); // idle, listening, thinking, speaking, live
-    const [isConnected, setIsConnected] = useState(false);
+  React.useEffect(() => {
+     return onAuthStateChanged(auth, u => setUser(u));
+  }, []);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-        return () => unsubscribe();
-    }, []);
+  const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
+  const handleLogout = () => signOut(auth);
 
-    const handleLogin = async () => {
-        try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error(e); }
-    };
+  const cleanupAudio = () => {
+      // Close contexts
+      if (inputAudioContextRef.current) {
+          inputAudioContextRef.current.close();
+          inputAudioContextRef.current = null;
+      }
+      if (outputAudioContextRef.current) {
+          outputAudioContextRef.current.close();
+          outputAudioContextRef.current = null;
+      }
+      // Stop sources
+      if (scheduledSourcesRef.current) {
+          scheduledSourcesRef.current.forEach(source => {
+              try { source.stop(); } catch(e) {}
+          });
+          scheduledSourcesRef.current = [];
+      }
+      // Disconnect processor
+      if (scriptProcessorRef.current) {
+          scriptProcessorRef.current.disconnect();
+          scriptProcessorRef.current = null;
+      }
+      if (audioSourceRef.current) {
+          audioSourceRef.current.disconnect();
+          audioSourceRef.current = null;
+      }
+  };
 
-    const handleLogout = async () => {
-        try { await signOut(auth); } catch (e) { console.error(e); }
-    };
+  const connect = async () => {
+    if (isConnected) {
+        if (sessionRef.current) {
+            // It's tricky to cleanly close without a method, but we can reset state.
+            // Ideally session.close() would exist, but current Live SDK is session-based.
+            // We'll rely on reloading or state reset.
+        }
+        cleanupAudio();
+        setIsConnected(false);
+        setStatus('idle');
+        return;
+    }
+    
+    setStatus('listening');
+    
+    // Initialize Audio Contexts
+    try {
+        outputAudioContextRef.current = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 24000 });
+        inputAudioContextRef.current = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 16000 });
+        nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
+    } catch (e) {
+        console.error("Audio Context Error", e);
+        setStatus('error');
+        return;
+    }
 
-    const toggleConnection = async () => {
-        if (isConnected) {
-            // Disconnect logic
-            setIsConnected(false);
-            setAppState('idle');
-            // Assuming we have a way to close session, but here just UI toggle for now as full implementation is missing
-        } else {
-            // Connect logic
+    const callbacks = {
+        onopen: async () => {
             setIsConnected(true);
-            setAppState('live');
-            try {
-                // Example connection
-                const voice = gender === 'female' ? femaleVoices.main : maleVoices.main;
-                const apiKey = apiKeys.gemini; // User provided key override
-                // We would call connectLiveSession here
-            } catch(e) {
-                console.error(e);
-                setIsConnected(false);
-                setAppState('idle');
+            setStatus('live');
+            if (connectionSound) {
+                new Audio(connectionSound).play().catch(e => console.warn("SFX failed", e));
             }
+
+            // Start Mic Streaming
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(stream);
+                scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
+                
+                scriptProcessorRef.current.onaudioprocess = (e) => {
+                    if (!sessionRef.current) return;
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const pcmBlob = createBlob(inputData); 
+                    sessionRef.current.sendRealtimeInput({ media: pcmBlob });
+                };
+                
+                audioSourceRef.current.connect(scriptProcessorRef.current);
+                scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
+            } catch (err) {
+                console.error("Mic Error", err);
+                alert("Could not access microphone.");
+                setStatus('error');
+            }
+        },
+        onmessage: async (msg) => {
+             // Audio Playback
+             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+             if (audioData) {
+                 setStatus('speaking');
+                 try {
+                     const binary = atob(audioData);
+                     const bytes = new Uint8Array(binary.length);
+                     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                     
+                     // Decode raw PCM (16-bit little endian, 24kHz)
+                     // Since standard decodeAudioData expects headers, we do raw float conversion manually or use helper
+                     // The helper decodeAudioData in this file handles Int16 -> Float32
+                     const buffer = await decodeAudioData(bytes, outputAudioContextRef.current, 24000, 1);
+                     
+                     const source = outputAudioContextRef.current.createBufferSource();
+                     source.buffer = buffer;
+                     source.connect(outputAudioContextRef.current.destination);
+                     
+                     // Scheduling
+                     const now = outputAudioContextRef.current.currentTime;
+                     const startTime = Math.max(now, nextStartTimeRef.current);
+                     source.start(startTime);
+                     nextStartTimeRef.current = startTime + buffer.duration;
+                     
+                     scheduledSourcesRef.current.push(source);
+                     source.onended = () => {
+                         scheduledSourcesRef.current = scheduledSourcesRef.current.filter(s => s !== source);
+                         if (scheduledSourcesRef.current.length === 0) setStatus('live');
+                     };
+                 } catch (e) {
+                     console.error("Audio Decode Error", e);
+                 }
+             }
+
+             if (msg.serverContent?.interrupted) {
+                 // Clear Queue
+                 scheduledSourcesRef.current.forEach(s => s.stop());
+                 scheduledSourcesRef.current = [];
+                 nextStartTimeRef.current = outputAudioContextRef.current?.currentTime || 0;
+                 setStatus('listening'); // Back to listening immediately
+             }
+             
+             if (msg.toolCall?.functionCalls) {
+                 const responses = [];
+                 for (const call of msg.toolCall.functionCalls) {
+                     let result: Record<string, any> = { result: "ok" };
+                     if (call.name === 'searchYouTube') {
+                         try {
+                             const query = typeof call.args === 'object' && call.args ? (call.args).query : '';
+                             const video = await searchYouTube(apiKeys.youtube, query);
+                             if (video) {
+                                 setCurrentVideo(video);
+                                 result = { result: `Playing ${video.title}` };
+                             } else result = { result: "Not found" };
+                         } catch(e) { result = { error: e.message }; }
+                     } else if (call.name === 'openSettings') {
+                         setIsSettingsOpen(true);
+                     }
+                     responses.push({ id: call.id, name: call.name, response: result });
+                 }
+                 sessionRef.current?.sendToolResponse({ functionResponses: responses });
+             }
+        },
+        onclose: () => { 
+            cleanupAudio();
+            setIsConnected(false); 
+            setStatus('idle'); 
+        },
+        onerror: (e) => { 
+            console.error(e); 
+            cleanupAudio();
+            setIsConnected(false); 
+            setStatus('error'); 
         }
     };
 
-    return h('div', { className: theme },
-        h('div', { className: "min-h-screen bg-black text-white font-sans overflow-hidden relative" },
-             // Avatar Display
-             h('div', { className: "absolute inset-0 flex items-center justify-center z-0" },
-                h(Avatar, { state: appState, customUrl: avatarUrl })
-             ),
-             
-             // Header
-             h('div', { className: "absolute top-0 left-0 w-full p-6 flex justify-between items-center z-10" },
-                h('div', { className: "flex items-center gap-3" },
-                    h('h1', { className: "text-2xl font-bold tracking-tighter text-cyan-500" }, t('appName').toUpperCase())
-                ),
-                h('button', { 
-                    onClick: () => setIsSettingsOpen(true),
-                    className: "p-3 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 transition-all"
-                }, h(SettingsIcon, { className: "w-6 h-6 text-cyan-400" }))
-             ),
+    try {
+        const voice = gender === 'female' ? femaleVoices.main : maleVoices.main;
+        const instructions = `${customInstructions}\n\nUser Name: ${userName}\nBio: ${userBio}`;
+        const session = await connectLiveSession(callbacks, instructions, voice, apiKeys.gemini);
+        sessionRef.current = session;
+    } catch(e) {
+        console.error(e);
+        alert(e.message);
+        setStatus('idle');
+    }
+  };
 
-             // Footer Controls
-             h('div', { className: "absolute bottom-0 left-0 w-full p-8 flex justify-center items-center z-10" },
-                h('button', {
-                    onClick: toggleConnection,
-                    className: `px-8 py-4 rounded-full font-bold uppercase tracking-widest transition-all shadow-lg flex items-center gap-3 ${isConnected ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/30' : 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/30'}`
-                },
-                    isConnected ? h(DisconnectIcon, { className: "w-5 h-5" }) : h(ConnectIcon, { className: "w-5 h-5" }),
-                    isConnected ? t('footer.disconnect') : t('footer.connect')
+  return h('div', { className: `min-h-screen ${theme === 'dark' ? 'bg-black text-white' : 'bg-white text-black'} font-sans overflow-hidden relative selection:bg-cyan-500/30` },
+    h('div', { className: "fixed top-0 left-0 right-0 p-6 flex justify-between items-center z-40 pointer-events-none" },
+        h('div', { className: "flex items-center gap-3 pointer-events-auto" },
+             h('div', { className: "w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/20" },
+                h('span', { className: "font-bold text-black text-lg" }, "K")
+             ),
+             h('span', { className: "font-bold text-xl tracking-tight" }, t('appName'))
+        ),
+        h('button', {
+            onClick: () => setIsSettingsOpen(true),
+            className: "p-3 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 transition-all pointer-events-auto"
+        }, h(SettingsIcon, { className: "w-5 h-5 text-gray-300" }))
+    ),
+    h('main', { className: "w-full h-screen flex flex-col items-center justify-center relative" },
+         h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl }),
+         h('div', { className: "absolute bottom-32 flex flex-col items-center gap-2 pointer-events-none" },
+             h('div', { className: `px-4 py-1.5 rounded-full backdrop-blur-md border ${
+                 status === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                 status === 'live' ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 
+                 'bg-gray-800/40 border-gray-700/50 text-gray-400'
+             }` },
+                h('span', { className: "text-xs font-mono font-bold tracking-widest uppercase flex items-center gap-2" },
+                    status === 'live' && h('span', { className: "w-2 h-2 rounded-full bg-cyan-500 animate-pulse" }),
+                    t(`main.status.${status}`) || status
                 )
-             ),
-
-             // Settings Modal
-             h(SettingsModal, {
-                 isOpen: isSettingsOpen,
-                 onClose: () => setIsSettingsOpen(false),
-                 activeTab: activeSettingsTab,
-                 setActiveTab: setActiveSettingsTab,
-                 theme, setTheme,
-                 gender, setGender,
-                 assistantName, setAssistantName,
-                 userName, setUserName,
-                 greetingMessage, setGreetingMessage,
-                 customInstructions, setCustomInstructions,
-                 userBio, setUserBio,
-                 emotionTuning, setEmotionTuning,
-                 apiKeys, setApiKeys,
-                 lang, setLang,
-                 femaleVoices, setFemaleVoices,
-                 maleVoices, setMaleVoices,
-                 ambientVolume, setAmbientVolume,
-                 connectionSound, setConnectionSound,
-                 avatarUrl, setAvatarUrl,
-                 subscriptionPlan, setSubscriptionPlan,
-                 dailyUsage,
-                 user,
-                 handleLogin,
-                 handleLogout
-             })
+             )
+         )
+    ),
+    h('div', { className: "fixed bottom-10 left-0 right-0 flex justify-center items-center z-40 pointer-events-none" },
+        h('button', {
+            onClick: connect,
+            className: `pointer-events-auto group relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
+                isConnected 
+                ? 'bg-red-500/90 hover:bg-red-600 shadow-[0_0_30px_rgba(239,68,68,0.3)]' 
+                : 'bg-cyan-500/90 hover:bg-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.3)]'
+            }`
+        },
+            h('div', { className: `absolute inset-0 rounded-full border-2 border-white/20 animate-ping opacity-20 ${isConnected ? 'hidden' : 'block'}` }),
+            isConnected 
+            ? h(DisconnectIcon, { className: "w-8 h-8 text-white transition-transform group-hover:scale-110" }) 
+            : h(ConnectIcon, { className: "w-8 h-8 text-black transition-transform group-hover:scale-110" })
         )
-    );
+    ),
+    currentVideo && h(YouTubePlayer, { video: currentVideo, onClose: () => setCurrentVideo(null) }),
+    h(SettingsModal, {
+         isOpen: isSettingsOpen,
+         onClose: () => setIsSettingsOpen(false),
+         activeTab, setActiveTab,
+         theme, setTheme,
+         gender, setGender,
+         assistantName, setAssistantName,
+         userName, setUserName,
+         greetingMessage, setGreetingMessage,
+         customInstructions, setCustomInstructions,
+         userBio, setUserBio,
+         emotionTuning, setEmotionTuning,
+         apiKeys, setApiKeys,
+         lang, setLang,
+         femaleVoices, setFemaleVoices,
+         maleVoices, setMaleVoices,
+         ambientVolume, setAmbientVolume,
+         connectionSound, setConnectionSound,
+         avatarUrl, setAvatarUrl,
+         subscriptionPlan, setSubscriptionPlan,
+         dailyUsage,
+         user, handleLogin, handleLogout
+    })
+  );
 };
