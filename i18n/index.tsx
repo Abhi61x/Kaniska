@@ -159,8 +159,8 @@ const en = {
     "apiKeysTab": {
       "gemini": {
         "title": "Gemini API Key (Required)",
-        "description": "The core key for AI functionality. This is managed by the application's environment and cannot be changed here.",
-        "envSet": "Environment Set"
+        "description": "Leave empty to use the default environment key, or enter your own to override.",
+        "envSet": "Default Environment Key Active"
       },
       "optional": {
         "title": "Optional API Keys",
@@ -399,8 +399,8 @@ const hi = {
     "apiKeysTab": {
       "gemini": {
         "title": "जेमिनी एपीआई कुंजी (आवश्यक)",
-        "description": "एआई कार्यक्षमता के लिए मुख्य कुंजी। यह एप्लिकेशन के परिवेश द्वारा प्रबंधित है और इसे यहां बदला नहीं जा सकता।",
-        "envSet": "पर्यावरण सेट"
+        "description": "डिफ़ॉल्ट पर्यावरण कुंजी का उपयोग करने के लिए खाली छोड़ें, या ओवरराइड करने के लिए अपना स्वयं का दर्ज करें।",
+        "envSet": "डिफ़ॉल्ट पर्यावरण कुंजी सक्रिय"
       },
       "optional": {
         "title": "वैकल्पिक एपीआई कुंजी",

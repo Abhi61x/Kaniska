@@ -128,7 +128,7 @@ export const sendWhatsAppTool: FunctionDeclaration = {
     },
 };
 
-export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore') {
+export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore', apiKey = null) {
     let systemInstruction = customSystemInstruction;
     
     if (!systemInstruction) {
@@ -163,18 +163,27 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         `;
     }
 
+    // Determine which key to use and create a client instance
+    const activeKey = apiKey || process.env.API_KEY;
+    if (!activeKey) {
+        throw new MainApiKeyError("No API Key available for Gemini Live session.");
+    }
+    
+    // Create a specific client for this session to ensure the correct key is used
+    const client = new GoogleGenAI({ apiKey: activeKey });
+
     // Default voice fallback
     const validVoice = voiceName || 'Kore';
 
-    return await ai.live.connect({
+    return await client.live.connect({
         model: 'gemini-2.0-flash-exp', // Updated to 2.0 Flash Exp for reliable Live API support
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
-            tools: [{ 
-                functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool],
-                googleSearch: {} 
-            }],
+            tools: [
+                { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool] },
+                { googleSearch: {} }
+            ],
             systemInstruction: systemInstruction,
             speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: validVoice } },

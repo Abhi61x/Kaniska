@@ -284,6 +284,8 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
         status.news = await validateNewsKey(localKeys.news);
         status.youtube = await validateYouTubeKey(localKeys.youtube);
         status.auddio = await validateAuddioKey(localKeys.auddio);
+        // We don't validate Gemini key here as it's complex, we just save it.
+        status.gemini = { success: true, message: "Saved." };
 
         setValidationStatus(status);
         setApiKeys(localKeys);
@@ -292,7 +294,23 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
 
     return h('div', { className: "space-y-6 animate-fade-in" },
         h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
-            h('div', { className: "flex items-center gap-3 mb-4" },
+             // Gemini Key Section - Now Editable
+             h('div', { className: "bg-black/40 p-4 rounded-lg border border-cyan-900/30 mb-6" },
+                h('div', { className: "flex justify-between items-center mb-2" },
+                    h('label', { className: "text-xs uppercase tracking-wider font-semibold text-cyan-400" }, t('settings.apiKeysTab.gemini.title')),
+                    h('span', { className: "text-xs text-gray-500" }, localKeys.gemini ? "Custom Key Set" : t('settings.apiKeysTab.gemini.envSet'))
+                ),
+                h('p', { className: "text-xs text-gray-500 mb-3" }, t('settings.apiKeysTab.gemini.description')),
+                h('input', {
+                    type: "password",
+                    className: "w-full bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-600",
+                    value: localKeys.gemini || '',
+                    onChange: (e) => setLocalKeys({...localKeys, gemini: e.target.value}),
+                    placeholder: "Paste your Gemini API Key here to override default..."
+                })
+             ),
+
+            h('div', { className: "flex items-center gap-3 mb-4 mt-8" },
                 h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" },
                     h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })
                 ),
@@ -516,6 +534,7 @@ const SettingsModal = ({
                         )
                      )
                 );
+            // ... (Other tabs remain largely similar, but ensure correct rendering)
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
                      h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
@@ -736,6 +755,7 @@ const SettingsModal = ({
                         )
                     )
                 );
+             // ... other tabs ...
             case 'voice':
                  const currentVoices = gender === 'female' ? femaleVoices : maleVoices;
                  const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
@@ -807,6 +827,7 @@ const SettingsModal = ({
                                  )
                              )
                         ),
+                        // ... voice grid ...
                         h('div', { className: "space-y-8" },
                             h('div', null,
                                 h('h4', { className: "text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider border-b border-gray-700 pb-2" }, t('settings.voiceTab.mainVoiceLabel')),
@@ -875,6 +896,74 @@ const SettingsModal = ({
                 );
              case 'apiKeys':
                  return h(ApiKeysTab, { apiKeys, setApiKeys, t });
+             // ... other cases ...
+             case 'subscription':
+                 return h('div', { className: "space-y-6 animate-fade-in" },
+                    h('div', { className: "text-center mb-8" },
+                        h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')),
+                        h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))
+                    ),
+                    // ... (rest of subscription logic remains the same, verified correct)
+                    subscriptionPlan === 'free' && dailyUsage && h('div', { className: "mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto" },
+                        h('div', { className: "flex justify-between text-sm mb-2" },
+                            h('span', { className: "text-gray-300" }, t('settings.subscriptionTab.usage')),
+                            h('span', { className: `font-mono ${dailyUsage.seconds >= 3600 ? 'text-red-400' : 'text-cyan-400'}` },
+                                `${Math.floor(dailyUsage.seconds / 60)} / 60 min`
+                            )
+                        ),
+                        h('div', { className: "w-full h-2 bg-gray-700 rounded-full overflow-hidden" },
+                            h('div', {
+                                className: `h-full transition-all duration-500 ${dailyUsage.seconds >= 3600 ? 'bg-red-500' : 'bg-cyan-500'}`,
+                                style: { width: `${Math.min((dailyUsage.seconds / 3600) * 100, 100)}%` }
+                            })
+                        )
+                    ),
+                    h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
+                        ['free', 'monthly', 'quarterly', 'halfYearly', 'yearly'].map((planId) => 
+                            h('button', {
+                                key: planId,
+                                onClick: () => handlePlanSelection(planId),
+                                className: `relative p-6 rounded-xl border transition-all text-left group ${
+                                    subscriptionPlan === planId 
+                                    ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
+                                    : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
+                                }`
+                            },
+                                h('div', { className: "flex justify-between items-start mb-2" },
+                                    h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
+                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
+                                ),
+                                h('div', { className: "flex items-baseline gap-1" },
+                                    h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
+                                    h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))
+                                ),
+                                planId === 'yearly' && h('div', { className: "absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg" }, "BEST VALUE"),
+                                subscriptionPlan !== planId && h('div', { className: "mt-4 pt-4 border-t border-gray-700/50 text-xs text-center text-cyan-500 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity" }, t('settings.subscriptionTab.upgrade'))
+                            )
+                        )
+                    ),
+                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 mt-2" },
+                        h('h4', { className: "text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2" }, t('settings.subscriptionTab.featuresTitle')),
+                        h('div', { className: "space-y-3" },
+                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
+                                h(CheckCircleIcon, { className: "w-5 h-5 text-gray-400 shrink-0" }),
+                                h('span', null, t('settings.subscriptionTab.featureFree'))
+                            ),
+                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
+                                h(CheckCircleIcon, { className: "w-5 h-5 text-green-400 shrink-0" }),
+                                h('span', null, t('settings.subscriptionTab.feature1'))
+                            ),
+                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
+                                h(CheckCircleIcon, { className: "w-5 h-5 text-green-400 shrink-0" }),
+                                h('span', null, t('settings.subscriptionTab.feature2'))
+                            ),
+                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
+                                h(CheckCircleIcon, { className: "w-5 h-5 text-green-400 shrink-0" }),
+                                h('span', null, t('settings.subscriptionTab.feature3'))
+                            )
+                        )
+                    )
+                );
             case 'help':
                  return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800" },
@@ -988,75 +1077,6 @@ const SettingsModal = ({
                         )
                     )
                 );
-            case 'subscription':
-                 return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "text-center mb-8" },
-                        h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')),
-                        h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))
-                    ),
-
-                    subscriptionPlan === 'free' && dailyUsage && h('div', { className: "mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto" },
-                        h('div', { className: "flex justify-between text-sm mb-2" },
-                            h('span', { className: "text-gray-300" }, t('settings.subscriptionTab.usage')),
-                            h('span', { className: `font-mono ${dailyUsage.seconds >= 3600 ? 'text-red-400' : 'text-cyan-400'}` },
-                                `${Math.floor(dailyUsage.seconds / 60)} / 60 min`
-                            )
-                        ),
-                        h('div', { className: "w-full h-2 bg-gray-700 rounded-full overflow-hidden" },
-                            h('div', {
-                                className: `h-full transition-all duration-500 ${dailyUsage.seconds >= 3600 ? 'bg-red-500' : 'bg-cyan-500'}`,
-                                style: { width: `${Math.min((dailyUsage.seconds / 3600) * 100, 100)}%` }
-                            })
-                        )
-                    ),
-
-                    h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
-                        ['free', 'monthly', 'quarterly', 'halfYearly', 'yearly'].map((planId) => 
-                            h('button', {
-                                key: planId,
-                                onClick: () => handlePlanSelection(planId),
-                                className: `relative p-6 rounded-xl border transition-all text-left group ${
-                                    subscriptionPlan === planId 
-                                    ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' 
-                                    : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
-                                }`
-                            },
-                                h('div', { className: "flex justify-between items-start mb-2" },
-                                    h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
-                                    subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))
-                                ),
-                                h('div', { className: "flex items-baseline gap-1" },
-                                    h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)),
-                                    h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))
-                                ),
-                                planId === 'yearly' && h('div', { className: "absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg" }, "BEST VALUE"),
-                                subscriptionPlan !== planId && h('div', { className: "mt-4 pt-4 border-t border-gray-700/50 text-xs text-center text-cyan-500 font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity" }, t('settings.subscriptionTab.upgrade'))
-                            )
-                        )
-                    ),
-
-                    h('div', { className: "bg-black/20 p-6 rounded-xl border border-gray-800 mt-2" },
-                        h('h4', { className: "text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2" }, t('settings.subscriptionTab.featuresTitle')),
-                        h('div', { className: "space-y-3" },
-                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
-                                h(CheckCircleIcon, { className: "w-5 h-5 text-gray-400 shrink-0" }),
-                                h('span', null, t('settings.subscriptionTab.featureFree'))
-                            ),
-                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
-                                h(CheckCircleIcon, { className: "w-5 h-5 text-green-400 shrink-0" }),
-                                h('span', null, t('settings.subscriptionTab.feature1'))
-                            ),
-                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
-                                h(CheckCircleIcon, { className: "w-5 h-5 text-green-400 shrink-0" }),
-                                h('span', null, t('settings.subscriptionTab.feature2'))
-                            ),
-                            h('div', { className: "flex items-center gap-3 text-sm text-gray-300" },
-                                h(CheckCircleIcon, { className: "w-5 h-5 text-green-400 shrink-0" }),
-                                h('span', null, t('settings.subscriptionTab.feature3'))
-                            )
-                        )
-                    )
-                );
             default:
                 return null;
         }
@@ -1166,7 +1186,7 @@ export const App = () => {
     const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
     const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotion', { happiness: 50, empathy: 50, formality: 30, excitement: 50, sadness: 10, curiosity: 60 });
     const [voiceTuning, setVoiceTuning] = usePersistentState('kaniska-voice-tuning', { speed: 1.0, pitch: 0 });
-    const [apiKeys, setApiKeys] = usePersistentState('kaniska-api-keys', { weather: '', news: '', youtube: '', auddio: '' });
+    const [apiKeys, setApiKeys] = usePersistentState('kaniska-api-keys', { gemini: '', weather: '', news: '', youtube: '', auddio: '' });
     const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
     const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
     const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-volume', 0.5);
@@ -1433,7 +1453,8 @@ export const App = () => {
             const currentVoice = gender === 'female' ? femaleVoices.main : maleVoices.main;
             
             // FIX: Await the connection to ensure we catch startup errors like 401/404/Network
-            const sessionPromise = connectLiveSession(callbacks, customInstructions, currentVoice);
+            // Pass the custom Gemini API Key (if set) to override the env key
+            const sessionPromise = connectLiveSession(callbacks, customInstructions, currentVoice, apiKeys.gemini);
             sessionRef.current = sessionPromise;
             await sessionPromise;
 
