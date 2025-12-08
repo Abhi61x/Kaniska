@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -755,90 +753,6 @@ const SettingsModal = ({
                         )
                     )
                 );
-            case 'voice':
-                 const currentVoices = gender === 'female' ? femaleVoices : maleVoices;
-                 const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
-                 
-                 const categories = {
-                    "Female Persona": ['Kore', 'Aoede', 'Zephyr'],
-                    "Male Persona": ['Fenrir', 'Charon', 'Puck']
-                 };
-
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
-                        h('div', { className: "mb-6" },
-                            h('h3', { className: "font-semibold text-lg text-cyan-400" }, gender === 'female' ? t('settings.voiceTab.female.title') : t('settings.voiceTab.male.title')),
-                            h('p', { className: "text-xs text-gray-300" }, t('settings.voiceTab.description'))
-                        ),
-                        h('div', { className: "space-y-8" },
-                            // Main Voice Section
-                            h('div', null,
-                                h('h4', { className: "text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider border-b border-gray-700 pb-2" }, t('settings.voiceTab.mainVoiceLabel')),
-                                Object.entries(categories).map(([category, voices]) => 
-                                    h('div', { key: category, className: "mb-4" },
-                                        h('h5', { className: "text-xs text-gray-500 mb-2 font-medium" }, category),
-                                        h('div', { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" },
-                                            voices.map(v => 
-                                                h('div', { 
-                                                    key: v, 
-                                                    onClick: () => setVoices({...currentVoices, main: v}),
-                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${currentVoices.main === v ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
-                                                },
-                                                    h('div', { className: "flex items-center gap-3" },
-                                                        h('div', { className: `w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentVoices.main === v ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
-                                                            h(VoiceIcon, { className: "w-4 h-4" })
-                                                        ),
-                                                        h('span', { className: `font-medium text-sm ${currentVoices.main === v ? 'text-cyan-400' : 'text-gray-300'}` }, v)
-                                                    ),
-                                                    h('button', {
-                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v); },
-                                                        disabled: previewingVoice === v,
-                                                        className: "p-2 rounded-full hover:bg-white/10 text-cyan-400 transition-colors"
-                                                    },
-                                                        previewingVoice === v ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            ),
-                            
-                            // Greeting Voice Section
-                            h('div', null,
-                                h('h4', { className: "text-sm font-semibold text-gray-300 mb-4 uppercase tracking-wider border-b border-gray-700 pb-2" }, t('settings.voiceTab.greetingVoiceLabel')),
-                                Object.entries(categories).map(([category, voices]) => 
-                                    h('div', { key: category, className: "mb-4" },
-                                        h('h5', { className: "text-xs text-gray-500 mb-2 font-medium" }, category),
-                                        h('div', { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" },
-                                            voices.map(v => 
-                                                h('div', { 
-                                                    key: v, 
-                                                    onClick: () => setVoices({...currentVoices, greeting: v}),
-                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${currentVoices.greeting === v ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
-                                                },
-                                                    h('div', { className: "flex items-center gap-3" },
-                                                        h('div', { className: `w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentVoices.greeting === v ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
-                                                            h(VoiceIcon, { className: "w-4 h-4" })
-                                                        ),
-                                                        h('span', { className: `font-medium text-sm ${currentVoices.greeting === v ? 'text-cyan-400' : 'text-gray-300'}` }, v)
-                                                    ),
-                                                    h('button', {
-                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v); },
-                                                        disabled: previewingVoice === v,
-                                                        className: "p-2 rounded-full hover:bg-white/10 text-cyan-400 transition-colors"
-                                                    },
-                                                        previewingVoice === v ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                );
              case 'apiKeys':
                  return h(ApiKeysTab, { apiKeys, setApiKeys, t });
             case 'help':
@@ -1279,7 +1193,26 @@ export const App = () => {
 
     try {
         const voice = gender === 'female' ? femaleVoices.main : maleVoices.main;
-        const instructions = `${customInstructions}\n\nUser Name: ${userName}\nBio: ${userBio}`;
+        // FIX: Construct prompt using all setting variables so the AI actually knows who it is.
+        const instructions = `
+        Identity Configuration:
+        Name: ${assistantName}
+        Gender: ${gender}
+        Core Persona: ${customInstructions}
+        
+        User Context:
+        User Name: ${userName}
+        User Bio: ${userBio}
+        
+        Emotional State Tuning (0-100):
+        Happiness: ${emotionTuning.happiness}
+        Empathy: ${emotionTuning.empathy}
+        Formality: ${emotionTuning.formality}
+        Excitement: ${emotionTuning.excitement}
+        Sadness: ${emotionTuning.sadness}
+        Curiosity: ${emotionTuning.curiosity}
+        `;
+
         const session = await connectLiveSession(callbacks, instructions, voice, apiKeys.gemini);
         sessionRef.current = session;
     } catch(e) {
@@ -1293,9 +1226,10 @@ export const App = () => {
     h('div', { className: "fixed top-0 left-0 right-0 p-6 flex justify-between items-center z-40 pointer-events-none" },
         h('div', { className: "flex items-center gap-3 pointer-events-auto" },
              h('div', { className: "w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/20" },
-                h('span', { className: "font-bold text-black text-lg" }, "K")
+                h('span', { className: "font-bold text-black text-lg" }, assistantName.charAt(0).toUpperCase())
              ),
-             h('span', { className: "font-bold text-xl tracking-tight" }, t('appName'))
+             // FIX: Display dynamic assistantName from state instead of static translation
+             h('span', { className: "font-bold text-xl tracking-tight" }, assistantName || t('appName'))
         ),
         h('button', {
             onClick: () => setIsSettingsOpen(true),
