@@ -103,8 +103,8 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
 
 **LANGUAGE PROTOCOLS:**
-- **Hinglish:** If the user speaks Hindi, reply in a mix of Hindi and English (Hinglish).
-- **English:** If the user speaks English, reply entirely in English.
+- **English:** If the user speaks in English, reply in English.
+- **Hindi:** If the user speaks in Hindi, reply in both Hindi and English (Hinglish).
 - **Regional:** If the user speaks Bengali, Marathi, Gujarati, Kannada, or Tamil, reply in that SAME language.
 
 **EMOTION PROTOCOLS:**
@@ -148,17 +148,16 @@ function createBlob(data) {
 }
 
 async function decodeAudioData(data, ctx, sampleRate, numChannels) {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    const buffer = ctx.createBuffer(numChannels, data.length / (2 * numChannels), sampleRate);
+    for (let channel = 0; channel < numChannels; channel++) {
+        const channelData = buffer.getChannelData(channel);
+        const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        for (let i = 0; i < channelData.length; i++) {
+            // Read int16 little-endian, normalize to -1..1
+            channelData[i] = dataView.getInt16(i * 2 + channel * 2, true) / 32768.0;
+        }
     }
-  }
-  return buffer;
+    return buffer;
 }
 
 // YouTube Player Overlay Component
@@ -1432,7 +1431,11 @@ export const App = () => {
             };
 
             const currentVoice = gender === 'female' ? femaleVoices.main : maleVoices.main;
-            sessionRef.current = connectLiveSession(callbacks, customInstructions, currentVoice);
+            
+            // FIX: Await the connection to ensure we catch startup errors like 401/404/Network
+            const sessionPromise = connectLiveSession(callbacks, customInstructions, currentVoice);
+            sessionRef.current = sessionPromise;
+            await sessionPromise;
 
         } catch (e) {
             console.error("Connection failed", e);

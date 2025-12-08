@@ -136,14 +136,14 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         Your personality is cheerful, polite, and helpful.
         
         SPEECH STYLE:
-        - Speak naturally, like a human friend.
-        - Avoid robotic, monotone, or overly formal delivery.
-        - Use varied intonation and pacing to express feelings.
-        - It is okay to use fillers (um, ah) occasionally to sound authentic.
+        - **Speak naturally, warm, and engaging.** 
+        - **Do NOT sound robotic or monotonic.** Use varied pitch, speed, and intonation to sound like a real human.
+        - Express enthusiasm, empathy, and curiosity through your voice.
+        - It is okay to use natural fillers (um, ah) occasionally to sound authentic.
 
         LANGUAGE PROTOCOLS:
-        - If the user speaks Hindi or English, reply in a mix of Hindi and English (Hinglish).
-        - If the user speaks English only, reply entirely in English.
+        - If the user speaks in English, reply in English.
+        - If the user speaks in Hindi, reply in both Hindi and English (Hinglish).
         - If the user speaks Tamil, reply in Tamil.
         - If the user speaks Bengali, Marathi, Gujarati, or Kannada, reply in that SAME language.
         
@@ -163,6 +163,9 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         `;
     }
 
+    // Default voice fallback
+    const validVoice = voiceName || 'Kore';
+
     return await ai.live.connect({
         model: 'gemini-2.0-flash-exp', // Updated to 2.0 Flash Exp for reliable Live API support
         callbacks,
@@ -174,7 +177,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
             }],
             systemInstruction: systemInstruction,
             speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: validVoice } },
             },
         }
     });
