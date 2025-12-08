@@ -171,7 +171,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
     // Determine which key to use and create a client instance
     const activeKey = apiKey || process.env.API_KEY;
     if (!activeKey) {
-        throw new MainApiKeyError("No API Key available for Gemini Live session.");
+        throw new MainApiKeyError("No API Key available for Gemini Live session. Please add one in Settings.");
     }
     
     // Create a specific client for this session to ensure the correct key is used
@@ -181,7 +181,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
     const validVoice = voiceName || 'Kore';
 
     return await client.live.connect({
-        model: 'gemini-2.0-flash-exp', // Updated to 2.0 Flash Exp for reliable Live API support
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025', // Updated for best Live API performance
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
