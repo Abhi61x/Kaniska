@@ -320,7 +320,8 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
                 )
             ),
             h('div', { className: "space-y-6 mt-6" },
-                ['weather', 'news', 'youtube', 'auddio'].map(keyType => 
+                // Only showing Youtube and Auddio as Weather and News are now system managed
+                ['youtube', 'auddio'].map(keyType => 
                     h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-gray-700/50" },
                         h('div', { className: "flex justify-between items-center mb-2" },
                             h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, t(`settings.apiKeysTab.${keyType}Key`)),
@@ -755,8 +756,8 @@ const SettingsModal = ({
                         )
                     )
                 );
-             // ... other tabs ...
-            case 'voice':
+             // ... other cases ...
+             case 'voice':
                  const currentVoices = gender === 'female' ? femaleVoices : maleVoices;
                  const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
                  

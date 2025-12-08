@@ -1,5 +1,9 @@
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
+// Internal API Keys (Hardcoded as requested)
+const WEATHER_API_KEY = "a9d473331d424f9699a82612250812"; // WeatherAPI.com
+const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
+
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
   keyType: string;
@@ -304,8 +308,8 @@ export async function getSupportResponse(history) {
 The app's features include:
 - Live voice conversations with an AI.
 - Searching and playing YouTube videos.
-- Getting weather forecasts (requires a Visual Crossing API key).
-- Fetching top news headlines (requires a GNews API key).
+- Getting weather forecasts (Powered by WeatherAPI.com).
+- Fetching top news headlines (Powered by NewsData.io).
 - Setting timers.
 - Singing songs (requires Gemini to find lyrics).
 - Recognizing songs playing nearby (requires an Audd.io API key).
@@ -322,7 +326,7 @@ The app's features include:
 Users can configure:
 - Persona: Gender (male/female), greeting message, and emotional tuning.
 - Voice: Specific TTS voices for each gender.
-- API Keys: For weather, news, YouTube, and song recognition.
+- API Keys: YouTube (optional), Song Recognition (optional). Weather and News are built-in.
 - Theme: Light or dark mode.
 
 When asked about API keys, guide them to the FAQ section in the Help & Support tab for detailed, step-by-step instructions.`;
@@ -394,13 +398,17 @@ The programming language is: "${language}".`;
     }
 }
 
-export async function fetchWeatherSummary(location, apiKey) {
+// Switched to WeatherAPI.com (using internal hardcoded key)
+export async function fetchWeatherSummary(location, apiKeyIgnored = null) {
+    const apiKey = WEATHER_API_KEY; 
+    
+    // Fallback logic in case key is somehow missing (though it's hardcoded)
     if (!apiKey) {
-      throw new ApiKeyError("To enable weather forecasts, please go to Settings > API Keys and enter your Visual Crossing API key.", 'weather');
+      throw new ApiKeyError("Internal Weather API key is missing.", 'weather');
     }
 
     const encodedLocation = encodeURIComponent(location);
-    const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodedLocation}?unitGroup=metric&key=${apiKey}&contentType=json`;
+    const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodedLocation}`;
 
     try {
         const response = await fetch(url);
@@ -410,35 +418,35 @@ export async function fetchWeatherSummary(location, apiKey) {
                 case 400:
                     throw new Error(`I couldn't get weather for "${location}". Please check if the location is valid.`);
                 case 401:
-                    throw new ApiKeyError("The Visual Crossing API key appears to be invalid. Please go to Settings > API Keys to check or update it.", 'weather');
-                case 429:
-                    throw new RateLimitError("The Visual Crossing service has exceeded its request limit. Please check your account or try again later.");
+                case 403:
+                    throw new ApiKeyError("The internal Weather API key is invalid or expired.", 'weather');
                 default:
-                     if (response.status >= 500) {
-                        throw new ServiceError("The weather service is currently experiencing issues. Please try again in a few moments.");
-                    }
-                    throw new Error(`I'm having trouble fetching the weather forecast. The service reported: ${errorText}`);
+                    throw new Error(`I'm having trouble fetching the weather forecast. The service reported: ${response.status}`);
             }
         }
         const data = await response.json();
         
-        if (!data.currentConditions) {
-            throw new Error("I couldn't get weather for that location. It may be invalid, or the service is temporarily unavailable.");
+        // Mapping WeatherAPI.com response to our app's format
+        if (!data.current) {
+            throw new Error("I couldn't get weather for that location. The service response was incomplete.");
         }
 
+        const conditionText = data.current.condition?.text || 'Unknown';
+        const tempC = data.current.temp_c;
+        const feelsLikeC = data.current.feelslike_c;
+        
         return {
-            summary: data.description || 'No summary available.',
-            location: data.resolvedAddress || location,
-            temp: Math.round(data.currentConditions.temp),
-            conditions: data.currentConditions.conditions,
-            icon: data.currentConditions.icon,
+            summary: `It is currently ${conditionText} and ${tempC}°C in ${data.location?.name || location}. Feels like ${feelsLikeC}°C.`,
+            location: data.location?.name ? `${data.location.name}, ${data.location.country}` : location,
+            temp: Math.round(tempC),
+            conditions: conditionText,
+            icon: data.current.condition?.icon ? `https:${data.current.condition.icon}` : '',
         };
     } catch (error) {
         if (error instanceof ApiKeyError || error instanceof RateLimitError || error instanceof ServiceError) {
             throw error;
         }
-        if (error instanceof TypeError) { // Likely a network error
-             // Improve network error feedback
+        if (error instanceof TypeError) { 
              throw new Error("I'm unable to connect to the weather service. Please check your internet connection.");
         }
         console.error("Error fetching weather data:", error);
@@ -447,66 +455,13 @@ export async function fetchWeatherSummary(location, apiKey) {
 }
 
 export async function validateWeatherKey(apiKey) {
-    if (!apiKey) {
-        return { success: true, message: "No key provided. Weather will be disabled." };
-    }
-    const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/London,UK/today?unitGroup=metric&key=${apiKey}&contentType=json`;
-    try {
-        const response = await fetch(url);
-        if (response.ok) {
-            return { success: true, message: "Weather key is valid." };
-        }
-        
-        // Specific status code handling
-        if (response.status === 401) {
-             return { success: false, message: "The provided API key is invalid." };
-        }
-        if (response.status === 429) {
-             return { success: false, message: "This API key has exceeded its daily query limit." };
-        }
-
-        const errorText = await response.text();
-        if (errorText.toLowerCase().includes('invalid api key')) {
-            return { success: false, message: "The provided API key is invalid." };
-        }
-        if (errorText.toLowerCase().includes('exceeded')) {
-             return { success: false, message: "This API key has exceeded its daily query limit." };
-        }
-        return { success: false, message: errorText || `Validation failed with status ${response.status}.` };
-    } catch (e) {
-        return { success: false, message: "A network error occurred while trying to validate the key." };
-    }
+    // Internal key validation always returns true since it's hardcoded and managed by us
+    return { success: true, message: "Weather service is active (System Managed)." };
 }
 
 export async function validateNewsKey(apiKey) {
-    if (!apiKey) {
-        return { success: true, message: "No key provided. News will be disabled." };
-    }
-    const url = `https://gnews.io/api/v4/search?q=example&lang=en&max=1&apikey=${apiKey}`;
-    try {
-        const response = await fetch(url);
-        if (response.ok) {
-            return { success: true, message: "News key is valid." };
-        }
-
-        const status = response.status;
-        if (status === 401 || status === 403) {
-            return { success: false, message: "The provided API key is invalid or unauthorized." };
-        }
-        if (status === 429) {
-            return { success: false, message: "This API key has exceeded its request limit." };
-        }
-
-        const data = await response.json().catch(() => ({}));
-        return { success: false, message: data.errors?.[0] || `Invalid API key (Status: ${response.status}).` };
-    } catch (e) {
-        // GNews API often returns 403 Forbidden without CORS headers if the key is invalid,
-        // causing a browser Network Error instead of a readable response.
-        if (e instanceof TypeError && e.message === 'Failed to fetch') {
-             return { success: false, message: "Validation failed. The GNews API rejected the request (likely invalid key)." };
-        }
-        return { success: false, message: "Network error during validation. Please check your internet connection." };
-    }
+    // Internal key validation always returns true since it's hardcoded and managed by us
+    return { success: true, message: "News service is active (System Managed)." };
 }
 
 export async function validateYouTubeKey(apiKey) {
@@ -577,36 +532,40 @@ export async function validateAuddioKey(apiKey) {
     }
 }
 
-export async function fetchNews(apiKey, query) {
+// Switched to NewsData.io (using internal hardcoded key)
+export async function fetchNews(apiKeyIgnored = null, query) {
+    const apiKey = NEWSDATA_API_KEY;
+
     if (!apiKey) {
-        throw new ApiKeyError("To get news updates, please go to Settings > API Keys and enter your GNews API key.", 'news');
+        throw new ApiKeyError("Internal News API key is missing.", 'news');
     }
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://gnews.io/api/v4/search?q=${encodedQuery}&lang=en&max=5&apikey=${apiKey}`;
+    // NewsData.io URL
+    const url = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodedQuery}&language=en`;
+    
     try {
         const response = await fetch(url);
         if (!response.ok) {
              const data = await response.json().catch(() => ({}));
-             const apiMessage = data.errors?.[0] || 'The service returned an unspecified error.';
-             switch (response.status) {
-                case 401:
-                case 403:
-                    // Treat 403 Forbidden as an API key issue as well for GNews
-                    throw new ApiKeyError("The GNews API key appears to be invalid or expired. Please go to Settings > API Keys to check or update it.", 'news');
-                case 429:
-                    throw new RateLimitError("The GNews API key has exceeded its quota. Please check your GNews account or try again later.");
-                default:
-                    if (response.status >= 500) {
-                        throw new ServiceError("The news service is currently unavailable. Please try again in a few moments.");
-                    }
-                    throw new Error(`The news service reported an error: ${apiMessage}`);
+             // NewsData error handling
+             const apiMessage = data.results?.message || 'The service returned an unspecified error.';
+             
+             if (response.status === 401 || response.status === 403) {
+                 throw new ApiKeyError("The internal News API key is invalid or expired.", 'news');
              }
+             if (response.status === 429) {
+                 throw new RateLimitError("The News service has exceeded its quota. Please try again later.");
+             }
+             
+             throw new Error(`The news service reported an error: ${apiMessage}`);
         }
+        
         const data = await response.json();
-        if (!data.articles || data.articles.length === 0) {
+        if (!data.results || data.results.length === 0) {
             return `I couldn't find any recent news articles about "${query}".`;
         }
-        const summary = data.articles.map((article, index) => 
+        
+        const summary = data.results.slice(0, 5).map((article, index) => 
             `${index + 1}. ${article.title}`
         ).join('\n');
         return `Here are the top headlines about "${query}":\n${summary}`;
@@ -614,13 +573,7 @@ export async function fetchNews(apiKey, query) {
         if (error instanceof ApiKeyError || error instanceof RateLimitError || error instanceof ServiceError) {
             throw error;
         }
-        // Check for specific TypeError messages that indicate network issues/CORS which might be invalid key disguised
         if (error instanceof TypeError) { 
-            // If we are here, it could be a CORS error caused by a 403 from GNews (invalid key).
-            // We can't know for sure, but we can give a hint.
-            if (error.message === 'Failed to fetch') {
-                throw new ApiKeyError("I couldn't connect to the news service. This usually means the GNews API Key is invalid or restricted, causing the browser to block the request. Please check your key in Settings.", 'news');
-            }
             throw new Error("I'm unable to connect to the news service. Please check your internet connection.");
         }
         console.error("Error fetching news:", error);
