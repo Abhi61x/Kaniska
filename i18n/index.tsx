@@ -420,7 +420,11 @@ const hi = {
     "subscriptionTab": {
       "title": "सदस्यता",
       "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो।",
+      "usage": "दैनिक उपयोग",
+      "active": "सक्रिय",
+      "upgrade": "अपग्रेड",
       "plans": {
+        "free": { "name": "निःशुल्क", "price": "₹0", "duration": "/ हमेशा के लिए" },
         "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" },
         "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" },
         "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" },
@@ -428,6 +432,7 @@ const hi = {
       },
       "subscribeButton": "अभी सदस्यता लें",
       "featuresTitle": "सभी योजनाओं में शामिल हैं:",
+      "featureFree": "प्रति दिन 1 घंटे का उपयोग",
       "feature1": "व्यस्त समय के दौरान उच्च प्राथमिकता वाली पहुंच",
       "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच",
       "feature3": "विशेष अवतार पैक और दृश्य अनुकूलन"

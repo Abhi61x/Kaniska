@@ -1071,7 +1071,7 @@ const SettingsModal = ({
             className: "bg-black md:bg-panel-bg w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-border-color overflow-hidden flex flex-col md:flex-row relative animate-panel-enter",
             onClick: e => e.stopPropagation()
         },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20` },
+            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-border-color h-full absolute md:relative z-20 md:shrink-0` },
                 h('div', { className: "p-6 border-b border-border-color flex justify-between items-center" },
                     h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" },
                         h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }),
@@ -1444,8 +1444,11 @@ export const App = () => {
             } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
                  alert("Microphone is already in use by another application.");
             } else {
-                // Show the specific error message if available (e.g. Network Error), otherwise generic
-                alert(e.message || t('errors.speechRecognitionGeneric'));
+                if (e.message && e.message.includes("Network")) {
+                     alert(t('errors.speechRecognitionNetwork'));
+                } else {
+                     alert(e.message || t('errors.speechRecognitionGeneric'));
+                }
             }
         }
     };
