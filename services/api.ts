@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
 // A custom error class to signal API key issues that the user can fix.
@@ -156,6 +154,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         - Match the user's energy and emotional tone.
         
         TOOLS:
+        - If the user asks about recent events, news, or real-time info, use the integrated Google Search to find the answer.
         - If the user asks to open settings, call 'openSettings'.
         - If the user asks to set a timer, call 'setTimer'.
         - If the user asks to play a video or song, call 'searchYouTube'.
@@ -169,7 +168,10 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
-            tools: [{ functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool] }],
+            tools: [{ 
+                functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool],
+                googleSearch: {} 
+            }],
             systemInstruction: systemInstruction,
             speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
