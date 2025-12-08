@@ -1257,7 +1257,8 @@ export const App = () => {
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            // FIX: Use default sample rate for output to avoid robotic voice on incompatible devices
+            outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
             // Ensure context is running (fixes issues where browser suspends audio context until gesture)
             await outputAudioContextRef.current.resume();
 
@@ -1297,6 +1298,7 @@ export const App = () => {
                          const ctx = outputAudioContextRef.current;
                          if (!ctx) return;
                          
+                         // Pass 24000 as source rate so decodeAudioData resamples correctly
                          const audioBuffer = await decodeAudioData(decode(base64), ctx, 24000, 1);
                          const source = ctx.createBufferSource();
                          source.buffer = audioBuffer;
@@ -1310,9 +1312,9 @@ export const App = () => {
                          }
 
                          const currentTime = ctx.currentTime;
-                         // If nextStartTime is way behind, reset it to now to avoid huge lag/silence gaps
+                         // FIX: Add small jitter buffer (50ms) to nextStartTime to prevent robotic gaps/stuttering
                          if (nextStartTimeRef.current < currentTime) {
-                             nextStartTimeRef.current = currentTime;
+                             nextStartTimeRef.current = currentTime + 0.05;
                          }
                          
                          const startTime = Math.max(currentTime, nextStartTimeRef.current);
@@ -1445,7 +1447,7 @@ export const App = () => {
                  alert("Microphone is already in use by another application.");
             } else {
                 if (e.message && e.message.includes("Network")) {
-                     alert(t('errors.speechRecognitionNetwork'));
+                     alert(t('errors.speechRecognitionNetwork') + " (Please check your API Key)");
                 } else {
                      alert(e.message || t('errors.speechRecognitionGeneric'));
                 }
