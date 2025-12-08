@@ -55,7 +55,7 @@ function handleGeminiError(error, context = 'processing your request') {
     console.error(`Error calling the Gemini API during ${context}:`, error);
     const errorMessage = (error.message || error.toString() || '').toLowerCase();
 
-    if (errorMessage.includes('api key not valid')) {
+    if (errorMessage.includes('api key not valid') || errorMessage.includes('api_key')) {
         return new MainApiKeyError("I can't connect to my core services. This app's main API key seems to be invalid or missing.");
     }
     if (errorMessage.includes('rate limit')) {
@@ -170,6 +170,8 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
 
     // Determine which key to use and create a client instance
     const activeKey = apiKey || process.env.API_KEY;
+    console.log("[Kaniska] Attempting connection. Key present:", !!activeKey);
+
     if (!activeKey) {
         throw new MainApiKeyError("No API Key available for Gemini Live session. Please add one in Settings.");
     }
@@ -180,21 +182,31 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
     // Default voice fallback
     const validVoice = voiceName || 'Kore';
 
-    return await client.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025', // Updated for best Live API performance
-        callbacks,
-        config: {
-            responseModalities: [Modality.AUDIO],
-            tools: [
-                { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool] },
-                { googleSearch: {} }
-            ],
-            systemInstruction: systemInstruction,
-            speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: validVoice } },
-            },
+    try {
+        return await client.live.connect({
+            model: 'gemini-2.5-flash-native-audio-preview-09-2025', // Updated for best Live API performance
+            callbacks,
+            config: {
+                responseModalities: [Modality.AUDIO],
+                tools: [
+                    { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool] },
+                    { googleSearch: {} }
+                ],
+                systemInstruction: systemInstruction,
+                speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: validVoice } },
+                },
+            }
+        });
+    } catch (e) {
+        // Intercept network errors to provide better guidance
+        const msg = e.toString().toLowerCase();
+        if (msg.includes('network') || msg.includes('fetch')) {
+            console.error("[Kaniska] Connection Handshake Failed:", e);
+            throw new Error("Connection failed. The API key might be invalid for this service, or the network blocked the connection.");
         }
-    });
+        throw e;
+    }
 }
 
 export async function processUserCommand(

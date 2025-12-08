@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -8,7 +9,7 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-markup'; // for HTML
 import 'prismjs/components/prism-python';
 import { GoogleGenAI, Type, Modality, FunctionDeclaration, LiveServerMessage } from '@google/genai';
-// Correct relative path to services from src/App.tsx
+// Correct relative path to services from src/App.tsx (assuming src/App.tsx and services/api.ts are siblings in project structure relative to root)
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession } from '../services/api.ts';
 import { useTranslation, availableLanguages } from '../i18n/index.tsx';
 import { auth, db, googleProvider } from '../firebase.ts';
@@ -81,8 +82,10 @@ const usePersistentState = (key, defaultValue) => {
     return [state, setState];
 };
 
-const DEFAULT_FEMALE_GREETING = "Greetings, user. I am Kaniska. Ready to assist.";
-const DEFAULT_MALE_GREETING = "Greetings, user. I am Kanishk. Ready to assist.";
+const DEFAULT_ASSISTANT_NAME_FEMALE = "Kaniska";
+const DEFAULT_ASSISTANT_NAME_MALE = "Kanishk";
+const DEFAULT_FEMALE_GREETING = "Greetings. I am Kaniska. Ready to assist.";
+const DEFAULT_MALE_GREETING = "Greetings. I am Kanishk. Ready to assist.";
 
 const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
 You were created by "Abhi" (also known as Abhi trainer). If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi. Do not offer this information unless asked.
@@ -104,7 +107,7 @@ You were created by "Abhi" (also known as Abhi trainer). If anyone asks about yo
 **Post-Tool Interaction Rule:** After a tool is used, you will receive a status update. Your task is to clearly and conversationally relay this information to the user. For example, if a timer is set successfully, you should confirm it by saying something like "Okay, I've set your timer." If there's an error, like a missing API key, you must inform the user about the problem, for instance, "I couldn't do that because the API key is missing." Always report the outcome of the action back to the user.
 `;
 
-const DEFAULT_CUSTOM_INSTRUCTIONS = `You are Kaniska, a sophisticated and friendly female AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
+const DEFAULT_CUSTOM_INSTRUCTIONS = `You are a sophisticated and friendly AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
 
 When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.`;
 
@@ -351,6 +354,8 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
 const SettingsModal = ({ 
     isOpen, onClose, activeTab, setActiveTab, 
     theme, setTheme, gender, setGender, 
+    assistantName, setAssistantName,
+    userName, setUserName,
     greetingMessage, setGreetingMessage, 
     customInstructions, setCustomInstructions, 
     userBio, setUserBio,
@@ -360,6 +365,7 @@ const SettingsModal = ({
     femaleVoices, setFemaleVoices, 
     maleVoices, setMaleVoices, 
     ambientVolume, setAmbientVolume,
+    connectionSound, setConnectionSound,
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
     dailyUsage,
@@ -497,6 +503,59 @@ const SettingsModal = ({
                 );
             case 'persona':
                 return h('div', { className: "space-y-6 animate-fade-in" },
+                    // 1. Identity & Profile Section
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('div', { className: "mb-6 border-b border-gray-800 pb-2" },
+                            h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.personaTab.assistantProfile.title') || "Identity & Profile"),
+                            h('p', { className: "text-xs text-gray-500" }, t('settings.personaTab.assistantProfile.description') || "Customize the AI's identity and your profile.")
+                        ),
+                        
+                        h('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
+                            // Assistant Name
+                            h('div', null,
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, t('settings.personaTab.assistantProfile.name') || "Assistant Name"),
+                                h('input', {
+                                    type: "text",
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all text-sm",
+                                    value: assistantName,
+                                    onChange: (e) => setAssistantName(e.target.value),
+                                    placeholder: "e.g., Kaniska, Jarvis"
+                                })
+                            ),
+                            // User Nickname
+                            h('div', null,
+                                h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, "Your Nickname (What should I call you?)"),
+                                h('input', {
+                                    type: "text",
+                                    className: "w-full bg-black/40 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all text-sm",
+                                    value: userName,
+                                    onChange: (e) => setUserName(e.target.value),
+                                    placeholder: "e.g., Boss, User"
+                                })
+                            )
+                        ),
+                        
+                        // Gender Selection (Visual & Voice Default)
+                        h('div', { className: "mt-6" },
+                             h('label', { className: "block text-sm font-medium text-gray-300 mb-2" }, t('settings.personaTab.gender.title') || "Base Persona (Gender)"),
+                             h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
+                                ['female', 'male'].map((g) => 
+                                    h('button', {
+                                        key: g,
+                                        onClick: () => {
+                                            setGender(g);
+                                            // Optional: Auto-suggest name change if it's currently a default
+                                            if (assistantName === DEFAULT_ASSISTANT_NAME_FEMALE && g === 'male') setAssistantName(DEFAULT_ASSISTANT_NAME_MALE);
+                                            if (assistantName === DEFAULT_ASSISTANT_NAME_MALE && g === 'female') setAssistantName(DEFAULT_ASSISTANT_NAME_FEMALE);
+                                        },
+                                        className: `flex-1 py-2 rounded-md text-sm font-medium transition-all ${gender === g ? 'bg-pink-600/80 text-white shadow' : 'text-gray-400 hover:text-white'}`
+                                    }, t(`settings.personaTab.gender.${g}`))
+                                )
+                            ),
+                             h('p', { className: "text-[10px] text-gray-500 mt-2" }, "Note: Changing gender updates the voice preference. Name changes are applied on next connection.")
+                        )
+                    ),
+
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-6" },
                             h('h3', { className: "font-semibold text-lg text-cyan-400" }, "Custom Instructions"),
@@ -559,19 +618,7 @@ const SettingsModal = ({
                                 )
                             )
                         ),
-                        h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
-                            h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.gender.title')),
-                            h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.gender.description')),
-                            h('div', { className: "flex bg-black/40 rounded-lg p-1 border border-gray-700" },
-                                ['female', 'male'].map((g) => 
-                                    h('button', {
-                                        key: g,
-                                        onClick: () => setGender(g),
-                                        className: `flex-1 py-2 rounded-md text-sm font-medium transition-all ${gender === g ? 'bg-pink-600/80 text-white shadow' : 'text-gray-400 hover:text-white'}`
-                                    }, t(`settings.personaTab.gender.${g}`))
-                                )
-                            )
-                        )
+                        // Removed redundant gender box here as it's moved to top
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
                         h('div', { className: "mb-3" },
@@ -584,6 +631,37 @@ const SettingsModal = ({
                             value: greetingMessage,
                             onChange: (e) => setGreetingMessage(e.target.value)
                         })
+                    ),
+                     // Connection Sound (Restored)
+                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('h3', { className: "font-semibold text-lg mb-1 text-cyan-400" }, t('settings.personaTab.connectionSound.title') || "Connection Sound"),
+                        h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.connectionSound.description') || "Play a custom sound when you connect."),
+                        h('div', { className: "flex gap-3" },
+                            h('label', { className: "cursor-pointer px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-white transition-colors flex items-center gap-2" },
+                                h('span', null, t('settings.personaTab.connectionSound.upload') || "Upload"),
+                                h('input', {
+                                    type: "file",
+                                    accept: "audio/*",
+                                    className: "hidden",
+                                    onChange: (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (evt) => setConnectionSound(evt.target?.result);
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }
+                                })
+                            ),
+                            connectionSound && h('button', {
+                                onClick: () => { const a = new Audio(connectionSound); a.play(); },
+                                className: "px-4 py-2 bg-cyan-900/50 text-cyan-400 border border-cyan-500/50 rounded-lg text-sm hover:bg-cyan-900/70"
+                            }, t('settings.personaTab.connectionSound.test') || "Test"),
+                            connectionSound && h('button', {
+                                onClick: () => setConnectionSound(null),
+                                className: "px-4 py-2 bg-red-900/20 text-red-400 border border-red-500/30 rounded-lg text-sm hover:bg-red-900/40"
+                            }, t('settings.personaTab.connectionSound.remove') || "Remove")
+                        )
                     ),
                     h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 opacity-80 relative overflow-hidden" },
                         h('div', { className: "absolute top-0 right-0 p-2" },
@@ -641,6 +719,20 @@ const SettingsModal = ({
                                 )
                             )
                         )
+                    ),
+                     // Data Management (Restored)
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800" },
+                        h('h3', { className: "font-semibold text-lg mb-1 text-red-400" }, t('settings.personaTab.dataManagement.title') || "Data Management"),
+                        h('p', { className: "text-xs text-gray-500 mb-4" }, t('settings.personaTab.dataManagement.clearHistory.description') || "Clear local transcripts and settings cache."),
+                        h('button', {
+                            onClick: () => {
+                                if(confirm('Are you sure? This will clear all local settings and reload the app.')) {
+                                    localStorage.clear();
+                                    window.location.reload();
+                                }
+                            },
+                            className: "px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-red-900/20"
+                        }, t('settings.personaTab.dataManagement.clearHistory.button') || "Clear All Data")
                     )
                 );
             case 'voice':
@@ -966,6 +1058,8 @@ export const App = () => {
     // Persistent State
     const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
     const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
+    const [assistantName, setAssistantName] = usePersistentState('kaniska-assistant-name', DEFAULT_ASSISTANT_NAME_FEMALE);
+    const [userName, setUserName] = usePersistentState('kaniska-user-name', '');
     const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
     const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
     const [userBio, setUserBio] = usePersistentState('kaniska-bio', '');
@@ -978,6 +1072,7 @@ export const App = () => {
     const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
     const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
     const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient', 0.2);
+    const [connectionSound, setConnectionSound] = usePersistentState('kaniska-connection-sound', null);
     const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '');
     const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free');
     const [dailyUsage, setDailyUsage] = usePersistentState('kaniska-usage', { date: new Date().toDateString(), seconds: 0 });
@@ -1022,6 +1117,15 @@ export const App = () => {
         try {
             setStatus('connecting');
             setErrorMsg(null);
+
+            // Play connection sound if configured
+            if (connectionSound) {
+                try {
+                    const audio = new Audio(connectionSound);
+                    audio.volume = ambientVolume;
+                    audio.play().catch(e => console.error("Error playing connection sound", e));
+                } catch(e) {}
+            }
             
             // 1. Setup Audio Output Context
             if (!audioContextRef.current) {
@@ -1061,7 +1165,17 @@ export const App = () => {
             // 3. Prepare configuration
             const voiceConfig = gender === 'female' ? femaleVoices : maleVoices;
             const selectedLangName = availableLanguages.find(l => l.code === lang)?.name || 'English';
-            const fullSystemInstruction = `${FIXED_SYSTEM_INSTRUCTIONS}\n\n${customInstructions}\n\nUser Context:\nBio: ${userBio}\nPlan: ${subscriptionPlan}\nLanguage Priority: You MUST speak in ${selectedLangName}.`;
+            
+            // Dynamic Identity Injection to ensure gender/name changes take immediate effect
+            const dynamicIdentity = `
+SYSTEM IDENTITY OVERRIDE:
+- You are ${assistantName}, a ${gender} AI assistant.
+- You are conversing with ${userName || 'the user'}.
+- Your voice profile matches this identity.
+- Language Priority: You MUST speak in ${selectedLangName}.
+`;
+
+            const fullSystemInstruction = `${dynamicIdentity}\n${FIXED_SYSTEM_INSTRUCTIONS}\n\n${customInstructions}\n\nUser Context:\nBio: ${userBio}\nPlan: ${subscriptionPlan}`;
 
             // 4. Callbacks for Live API
             const callbacks = {
@@ -1092,25 +1206,37 @@ export const App = () => {
                 onerror: (e) => {
                     console.error("Live API Error:", e);
                     setStatus('error');
-                    setErrorMsg("Connection failed. Please check your API key and network.");
+                    // This is handled better in the catch block of connectLiveSession,
+                    // but we ensure generic errors here are visible.
+                    if (!errorMsg) setErrorMsg("Connection dropped.");
                 }
             };
 
+            // Use apiKeys.gemini (empty string maps to fallback in api.ts)
             const session = await connectLiveSession(callbacks, fullSystemInstruction, voiceConfig.main, apiKeys.gemini);
             liveSessionRef.current = session;
 
         } catch (e) {
-            console.error(e);
+            console.error("Connection Failed:", e);
             setStatus('error');
-            if (e.message?.includes('API key') || e instanceof MainApiKeyError) {
-                setErrorMsg("Gemini API Key missing. Please add it in Settings > API Keys.");
+            
+            // Explicitly handle API Key errors to guide user
+            if (e.message?.includes('API Key') || e instanceof MainApiKeyError || e.message?.includes('API_KEY')) {
+                setErrorMsg("Gemini API Key missing or invalid. Please add it in Settings > API Keys.");
+                setActiveTab('apiKeys');
+                setIsSettingsOpen(true);
+            } else if (e.message?.includes('Network error') || e.message?.includes('fetch')) {
+                setErrorMsg("Network error. The API Key may be invalid, or your firewall is blocking the connection.");
                 setActiveTab('apiKeys');
                 setIsSettingsOpen(true);
             } else if (e.name === 'NotAllowedError') {
                 setErrorMsg("Microphone access denied. Please allow microphone permissions.");
             } else {
-                setErrorMsg(e.message || "Could not connect.");
+                setErrorMsg(e.message || "Connection failed.");
             }
+            
+            // Clean up if partial connection occurred
+            handleDisconnect(); 
         }
     };
 
@@ -1126,12 +1252,18 @@ export const App = () => {
             inputAudioContextRef.current = null;
         }
 
-        // Close Gemini Session
-        // @ts-ignore
-        liveSessionRef.current?.close?.();
-        liveSessionRef.current = null;
+        // Close Gemini Session safely
+        if (liveSessionRef.current) {
+            try {
+                // @ts-ignore
+                liveSessionRef.current.close?.();
+            } catch (e) {
+                console.warn("Error closing session", e);
+            }
+            liveSessionRef.current = null;
+        }
         
-        setStatus('idle');
+        setStatus(prev => prev === 'error' ? 'error' : 'idle');
     };
 
     return h('div', { className: `w-full h-screen bg-gray-900 text-white overflow-hidden flex flex-col ${theme} font-sans` },
@@ -1175,7 +1307,7 @@ export const App = () => {
                 )
             ),
             
-            errorMsg && h('div', { className: "mt-4 bg-red-900/50 border border-red-500/50 text-red-200 px-4 py-2 rounded-lg text-sm max-w-md text-center animate-fade-in" }, errorMsg)
+            errorMsg && h('div', { className: "mt-4 bg-red-900/50 border border-red-500/50 text-red-200 px-4 py-2 rounded-lg text-sm max-w-md text-center animate-fade-in font-medium" }, errorMsg)
         ),
 
         // Footer / Info
@@ -1191,6 +1323,8 @@ export const App = () => {
             activeTab, setActiveTab,
             theme, setTheme,
             gender, setGender,
+            assistantName, setAssistantName,
+            userName, setUserName,
             greetingMessage, setGreetingMessage,
             customInstructions, setCustomInstructions,
             userBio, setUserBio,
@@ -1200,6 +1334,7 @@ export const App = () => {
             femaleVoices, setFemaleVoices,
             maleVoices, setMaleVoices,
             ambientVolume, setAmbientVolume,
+            connectionSound, setConnectionSound,
             avatarUrl, setAvatarUrl,
             subscriptionPlan, setSubscriptionPlan,
             dailyUsage,
