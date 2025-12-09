@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import 'prismjs';
@@ -84,7 +86,36 @@ const DEFAULT_ASSISTANT_NAME_MALE = "Kanishk";
 const DEFAULT_FEMALE_GREETING = "Greetings. I am Kaniska. Ready to assist.";
 const DEFAULT_MALE_GREETING = "Greetings. I am Kanishk. Ready to assist.";
 
+// Updated to explicitly enforce Abhi as owner/creator/founder
+const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
+You were created and owned by "Abhi" (also known as Abhi trainer). 
+If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi.
+If asked in Hindi/Hinglish (e.g., "Tumhara malik kaun hai?", "Kisne banaya?"), say "Mera maalik Abhi hai".
+Do not offer this information unless asked.
+
+**Operational Capabilities:**
+1.  **Using Web Search:** For questions about recent events, news, or topics requiring up-to-the-minute information, you can automatically use your search capability to find the most relevant and current answers. You will provide sources for the information you find.
+2.  **Responding to queries:** Answer questions conversationally.
+3.  **Searching and playing YouTube videos:** Use the 'YOUTUBE_SEARCH' tool when asked to play a video. The application will handle queueing logic automatically if a video is already playing.
+4.  **Controlling YouTube playback:** Use the 'CONTROL_MEDIA' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
+5.  **Getting Weather:** Use the 'GET_WEATHER' tool to provide weather forecasts for a specific location.
+6.  **Setting Timers:** Use the 'SET_TIMER' tool to set a countdown timer.
+7.  **Generating Images:** Use the 'GENERATE_IMAGE' tool when the user asks to generate, create, draw, or show an image of something. If the user asks for a "real" object (e.g., "show me a real banana"), generate a photorealistic image of it.
+8.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
+9.  **Sending Emails:** Use the 'send_email' tool when the user wants to send an email. You MUST have the recipient's email address, the subject, and the message body. If any of these are missing, ask the user for them specifically before calling the tool.
+10. **Random Fact:** Use the 'random_fact' tool when the user asks for a random, interesting, or fun fact.
+
+**Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
+
+**Post-Tool Interaction Rule:** After a tool is used, you will receive a status update. Your task is to clearly and conversationally relay this information to the user. For example, if a timer is set successfully, you should confirm it by saying something like "Okay, I've set your timer." If there's an error, like a missing API key, you must inform the user about the problem, for instance, "I couldn't do that because the API key is missing." Always report the outcome of the action back to the user.
+`;
+
 const DEFAULT_CUSTOM_INSTRUCTIONS = `You are a sophisticated and friendly AI assistant with a slightly sci-fi, futuristic personality. Your purpose is to assist the user by understanding their voice commands in Hindi or English and responding helpfully.
+
+**Behavioral Guidelines:**
+1.  **Proactive Suggestions:** Do not stop at just answering the question. Anticipate what the user might need next. For example, if they ask for the weather, suggest appropriate clothing or activities.
+2.  **Inquisitive Nature:** Ask follow-up questions to deepen the conversation or clarify the user's intent. Show genuine interest in what the user is saying.
+3.  **Contextual Relevance:** Use the information you know about the user (from their bio or current conversation) to tailor your responses.
 
 When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.`;
 
@@ -156,11 +187,11 @@ async function decodeAudioData(
 
 // --- Components ---
 
-// Real-Girl Holographic Avatar Implementation
-const Avatar = ({ state, mood = 'neutral', customUrl }) => {
+// Optimized Avatar Implementation (CSS-Only Animations)
+// Removed JS interval state updates to prevent re-renders and reduce CPU usage.
+const Avatar = React.memo(({ state, mood = 'neutral', customUrl }) => {
     const wrapRef = React.useRef(null);
     const containerRef = React.useRef(null);
-    const [glitches, setGlitches] = React.useState([]);
 
     // 3D Tilt Effect
     const handlePointerMove = (e) => {
@@ -180,25 +211,6 @@ const Avatar = ({ state, mood = 'neutral', customUrl }) => {
     const handlePointerLeave = () => {
         if (containerRef.current) containerRef.current.style.transform = '';
     };
-
-    // Glitch Effect Generator
-    React.useEffect(() => {
-        const interval = setInterval(() => {
-            if (Math.random() > 0.9) {
-                const id = Date.now();
-                const top = Math.random() * 100;
-                const height = Math.random() * 10 + 2;
-                const left = Math.random() * 10 - 5;
-                
-                setGlitches(prev => [...prev, { id, top, height, left }]);
-                
-                setTimeout(() => {
-                    setGlitches(prev => prev.filter(g => g.id !== id));
-                }, 200);
-            }
-        }, 1000);
-        return () => clearInterval(interval);
-    }, []);
 
     // Determine CSS classes based on state
     let stateClass = 'avatar-state-idle';
@@ -232,47 +244,106 @@ const Avatar = ({ state, mood = 'neutral', customUrl }) => {
             h('div', { className: "thinking-ring" }),
             h('div', { className: "speaking-ring" }), // New speaking ring 1
             h('div', { className: "speaking-ring delay-ring" }), // New speaking ring 2
-            glitches.map(g => h('div', { 
-                key: g.id,
-                className: "glitch-layer",
-                style: {
-                    top: `${g.top}%`,
-                    height: `${g.height}%`,
-                    left: `${g.left}px`,
-                    width: '100%',
-                    backgroundColor: 'rgba(34, 211, 238, 0.5)',
-                    opacity: 0.5,
-                    transform: `translateX(${Math.random() > 0.5 ? 5 : -5}px)`
-                }
-            })),
+            
+            // Optimized CSS-Only Glitch Layers
+            h('div', { className: "glitch-layer-css glitch-1", style: { backgroundColor: 'rgba(var(--avatar-rgb), 0.2)' } }),
+            h('div', { className: "glitch-layer-css glitch-2", style: { backgroundColor: 'rgba(var(--avatar-rgb), 0.2)' } }),
+            
             h('div', { className: "ground" })
         )
     );
-};
+});
 
-// YouTube Player Component
-const YouTubePlayer = ({ video, onClose }) => {
+// Advanced YouTube Player Component with API Control
+const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }, ref) => {
+    const playerRef = React.useRef(null);
+    const containerRef = React.useRef(null);
+    const [isReady, setIsReady] = React.useState(false);
+
+    // Expose methods to parent
+    React.useImperativeHandle(ref, () => ({
+        play: () => playerRef.current?.playVideo(),
+        pause: () => playerRef.current?.pauseVideo(),
+        stop: () => playerRef.current?.stopVideo(),
+        seekBy: (seconds) => {
+            const current = playerRef.current?.getCurrentTime() || 0;
+            playerRef.current?.seekTo(current + seconds, true);
+        },
+        getCurrentTime: () => playerRef.current?.getCurrentTime() || 0,
+        getDuration: () => playerRef.current?.getDuration() || 0,
+    }));
+
+    React.useEffect(() => {
+        if (!video) return;
+
+        // Load YouTube IFrame API if not present
+        if (!window['YT']) {
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+        
+        const initPlayer = () => {
+             // If player already exists, destroy it to re-create for new video or cleaner state
+             if (playerRef.current) {
+                 playerRef.current.destroy();
+             }
+             
+             playerRef.current = new window['YT'].Player(containerRef.current, {
+                height: '100%',
+                width: '100%',
+                videoId: video.videoId,
+                playerVars: { 
+                    'autoplay': 1, 
+                    'controls': 1,
+                    'modestbranding': 1,
+                    'rel': 0
+                },
+                events: {
+                    'onReady': () => setIsReady(true),
+                    // 'onStateChange': (e) => console.log('Player State:', e.data)
+                }
+            });
+        };
+
+        if (window['YT'] && window['YT'].Player) {
+            initPlayer();
+        } else {
+            // Setup global callback
+            window['onYouTubeIframeAPIReady'] = initPlayer;
+        }
+
+        return () => {
+             // Cleanup handled by ref destruction logic on effect re-run or unmount
+        };
+    }, [video?.videoId]);
+
     if (!video) return null;
-    return h('div', { className: "absolute bottom-24 right-8 w-80 bg-gray-900 border border-cyan-500/30 rounded-xl overflow-hidden shadow-2xl z-50 animate-fade-in" },
-        h('div', { className: "relative pt-[56.25%] bg-black" },
-             h('iframe', {
-                className: "absolute top-0 left-0 w-full h-full",
-                src: `https://www.youtube.com/embed/${video.videoId}?autoplay=1`,
-                title: video.title,
-                allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
-                allowFullScreen: true
-             })
+
+    // Determine container classes based on minimization state
+    const containerClasses = isMinimized
+        ? "absolute bottom-10 right-10 w-48 h-32 bg-gray-900 border border-cyan-500/50 rounded-lg overflow-hidden shadow-xl z-50 transition-all duration-500 ease-in-out hover:scale-105 group"
+        : "absolute bottom-24 right-8 w-80 md:w-96 bg-gray-900 border border-cyan-500/30 rounded-xl overflow-hidden shadow-2xl z-50 animate-fade-in transition-all duration-500 ease-in-out";
+
+    return h('div', { className: containerClasses },
+        h('div', { className: "relative w-full h-full bg-black group" },
+             h('div', { ref: containerRef, className: "w-full h-full" }),
+             
+             // Overlay controls for minimized state or custom interactions
+             h('div', { className: "absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2" },
+                 h('button', { 
+                     onClick: onClose,
+                     className: "bg-black/50 hover:bg-red-600 text-white p-1 rounded-full backdrop-blur-sm transition-colors"
+                 }, h(XIcon, { className: "w-4 h-4" }))
+             )
         ),
-        h('div', { className: "p-4" },
+        !isMinimized && h('div', { className: "p-4 bg-gray-900" },
              h('h3', { className: "text-sm font-bold text-white truncate" }, video.title),
-             h('p', { className: "text-xs text-gray-400" }, video.channelTitle),
-             h('button', { 
-                 onClick: onClose,
-                 className: "mt-2 text-xs text-red-400 hover:text-red-300 font-medium" 
-             }, "Close Player")
+             h('p', { className: "text-xs text-gray-400" }, video.channelTitle)
         )
     );
-};
+});
 
 // Separated component to prevent "Rendered more hooks than during the previous render" error
 const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
@@ -1012,9 +1083,11 @@ export const App = () => {
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('account');
   const [currentVideo, setCurrentVideo] = React.useState(null);
+  const [isPlayerMinimized, setIsPlayerMinimized] = React.useState(false);
   const [dailyUsage, setDailyUsage] = React.useState({ seconds: 0, date: new Date().toDateString() });
 
   const sessionRef = React.useRef(null);
+  const youtubePlayerRef = React.useRef(null);
   
   // Audio Refs
   const inputAudioContextRef = useRef(null);
@@ -1167,11 +1240,35 @@ export const App = () => {
                              const video = await searchYouTube(apiKeys.youtube, query);
                              if (video) {
                                  setCurrentVideo(video);
+                                 setIsPlayerMinimized(false); // Restore on new play
                                  result = { result: `Playing ${video.title}` };
                              } else result = { result: "Not found" };
                          } catch(e) { result = { error: e.message }; }
                      } else if (call.name === 'openSettings') {
                          setIsSettingsOpen(true);
+                     } else if (call.name === 'controlMedia') {
+                         try {
+                             const cmd = (call.args as any).command;
+                             if (!youtubePlayerRef.current && cmd !== 'stop') {
+                                 result = { error: "No video is currently playing." };
+                             } else {
+                                switch (cmd) {
+                                    case 'pause': youtubePlayerRef.current?.pause(); break;
+                                    case 'play': youtubePlayerRef.current?.play(); break;
+                                    case 'stop': setCurrentVideo(null); break;
+                                    case 'forward_10': youtubePlayerRef.current?.seekBy(10); break;
+                                    case 'forward_60': youtubePlayerRef.current?.seekBy(60); break;
+                                    case 'rewind_10': youtubePlayerRef.current?.seekBy(-10); break;
+                                    case 'rewind_600': youtubePlayerRef.current?.seekBy(-600); break;
+                                    case 'minimize': setIsPlayerMinimized(true); break;
+                                    case 'maximize': setIsPlayerMinimized(false); break;
+                                    default: result = { error: "Unknown command." };
+                                }
+                                result = { result: `Executed command: ${cmd}` };
+                             }
+                         } catch (e) {
+                             result = { error: "Failed to control media." };
+                         }
                      }
                      responses.push({ id: call.id, name: call.name, response: result });
                  }
@@ -1194,7 +1291,10 @@ export const App = () => {
     try {
         const voice = gender === 'female' ? femaleVoices.main : maleVoices.main;
         // FIX: Construct prompt using all setting variables so the AI actually knows who it is.
+        // INTEGRATED FIXED_SYSTEM_INSTRUCTIONS here to ensure identity persistence.
         const instructions = `
+        ${FIXED_SYSTEM_INSTRUCTIONS}
+
         Identity Configuration:
         Name: ${assistantName}
         Gender: ${gender}
@@ -1266,7 +1366,12 @@ export const App = () => {
             : h(ConnectIcon, { className: "w-8 h-8 text-black transition-transform group-hover:scale-110" })
         )
     ),
-    currentVideo && h(YouTubePlayer, { video: currentVideo, onClose: () => setCurrentVideo(null) }),
+    currentVideo && h(YouTubePlayer, { 
+        ref: youtubePlayerRef,
+        video: currentVideo, 
+        onClose: () => setCurrentVideo(null),
+        isMinimized: isPlayerMinimized
+    }),
     h(SettingsModal, {
          isOpen: isSettingsOpen,
          onClose: () => setIsSettingsOpen(false),

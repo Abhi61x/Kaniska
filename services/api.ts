@@ -110,6 +110,22 @@ export const searchYouTubeTool: FunctionDeclaration = {
     },
 };
 
+export const controlMediaTool: FunctionDeclaration = {
+    name: 'controlMedia',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Controls the active YouTube video player. Use this to play, pause, stop, seek (forward/rewind), or minimize/maximize the player.',
+        properties: {
+            command: {
+                type: Type.STRING,
+                description: 'The command to execute: "play", "pause", "stop", "forward_10", "forward_60", "rewind_10", "rewind_600", "minimize", "maximize".',
+                enum: ['play', 'pause', 'stop', 'forward_10', 'forward_60', 'rewind_10', 'rewind_600', 'minimize', 'maximize']
+            },
+        },
+        required: ['command'],
+    },
+};
+
 export const openWhatsAppTool: FunctionDeclaration = {
     name: 'open_whatsapp',
     parameters: {
@@ -163,6 +179,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
         - If the user asks to open settings, call 'openSettings'.
         - If the user asks to set a timer, call 'setTimer'.
         - If the user asks to play a video or song, call 'searchYouTube'.
+        - If the user asks to control the video (pause, rewind, minimize, etc.), call 'controlMedia'.
         - If the user asks to open WhatsApp, call 'open_whatsapp'.
         - If the user asks to send a WhatsApp message, call 'send_whatsapp'.
         `;
@@ -189,7 +206,7 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
             config: {
                 responseModalities: [Modality.AUDIO],
                 tools: [
-                    { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, openWhatsAppTool, sendWhatsAppTool] },
+                    { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, openWhatsAppTool, sendWhatsAppTool] },
                     { googleSearch: {} }
                 ],
                 systemInstruction: systemInstruction,
@@ -806,9 +823,9 @@ export async function generateImage(prompt) {
         
         // Iterate to find image part
         for (const candidate of response.candidates || []) {
-            for (const part of candidate.content?.parts || []) {
-                if (part.inlineData) {
-                    return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            for (const candidatePart of candidate.content?.parts || []) {
+                if (candidatePart.inlineData) {
+                    return `data:${candidatePart.inlineData.mimeType};base64,${candidatePart.inlineData.data}`;
                 }
             }
         }
