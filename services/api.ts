@@ -230,13 +230,18 @@ export async function processUserCommand(
     history, 
     systemInstruction, 
     temperature,
-    emotionTuning
+    emotionTuning,
+    apiKey = null
 ) {
   const lastMessage = history[history.length - 1];
   if (!lastMessage || lastMessage.sender !== 'user' || !lastMessage.text.trim()) {
       // This case should ideally not be retried as it's not an API failure.
       throw new Error("I didn't hear that. Could you please say it again?");
   }
+
+  // Use the provided key if available, otherwise default to global instance
+  const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
+
   try {
     const contents = history.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model',
@@ -260,7 +265,7 @@ Core Traits (0-100):
 - Curiosity: ${emotionTuning.curiosity}
 `;
 
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: contents,
         config: {
@@ -680,10 +685,11 @@ export async function searchYouTube(apiKey, query) {
     }
 }
 
-export async function generateSpeech(text, voiceName) {
+export async function generateSpeech(text, voiceName, apiKey = null) {
+    const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
     try {
         // Return the stream iterator directly for low-latency playback
-        return await ai.models.generateContentStream({
+        return await client.models.generateContentStream({
             model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text }] }],
             config: {
