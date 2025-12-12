@@ -76,7 +76,14 @@ export const openSettingsTool: FunctionDeclaration = {
     parameters: {
         type: Type.OBJECT,
         description: 'Opens the application settings menu. Use this when the user asks to open settings, configure the app, or change preferences.',
-        properties: {},
+        properties: {
+            // Strict schema requirement: Object cannot be empty.
+            confirm: {
+                type: Type.BOOLEAN,
+                description: 'Always set to true to confirm action.',
+            }
+        },
+        required: ['confirm']
     },
 };
 
@@ -131,7 +138,14 @@ export const openWhatsAppTool: FunctionDeclaration = {
     parameters: {
         type: Type.OBJECT,
         description: 'Opens the WhatsApp application or website. Use this when the user asks to open WhatsApp.',
-        properties: {},
+        properties: {
+            // Strict schema requirement: Object cannot be empty.
+            confirm: {
+                type: Type.BOOLEAN,
+                description: 'Always set to true to confirm action.',
+            }
+        },
+        required: ['confirm']
     },
 };
 
@@ -156,9 +170,10 @@ export const getNewsTool: FunctionDeclaration = {
         properties: {
             query: {
                 type: Type.STRING,
-                description: 'The topic or category to search for (e.g., "sports", "technology", "politics"). Optional.',
+                description: 'The topic or category to search for (e.g., "sports", "technology", "politics"). Defaults to "general" if not specified.',
             },
         },
+        required: ['query']
     },
 };
 
@@ -264,6 +279,7 @@ export async function connectLiveSession(callbacks, config) {
                 responseModalities: [Modality.AUDIO],
                 tools: [
                     // REMOVED googleSearch to prevent conflict with function declarations causing handshake failures
+                    // ALL tools now have strictly defined non-empty parameters
                     { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, openWhatsAppTool, sendWhatsAppTool, getNewsTool, getWeatherTool] }
                 ],
                 systemInstruction: fullSystemInstruction,
@@ -277,7 +293,7 @@ export async function connectLiveSession(callbacks, config) {
         const msg = e.toString().toLowerCase();
         if (msg.includes('network') || msg.includes('fetch') || msg.includes('websocket')) {
             console.error("[Kaniska] Connection Handshake Failed:", e);
-            throw new Error("Connection failed. The network blocked the connection or the configuration is invalid.");
+            throw new Error("Connection failed. The network blocked the connection or the tool configuration is invalid.");
         }
         throw e;
     }
