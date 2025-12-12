@@ -8,7 +8,7 @@ import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
 
-const FREE_DAILY_LIMIT_SECONDS = 3600; // 1 hour
+const FREE_LIMIT_SECONDS = 3600; // 1 hour per month
 
 // --- Icons ---
 const SettingsIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "3" }), h('path', { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" }));
@@ -410,7 +410,7 @@ const SettingsModal = ({
     connectionSound, setConnectionSound,
     avatarUrl, setAvatarUrl,
     subscriptionPlan, setSubscriptionPlan,
-    dailyUsage,
+    usageData,
     user, handleLogin, handleLogout
 }) => {
     const { t } = useTranslation();
@@ -918,17 +918,17 @@ const SettingsModal = ({
                         h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))
                     ),
 
-                    subscriptionPlan === 'free' && dailyUsage && h('div', { className: "mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto" },
+                    subscriptionPlan === 'free' && usageData && h('div', { className: "mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto" },
                         h('div', { className: "flex justify-between text-sm mb-2" },
-                            h('span', { className: "text-gray-300" }, t('settings.subscriptionTab.usage')),
-                            h('span', { className: `font-mono ${dailyUsage.seconds >= FREE_DAILY_LIMIT_SECONDS ? 'text-red-400' : 'text-cyan-400'}` },
-                                `${Math.floor(dailyUsage.seconds / 60)} / 60 min`
+                            h('span', { className: "text-gray-300" }, t('settings.subscriptionTab.usage') + " (Monthly)"),
+                            h('span', { className: `font-mono ${usageData.seconds >= FREE_LIMIT_SECONDS ? 'text-red-400' : 'text-cyan-400'}` },
+                                `${Math.floor(usageData.seconds / 60)} / 60 min`
                             )
                         ),
                         h('div', { className: "w-full h-2 bg-gray-700 rounded-full overflow-hidden" },
                             h('div', {
-                                className: `h-full transition-all duration-500 ${dailyUsage.seconds >= FREE_DAILY_LIMIT_SECONDS ? 'bg-red-500' : 'bg-cyan-500'}`,
-                                style: { width: `${Math.min((dailyUsage.seconds / FREE_DAILY_LIMIT_SECONDS) * 100, 100)}%` }
+                                className: `h-full transition-all duration-500 ${usageData.seconds >= FREE_LIMIT_SECONDS ? 'bg-red-500' : 'bg-cyan-500'}`,
+                                style: { width: `${Math.min((usageData.seconds / FREE_LIMIT_SECONDS) * 100, 100)}%` }
                             })
                         )
                     ),
@@ -1103,7 +1103,10 @@ export const App = () => {
   const [activeTab, setActiveTab] = React.useState('account');
   const [currentVideo, setCurrentVideo] = React.useState(null);
   const [isPlayerMinimized, setIsPlayerMinimized] = React.useState(false);
-  const [dailyUsage, setDailyUsage] = React.useState({ seconds: 0, date: new Date().toDateString() });
+  
+  // Persistent Usage State (Monthly)
+  // Stores usage in seconds and the current month (YYYY-MM)
+  const [usageData, setUsageData] = usePersistentState('kaniska-usage-data', { seconds: 0, period: new Date().toISOString().slice(0, 7) });
 
   const sessionRef = React.useRef(null);
   const youtubePlayerRef = React.useRef(null);
@@ -1120,37 +1123,38 @@ export const App = () => {
      return onAuthStateChanged(auth, u => setUser(u));
   }, []);
 
-  // Usage Tracker
+  // Usage Tracking & Limit Enforcement
   React.useEffect(() => {
       let interval;
       if (status === 'live') {
           interval = setInterval(() => {
-              setDailyUsage(prev => {
-                  const today = new Date().toDateString();
-                  // Reset if a new day
-                  if (prev.date !== today) {
-                      return { date: today, seconds: 1 };
+              setUsageData(prev => {
+                  const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
+                  
+                  // Reset if a new month
+                  if (prev.period !== currentPeriod) {
+                      return { period: currentPeriod, seconds: 0 };
                   }
                   
-                  // Check limit for free plan
-                  const newSeconds = prev.seconds + 1;
-                  if (subscriptionPlan === 'free' && newSeconds >= FREE_DAILY_LIMIT_SECONDS) {
-                      // Disconnect if limit reached during active session
-                      cleanupAudio();
-                      setIsConnected(false);
-                      setStatus('idle');
-                      setIsSettingsOpen(true);
-                      setActiveTab('subscription');
-                      alert("You have reached your daily usage limit for the Free plan. Please upgrade to continue.");
-                      return prev; // Stop incrementing
-                  }
-                  
-                  return { ...prev, seconds: newSeconds };
+                  // Increment usage
+                  return { ...prev, seconds: prev.seconds + 1 };
               });
           }, 1000);
       }
       return () => clearInterval(interval);
-  }, [status, subscriptionPlan]);
+  }, [status]);
+
+  // Separate effect to enforce limit based on updated usageData
+  React.useEffect(() => {
+      if (subscriptionPlan === 'free' && usageData.seconds >= FREE_LIMIT_SECONDS && status === 'live') {
+          cleanupAudio();
+          setIsConnected(false);
+          setStatus('idle');
+          setIsSettingsOpen(true);
+          setActiveTab('subscription');
+          alert("You have reached your monthly free trial limit (1 hour). Please upgrade to continue using Kaniska.");
+      }
+  }, [usageData.seconds, subscriptionPlan, status]);
 
   const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
   const handleLogout = () => signOut(auth);
@@ -1192,11 +1196,12 @@ export const App = () => {
     }
 
     // Check Usage Limit before connecting
-    const today = new Date().toDateString();
-    if (subscriptionPlan === 'free' && dailyUsage.date === today && dailyUsage.seconds >= FREE_DAILY_LIMIT_SECONDS) {
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    // If period changed since last load, reset logic is handled by effect, but we can double check here
+    if (subscriptionPlan === 'free' && usageData.period === currentPeriod && usageData.seconds >= FREE_LIMIT_SECONDS) {
         setIsSettingsOpen(true);
         setActiveTab('subscription');
-        alert("Daily usage limit reached. Please upgrade to continue.");
+        alert("Monthly usage limit reached. Please upgrade to continue.");
         return;
     }
     
@@ -1528,7 +1533,7 @@ export const App = () => {
             connectionSound, setConnectionSound,
             avatarUrl, setAvatarUrl,
             subscriptionPlan, setSubscriptionPlan,
-            dailyUsage,
+            usageData,
             user, handleLogin, handleLogout
         })
   );

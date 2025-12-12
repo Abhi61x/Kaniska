@@ -157,7 +157,11 @@
     "subscriptionTab": {
       "title": "Subscription",
       "description": "Choose the plan that suits you best.",
+      "usage": "Monthly Usage",
+      "active": "Active",
+      "upgrade": "Upgrade",
       "plans": {
+        "free": { "name": "Free", "price": "₹0", "duration": "/ forever" },
         "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" },
         "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" },
         "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" },
@@ -165,7 +169,7 @@
       },
       "subscribeButton": "Subscribe Now",
       "featuresTitle": "All plans include:",
-      "featureFree": "1 hour of usage per day",
+      "featureFree": "1 hour of usage per month",
       "feature1": "Higher priority access during peak times",
       "feature2": "Access to advanced and experimental voice models",
       "feature3": "Exclusive avatar packs and visual customizations"
