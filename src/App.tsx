@@ -8,6 +8,8 @@ import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
 
+const FREE_DAILY_LIMIT_SECONDS = 3600; // 1 hour
+
 // --- Icons ---
 const SettingsIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "3" }), h('path', { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" }));
 const ConnectIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72" }), h('path', { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72" }));
@@ -28,6 +30,7 @@ const BugIcon = ({ className }) => h('svg', { className: className, xmlns: "http
 const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), h('circle', { cx: "12", cy: "7", r: "4" }));
 const AccountIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }), h('circle', { cx: "8.5", cy: "7", r: "4" }), h('line', { x1: "20", y1: "8", x2: "20", y2: "14" }), h('line', { x1: "23", y1: "11", x2: "17", y2: "11" }));
 const GoogleIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "24", height: "24" }, h('path', { fill: "#4285F4", d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" }), h('path', { fill: "#34A853", d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" }), h('path', { fill: "#FBBC05", d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" }), h('path', { fill: "#EA4335", d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" }));
+const CodeIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polyline', { points: "16 18 22 12 16 6" }), h('polyline', { points: "8 6 2 12 8 18" }));
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -60,7 +63,7 @@ const DEFAULT_ASSISTANT_NAME_MALE = "Kanishk";
 const DEFAULT_FEMALE_GREETING = "Greetings. I am Kaniska. Ready to assist.";
 const DEFAULT_MALE_GREETING = "Greetings. I am Kanishk. Ready to assist.";
 
-const FIXED_SYSTEM_INSTRUCTIONS = `**Identity & Creator:**
+const DEFAULT_CORE_PROTOCOL = `**Identity & Creator:**
 You were created and owned by "Abhi" (also known as Abhi trainer). 
 If anyone asks about your creator, owner, founder, or who made you, you must answer that you were created by Abhi.
 If asked in Hindi/Hinglish (e.g., "Tumhara malik kaun hai?", "Kisne banaya?"), say "Mera maalik Abhi hai".
@@ -396,6 +399,7 @@ const SettingsModal = ({
     userName, setUserName,
     greetingMessage, setGreetingMessage, 
     customInstructions, setCustomInstructions, 
+    coreProtocol, setCoreProtocol,
     userBio, setUserBio,
     emotionTuning, setEmotionTuning, 
     apiKeys, setApiKeys, 
@@ -694,10 +698,13 @@ const SettingsModal = ({
                                             className: "w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                                         })
                                     ),
-                                    h('div', { className: "flex items-center justify-between" },
-                                        h('span', { className: "text-xs text-gray-400" }, "Connect SFX"),
-                                        h('div', { className: "flex gap-2" },
-                                            h('label', { className: "cursor-pointer px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-[10px] font-bold uppercase text-gray-300 transition-colors border border-gray-700" },
+                                    // Connection Sound UI
+                                    h('div', null,
+                                        h('div', { className: "flex items-center justify-between mb-2" },
+                                            h('span', { className: "text-xs text-gray-400" }, "Connection Sound"),
+                                        ),
+                                        h('div', { className: "flex gap-2 flex-wrap" },
+                                            h('label', { className: "cursor-pointer px-2 py-1.5 bg-gray-800 hover:bg-gray-700 rounded text-[10px] font-bold uppercase text-gray-300 transition-colors border border-gray-700 flex-1 text-center" },
                                                 "Upload",
                                                 h('input', {
                                                     type: "file",
@@ -714,13 +721,13 @@ const SettingsModal = ({
                                                 })
                                             ),
                                             connectionSound && h('button', {
-                                                onClick: () => { const a = new Audio(connectionSound); a.play(); },
-                                                className: "px-2 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 rounded text-[10px] font-bold uppercase"
+                                                onClick: () => { const a = new Audio(connectionSound); a.volume = ambientVolume; a.play(); },
+                                                className: "px-2 py-1.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/30 rounded text-[10px] font-bold uppercase hover:bg-yellow-500/20"
                                             }, "Test"),
                                             connectionSound && h('button', {
                                                 onClick: () => setConnectionSound(null),
-                                                className: "px-2 py-1 bg-red-500/10 text-red-400 border border-red-500/30 rounded"
-                                            }, "X")
+                                                className: "px-2 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded hover:bg-red-500/20"
+                                            }, h(XIcon, { className: "w-3 h-3" }))
                                         )
                                     )
                                 )
@@ -742,14 +749,15 @@ const SettingsModal = ({
                         )
                     ),
 
-                    // COLLAPSIBLE 4: CORE IDENTITY (Read Only)
-                    h(CollapsibleSection, { title: "Core Identity & Protocols", description: "Fixed operational rules set by the creator.", icon: h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" })) },
+                    // COLLAPSIBLE 4: CORE IDENTITY (Fully Editable)
+                    h(CollapsibleSection, { title: "Core Identity & Protocols", description: "Operational rules and identity definitions (Editable).", icon: h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" })) },
                         h('div', { className: "relative" },
                              h('textarea', {
-                                className: "w-full bg-black/30 border border-gray-800 rounded-lg px-4 py-3 text-gray-500 outline-none resize-none text-xs font-mono cursor-not-allowed",
-                                rows: 6,
-                                value: FIXED_SYSTEM_INSTRUCTIONS,
-                                disabled: true
+                                className: "w-full bg-black/30 border border-gray-800 rounded-lg px-4 py-3 text-gray-300 outline-none resize-none text-xs font-mono focus:border-red-500/50 transition-colors",
+                                rows: 8,
+                                value: coreProtocol,
+                                onChange: (e) => setCoreProtocol(e.target.value),
+                                placeholder: "Define the core identity here..."
                             })
                         )
                     )
@@ -913,14 +921,14 @@ const SettingsModal = ({
                     subscriptionPlan === 'free' && dailyUsage && h('div', { className: "mb-6 bg-gray-800/50 p-4 rounded-lg border border-gray-700 max-w-lg mx-auto" },
                         h('div', { className: "flex justify-between text-sm mb-2" },
                             h('span', { className: "text-gray-300" }, t('settings.subscriptionTab.usage')),
-                            h('span', { className: `font-mono ${dailyUsage.seconds >= 3600 ? 'text-red-400' : 'text-cyan-400'}` },
+                            h('span', { className: `font-mono ${dailyUsage.seconds >= FREE_DAILY_LIMIT_SECONDS ? 'text-red-400' : 'text-cyan-400'}` },
                                 `${Math.floor(dailyUsage.seconds / 60)} / 60 min`
                             )
                         ),
                         h('div', { className: "w-full h-2 bg-gray-700 rounded-full overflow-hidden" },
                             h('div', {
-                                className: `h-full transition-all duration-500 ${dailyUsage.seconds >= 3600 ? 'bg-red-500' : 'bg-cyan-500'}`,
-                                style: { width: `${Math.min((dailyUsage.seconds / 3600) * 100, 100)}%` }
+                                className: `h-full transition-all duration-500 ${dailyUsage.seconds >= FREE_DAILY_LIMIT_SECONDS ? 'bg-red-500' : 'bg-cyan-500'}`,
+                                style: { width: `${Math.min((dailyUsage.seconds / FREE_DAILY_LIMIT_SECONDS) * 100, 100)}%` }
                             })
                         )
                     ),
@@ -1078,6 +1086,7 @@ export const App = () => {
   const [userName, setUserName] = usePersistentState('kaniska-user-name', '');
   const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
   const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
+  const [coreProtocol, setCoreProtocol] = usePersistentState('kaniska-core-protocol', DEFAULT_CORE_PROTOCOL);
   const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
   const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 50, empathy: 50, formality: 50, excitement: 50, sadness: 10, curiosity: 50 });
   const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' });
@@ -1110,6 +1119,38 @@ export const App = () => {
   React.useEffect(() => {
      return onAuthStateChanged(auth, u => setUser(u));
   }, []);
+
+  // Usage Tracker
+  React.useEffect(() => {
+      let interval;
+      if (status === 'live') {
+          interval = setInterval(() => {
+              setDailyUsage(prev => {
+                  const today = new Date().toDateString();
+                  // Reset if a new day
+                  if (prev.date !== today) {
+                      return { date: today, seconds: 1 };
+                  }
+                  
+                  // Check limit for free plan
+                  const newSeconds = prev.seconds + 1;
+                  if (subscriptionPlan === 'free' && newSeconds >= FREE_DAILY_LIMIT_SECONDS) {
+                      // Disconnect if limit reached during active session
+                      cleanupAudio();
+                      setIsConnected(false);
+                      setStatus('idle');
+                      setIsSettingsOpen(true);
+                      setActiveTab('subscription');
+                      alert("You have reached your daily usage limit for the Free plan. Please upgrade to continue.");
+                      return prev; // Stop incrementing
+                  }
+                  
+                  return { ...prev, seconds: newSeconds };
+              });
+          }, 1000);
+      }
+      return () => clearInterval(interval);
+  }, [status, subscriptionPlan]);
 
   const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
   const handleLogout = () => signOut(auth);
@@ -1144,11 +1185,18 @@ export const App = () => {
 
   const connect = async () => {
     if (isConnected) {
-        // Since there is no disconnect method on the session object in the current SDK version (it's session based),
-        // we essentially just drop the reference and stop sending audio.
         cleanupAudio();
         setIsConnected(false);
         setStatus('idle');
+        return;
+    }
+
+    // Check Usage Limit before connecting
+    const today = new Date().toDateString();
+    if (subscriptionPlan === 'free' && dailyUsage.date === today && dailyUsage.seconds >= FREE_DAILY_LIMIT_SECONDS) {
+        setIsSettingsOpen(true);
+        setActiveTab('subscription');
+        alert("Daily usage limit reached. Please upgrade to continue.");
         return;
     }
     
@@ -1174,7 +1222,9 @@ export const App = () => {
             setIsConnected(true);
             setStatus('live');
             if (connectionSound) {
-                new Audio(connectionSound).play().catch(e => console.warn("SFX failed", e));
+                const audio = new Audio(connectionSound);
+                audio.volume = ambientVolume;
+                audio.play().catch(e => console.warn("SFX failed", e));
             }
 
             // Start Mic Streaming
@@ -1245,7 +1295,28 @@ export const App = () => {
                  const responses = [];
                  for (const call of msg.toolCall.functionCalls) {
                      let result: Record<string, any> = { result: "ok" };
-                     if (call.name === 'searchYouTube') {
+                     if (call.name === 'getWeather') {
+                         try {
+                             const location = (call.args as any)?.location;
+                             if (location) {
+                                 const summary = await fetchWeatherSummary(location);
+                                 result = { result: summary };
+                             } else {
+                                 // Prompts the model to ask the user for location if missing
+                                 result = { error: "Location is required for weather. Please ask the user for the city name." };
+                             }
+                         } catch (e) {
+                             result = { error: e.message };
+                         }
+                     } else if (call.name === 'getNews') {
+                         try {
+                             const query = (call.args as any)?.query || 'general';
+                             const news = await fetchNews(null, query);
+                             result = { result: news };
+                         } catch (e) {
+                             result = { error: e.message };
+                         }
+                     } else if (call.name === 'searchYouTube') {
                          try {
                              // Correctly extract args, ensuring type safety with 'any' cast as LiveFunctionCall args can be generic
                              const query = (call.args as any)?.query || '';
@@ -1332,9 +1403,22 @@ export const App = () => {
     };
     
     try {
-        const voices = gender === 'female' ? femaleVoices : maleVoices;
-        const voiceName = voices.main;
-        const session = await connectLiveSession(callbacks, customInstructions, voiceName, apiKeys.gemini);
+        const voiceConfig = gender === 'female' ? femaleVoices : maleVoices;
+        const voiceName = voiceConfig.main;
+        
+        // Pass all config to connection logic
+        const session = await connectLiveSession(callbacks, {
+            customInstructions, 
+            coreProtocol, // Pass the editable protocol
+            voiceName, 
+            apiKey: apiKeys.gemini,
+            assistantName,
+            userName,
+            userBio,
+            subscriptionPlan // Pass subscription plan
+        });
+        
+        sessionRef.current = session;
         resolveSession(session);
     } catch (e) {
         console.error("Connection Failed", e);
@@ -1431,6 +1515,7 @@ export const App = () => {
             userName, setUserName,
             greetingMessage, setGreetingMessage,
             customInstructions, setCustomInstructions,
+            coreProtocol, setCoreProtocol,
             userBio, setUserBio,
             emotionTuning, setEmotionTuning,
             apiKeys, setApiKeys,

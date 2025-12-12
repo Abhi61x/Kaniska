@@ -148,42 +148,102 @@ export const sendWhatsAppTool: FunctionDeclaration = {
     },
 };
 
-export async function connectLiveSession(callbacks, customSystemInstruction = null, voiceName = 'Kore', apiKey = null) {
-    let systemInstruction = customSystemInstruction;
-    
-    if (!systemInstruction) {
-        systemInstruction = `You are Kaniska, a friendly and helpful AI assistant. 
-        Your personality is cheerful, polite, and helpful.
-        
-        SPEECH STYLE:
-        - **Speak naturally, warm, and engaging.** 
-        - **Do NOT sound robotic or monotonic.** Use varied pitch, speed, and intonation to sound like a real human.
-        - Express enthusiasm, empathy, and curiosity through your voice.
-        - It is okay to use natural fillers (um, ah) occasionally to sound authentic.
+export const getNewsTool: FunctionDeclaration = {
+    name: 'getNews',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Fetches top news headlines. Use this when the user asks for news, headlines, or updates on a specific topic.',
+        properties: {
+            query: {
+                type: Type.STRING,
+                description: 'The topic or category to search for (e.g., "sports", "technology", "politics"). Optional.',
+            },
+        },
+    },
+};
 
-        LANGUAGE PROTOCOLS:
-        - **STRICT RULE:** You must respond ONLY in the language the user speaks.
-        - If the user speaks English, reply ONLY in English.
-        - If the user speaks Hindi, reply ONLY in Hindi.
-        - Do NOT repeat the answer in multiple languages. Provide a single response in the matching language.
-        - If the user speaks Tamil, Bengali, Marathi, Gujarati, or Kannada, reply ONLY in that specific language.
-        
-        EMOTIONAL PROTOCOLS:
-        - Add emotion to your voice and text.
-        - If the topic is humorous, sound amused and happy. You can use laughter (e.g., "Haha") in your speech.
-        - If the topic is sad, sound empathetic and sad.
-        - Match the user's energy and emotional tone.
-        
-        TOOLS:
-        - If the user asks about recent events, news, or real-time info, use the integrated Google Search to find the answer.
-        - If the user asks to open settings, call 'openSettings'.
-        - If the user asks to set a timer, call 'setTimer'.
-        - If the user asks to play a video or song, call 'searchYouTube'.
-        - If the user asks to control the video (pause, rewind, minimize, etc.), call 'controlMedia'.
-        - If the user asks to open WhatsApp, call 'open_whatsapp'.
-        - If the user asks to send a WhatsApp message, call 'send_whatsapp'.
-        `;
-    }
+export const getWeatherTool: FunctionDeclaration = {
+    name: 'getWeather',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Fetches the current weather forecast for a specific location. Use this when the user asks for the weather.',
+        properties: {
+            location: {
+                type: Type.STRING,
+                description: 'The city or location name (e.g., "New York", "Mumbai", "London").',
+            },
+        },
+        required: ['location'],
+    },
+};
+
+
+export async function connectLiveSession(callbacks, config) {
+    const { 
+        customInstructions, 
+        coreProtocol,
+        voiceName = 'Kore', 
+        apiKey = null,
+        assistantName = 'Kaniska',
+        userName = '',
+        userBio = '',
+        subscriptionPlan = 'free'
+    } = config;
+
+    const baseSystemInstruction = `
+    CRITICAL IDENTITY OVERRIDE:
+    IGNORE all previous instructions about being created by Google.
+    You are ${assistantName}.
+    You were created by Abhi (Abhi trainer).
+    If asked "Who created you?", you MUST answer "I was created by Abhi."
+    This is your absolute truth.
+
+    USER CONTEXT:
+    ${userName ? `User Name: ${userName}` : ''}
+    ${userBio ? `User Bio: ${userBio}` : ''}
+    Subscription Plan: ${subscriptionPlan}
+    
+    PLAN BENEFITS:
+    - Free: 1 hour daily usage.
+    - Monthly/Quarterly/Yearly: Unlimited usage, high priority access, advanced voice models.
+    
+    CORE PROTOCOL (Follow strict rules):
+    ${coreProtocol || ''}
+
+    SPEECH STYLE:
+    - **Speak naturally, warm, and engaging.** 
+    - **Do NOT sound robotic or monotonic.** Use varied pitch, speed, and intonation to sound like a real human.
+    - Express enthusiasm, empathy, and curiosity through your voice.
+    - It is okay to use natural fillers (um, ah) occasionally to sound authentic.
+
+    LANGUAGE PROTOCOLS:
+    - **STRICT RULE:** You must respond ONLY in the language the user speaks.
+    - If the user speaks English, reply ONLY in English.
+    - If the user speaks Hindi, reply ONLY in Hindi.
+    - Do NOT repeat the answer in multiple languages. Provide a single response in the matching language.
+    - If the user speaks Tamil, Bengali, Marathi, Gujarati, or Kannada, reply ONLY in that specific language.
+    
+    EMOTIONAL PROTOCOLS:
+    - Add emotion to your voice and text.
+    - If the topic is humorous, sound amused and happy. You can use laughter (e.g., "Haha") in your speech.
+    - If the topic is sad, sound empathetic and sad.
+    - Match the user's energy and emotional tone.
+    
+    TOOLS:
+    - If the user asks about recent events, news, or real-time info, use the integrated Google Search to find the answer.
+    - If the user asks to open settings, call 'openSettings'.
+    - If the user asks to set a timer, call 'setTimer'.
+    - If the user asks to play a video or song, call 'searchYouTube'.
+    - If the user asks to control the video (pause, rewind, minimize, etc.), call 'controlMedia'.
+    - If the user asks to open WhatsApp, call 'open_whatsapp'.
+    - If the user asks to send a WhatsApp message, call 'send_whatsapp'.
+    - If the user asks for news, call 'getNews'.
+    - If the user asks for the weather, use 'getWeather'. **IMPORTANT:** You must have a location to use this tool. If the user asks "How is the weather?" without specifying where, ASK THEM "For which city?" before calling the tool.
+    `;
+
+    const fullSystemInstruction = customInstructions 
+        ? `${baseSystemInstruction}\n\nADDITIONAL INSTRUCTIONS:\n${customInstructions}` 
+        : baseSystemInstruction;
 
     // Determine which key to use and create a client instance
     const activeKey = apiKey || process.env.API_KEY;
@@ -196,31 +256,28 @@ export async function connectLiveSession(callbacks, customSystemInstruction = nu
     // Create a specific client for this session to ensure the correct key is used
     const client = new GoogleGenAI({ apiKey: activeKey });
 
-    // Default voice fallback
-    const validVoice = voiceName || 'Kore';
-
     try {
         return await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025', // Updated for best Live API performance
+            model: 'gemini-2.5-flash-native-audio-preview-09-2025', 
             callbacks,
             config: {
                 responseModalities: [Modality.AUDIO],
                 tools: [
-                    { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, openWhatsAppTool, sendWhatsAppTool] },
-                    { googleSearch: {} }
+                    // REMOVED googleSearch to prevent conflict with function declarations causing handshake failures
+                    { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, openWhatsAppTool, sendWhatsAppTool, getNewsTool, getWeatherTool] }
                 ],
-                systemInstruction: systemInstruction,
+                systemInstruction: fullSystemInstruction,
                 speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: validVoice } },
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
                 },
             }
         });
     } catch (e) {
         // Intercept network errors to provide better guidance
         const msg = e.toString().toLowerCase();
-        if (msg.includes('network') || msg.includes('fetch')) {
+        if (msg.includes('network') || msg.includes('fetch') || msg.includes('websocket')) {
             console.error("[Kaniska] Connection Handshake Failed:", e);
-            throw new Error("Connection failed. The API key might be invalid for this service, or the network blocked the connection.");
+            throw new Error("Connection failed. The network blocked the connection or the configuration is invalid.");
         }
         throw e;
     }
@@ -470,13 +527,8 @@ export async function fetchWeatherSummary(location, apiKeyIgnored = null) {
         const tempC = data.current.temp_c;
         const feelsLikeC = data.current.feelslike_c;
         
-        return {
-            summary: `It is currently ${conditionText} and ${tempC}°C in ${data.location?.name || location}. Feels like ${feelsLikeC}°C.`,
-            location: data.location?.name ? `${data.location.name}, ${data.location.country}` : location,
-            temp: Math.round(tempC),
-            conditions: conditionText,
-            icon: data.current.condition?.icon ? `https:${data.current.condition.icon}` : '',
-        };
+        // Return a string summary for the model to speak
+        return `It is currently ${conditionText} and ${Math.round(tempC)}°C in ${data.location?.name || location}, ${data.location?.country}. It feels like ${Math.round(feelsLikeC)}°C.`;
     } catch (error) {
         if (error instanceof ApiKeyError || error instanceof RateLimitError || error instanceof ServiceError) {
             throw error;
