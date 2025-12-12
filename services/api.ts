@@ -202,8 +202,22 @@ export async function connectLiveSession(callbacks, config) {
         assistantName = 'Kaniska',
         userName = '',
         userBio = '',
-        subscriptionPlan = 'free'
+        subscriptionPlan = 'free',
+        greetingMessage = "Hello, how can I help you?",
+        emotionTuning = {}
     } = config;
+
+    // Construct emotion instructions
+    const emotionInstruction = Object.keys(emotionTuning).length > 0 ? `
+    EMOTIONAL TUNING:
+    You should adjust your speaking style and tone based on these traits (0-100):
+    - Happiness: ${emotionTuning.happiness || 50}
+    - Empathy: ${emotionTuning.empathy || 50}
+    - Formality: ${emotionTuning.formality || 50}
+    - Excitement: ${emotionTuning.excitement || 50}
+    - Sadness: ${emotionTuning.sadness || 10}
+    - Curiosity: ${emotionTuning.curiosity || 50}
+    ` : '';
 
     const baseSystemInstruction = `
     CRITICAL IDENTITY OVERRIDE:
@@ -218,6 +232,10 @@ export async function connectLiveSession(callbacks, config) {
     ${userBio ? `User Bio: ${userBio}` : ''}
     Subscription Plan: ${subscriptionPlan}
     
+    GREETING PROTOCOL:
+    - Your standard greeting is: "${greetingMessage}"
+    - Use this greeting when you first speak to the user or when you introduce yourself.
+    
     PLAN BENEFITS:
     - Free: 1 hour daily usage.
     - Monthly/Quarterly/Yearly: Unlimited usage, high priority access, advanced voice models.
@@ -230,6 +248,7 @@ export async function connectLiveSession(callbacks, config) {
     - **Do NOT sound robotic or monotonic.** Use varied pitch, speed, and intonation to sound like a real human.
     - Express enthusiasm, empathy, and curiosity through your voice.
     - It is okay to use natural fillers (um, ah) occasionally to sound authentic.
+    ${emotionInstruction}
 
     LANGUAGE PROTOCOLS:
     - **STRICT RULE:** You must respond ONLY in the language the user speaks.

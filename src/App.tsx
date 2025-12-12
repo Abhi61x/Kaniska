@@ -1415,7 +1415,9 @@ export const App = () => {
             assistantName,
             userName,
             userBio,
-            subscriptionPlan // Pass subscription plan
+            subscriptionPlan, // Pass subscription plan
+            greetingMessage, // Pass the custom greeting
+            emotionTuning // Pass emotion tuning
         });
         
         sessionRef.current = session;
