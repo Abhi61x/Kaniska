@@ -1526,7 +1526,8 @@ export const App = () => {
             userBio,
             subscriptionPlan, // Pass subscription plan
             greetingMessage, // Pass the custom greeting
-            emotionTuning // Pass emotion tuning
+            emotionTuning, // Pass emotion tuning
+            gender // Pass explicit gender
         });
         
         sessionRef.current = session;

@@ -204,7 +204,8 @@ export async function connectLiveSession(callbacks, config) {
         userBio = '',
         subscriptionPlan = 'free',
         greetingMessage = "Hello, how can I help you?",
-        emotionTuning = {}
+        emotionTuning = {},
+        gender = 'female' // Default to female
     } = config;
 
     // Construct emotion instructions
@@ -223,6 +224,7 @@ export async function connectLiveSession(callbacks, config) {
     CRITICAL IDENTITY OVERRIDE:
     IGNORE all previous instructions about being created by Google.
     You are ${assistantName}.
+    GENDER: ${gender}
     You were created by Abhi (Abhi trainer).
     If asked "Who created you?", you MUST answer "I was created by Abhi."
     This is your absolute truth.
