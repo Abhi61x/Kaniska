@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession } from '../services/api.ts';
@@ -74,8 +75,10 @@ const usePersistentState = (key, defaultValue, user) => {
                 }
              } else {
                  // Push local state to remote if doc doesn't exist (First sync)
-                 setDoc(docRef, { value: stateRef.current }, { merge: true });
+                 setDoc(docRef, { value: stateRef.current }, { merge: true }).catch(err => console.debug("Firestore write error", err));
              }
+        }, (err) => {
+            console.warn(`Firestore sync error for ${key}:`, err.message);
         });
         return () => unsubscribe();
     }, [user, key]);
@@ -237,7 +240,15 @@ const Avatar = React.memo(({ state, mood = 'neutral', customUrl }) => {
             style: {cursor: 'default'}
         },
         h('div', { className: "avatar-container relative flex flex-col items-center justify-center", ref: containerRef },
-            h('img', { src: imageUrl, alt: "Kaniska Avatar", className: "avatar-image z-10" }),
+            h('img', { 
+                src: imageUrl, 
+                alt: "Kaniska Avatar", 
+                className: "avatar-image z-10",
+                onError: (e) => {
+                    // Fallback if custom URL fails
+                    e.currentTarget.src = "https://i.gifer.com/NTHO.gif";
+                }
+            }),
             
             // Holographic Projector Base
             h('div', { className: "absolute -bottom-12 w-32 h-8 bg-cyan-500/20 blur-xl rounded-[100%] animate-pulse z-0" }),
@@ -399,12 +410,12 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
             ),
             
             h('div', { className: "space-y-6 mt-6" },
-                // Only Gemini and YouTube keys
-                ['gemini', 'youtube'].map(keyType => 
+                // Only YouTube key
+                ['youtube'].map(keyType => 
                     h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-white/5" },
                         h('div', { className: "flex justify-between items-center mb-2" },
                             h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, 
-                                keyType === 'gemini' ? 'Gemini API Key (Google AI Studio)' : t(`settings.apiKeysTab.${keyType}Key`)
+                                t(`settings.apiKeysTab.${keyType}Key`)
                             ),
                             validationStatus[keyType] && (
                                 h('span', { className: `text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}` },
@@ -418,7 +429,7 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
                             className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-500",
                             value: localKeys[keyType] || '',
                             onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
-                            placeholder: keyType === 'gemini' ? "Optional: Override default API key..." : "Enter your API key here..."
+                            placeholder: "Enter your API key here..."
                         }),
                         validationStatus[keyType] && !validationStatus[keyType].success && (
                             h('p', { className: "text-xs text-red-400 mt-2 pl-1" }, validationStatus[keyType].message)
