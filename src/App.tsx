@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession } from '../services/api.ts';
 import { useTranslation, availableLanguages } from '../i18n/index.tsx';
-import { auth, googleProvider } from '../firebase.ts';
+import { auth, db, googleProvider } from '../firebase.ts';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // Helper for React.createElement to keep code readable
 const h = React.createElement;
@@ -31,6 +32,8 @@ const UserIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.
 const AccountIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }), h('circle', { cx: "8.5", cy: "7", r: "4" }), h('line', { x1: "20", y1: "8", x2: "20", y2: "14" }), h('line', { x1: "23", y1: "11", x2: "17", y2: "11" }));
 const GoogleIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "24", height: "24" }, h('path', { fill: "#4285F4", d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" }), h('path', { fill: "#34A853", d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" }), h('path', { fill: "#FBBC05", d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" }), h('path', { fill: "#EA4335", d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" }));
 const CodeIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polyline', { points: "16 18 22 12 16 6" }), h('polyline', { points: "8 6 2 12 8 18" }));
+const TrashIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polyline', { points: "3 6 5 6 21 6" }), h('path', { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }));
+const UpdateIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }), h('path', { d: "M3 3v5h5" }), h('path', { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" }), h('path', { d: "M16 16h5v5" }));
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -44,18 +47,63 @@ const getInitialState = (key, defaultValue) => {
     }
 };
 
-const usePersistentState = (key, defaultValue) => {
+// Updated hook to sync state with Firebase Firestore
+const usePersistentState = (key, defaultValue, user) => {
     const [state, setState] = React.useState(() => getInitialState(key, defaultValue));
+    const timeoutRef = React.useRef(null);
+    const stateRef = React.useRef(state);
 
+    // Keep ref updated for comparisons inside useEffect
     React.useEffect(() => {
-        try {
-            localStorage.setItem(key, JSON.stringify(state));
-        } catch (error) {
-            console.error(`Error writing to localStorage key "${key}":`, error);
-        }
-    }, [key, state]);
+        stateRef.current = state;
+    }, [state]);
 
-    return [state, setState];
+    // Sync with Firestore
+    React.useEffect(() => {
+        if (!user) return;
+        const docRef = doc(db, "users", user.uid, "settings", key);
+        
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+             if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data && data.value !== undefined) {
+                    // Only update if value changed remotely to avoid loop
+                    if (JSON.stringify(data.value) !== JSON.stringify(stateRef.current)) {
+                        setState(data.value);
+                        localStorage.setItem(key, JSON.stringify(data.value));
+                    }
+                }
+             } else {
+                 // Push local state to remote if doc doesn't exist (First sync)
+                 setDoc(docRef, { value: stateRef.current }, { merge: true });
+             }
+        });
+        return () => unsubscribe();
+    }, [user, key]);
+
+    const setPersistentState = React.useCallback((newValue) => {
+        setState(current => {
+            const valueToStore = newValue instanceof Function ? newValue(current) : newValue;
+            
+            // Local persistence (Backup/Offline)
+            try {
+                localStorage.setItem(key, JSON.stringify(valueToStore));
+            } catch (error) { console.error(error); }
+            
+            // Backend persistence (Debounced)
+            if (user) {
+                if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                timeoutRef.current = setTimeout(() => {
+                    const docRef = doc(db, "users", user.uid, "settings", key);
+                    setDoc(docRef, { value: valueToStore }, { merge: true }).catch(console.error);
+                }, 1000); // 1s debounce to prevent excessive writes
+            }
+            
+            return valueToStore;
+        });
+    }, [user, key]);
+
+    return [state, setPersistentState];
 };
 
 const DEFAULT_ASSISTANT_NAME_FEMALE = "Kaniska";
@@ -760,6 +808,27 @@ const SettingsModal = ({
                                 placeholder: "Define the core identity here..."
                             })
                         )
+                    ),
+
+                    // DATA MANAGEMENT SECTION
+                    h('div', { className: "bg-black/20 p-5 rounded-xl border border-gray-800 mt-4" },
+                        h('div', { className: "mb-4" },
+                            h('h3', { className: "font-semibold text-lg text-red-400" }, t('settings.personaTab.dataManagement.title')),
+                            h('p', { className: "text-xs text-gray-500" }, "Manage your local data.")
+                        ),
+                        h('button', {
+                            onClick: () => {
+                                if (window.confirm("Are you sure? This cannot be undone.")) {
+                                    localStorage.removeItem('kaniska-chat-history'); 
+                                    alert("Conversation history cleared from local storage.");
+                                }
+                            },
+                            className: "w-full py-3 rounded-lg border border-red-900/30 bg-red-900/10 text-red-400 hover:bg-red-900/20 transition-all text-sm font-bold flex items-center justify-center gap-2"
+                        },
+                            h(TrashIcon, { className: "w-4 h-4" }),
+                            t('settings.personaTab.dataManagement.clearHistory.button') || "Clear Conversation History"
+                        ),
+                        h('p', { className: "text-[10px] text-gray-600 mt-2 text-center" }, t('settings.personaTab.dataManagement.clearHistory.description') || "This will permanently remove conversation history from this browser.")
                     )
                 );
             case 'voice':
@@ -770,8 +839,16 @@ const SettingsModal = ({
                  const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
                  
                  const categories = {
-                    "Female Persona": ['Kore', 'Aoede', 'Zephyr'],
-                    "Male Persona": ['Fenrir', 'Charon', 'Puck']
+                    "Female Persona": [
+                        { id: 'Kore', name: 'Kore', desc: 'Balanced & Warm' },
+                        { id: 'Aoede', name: 'Aoede', desc: 'Soft & Calm' },
+                        { id: 'Zephyr', name: 'Zephyr', desc: 'Energetic & Bright' }
+                    ],
+                    "Male Persona": [
+                        { id: 'Fenrir', name: 'Fenrir', desc: 'Deep & Authoritative' },
+                        { id: 'Charon', name: 'Charon', desc: 'Low & Steady' },
+                        { id: 'Puck', name: 'Puck', desc: 'Playful & Expressive' }
+                    ]
                  };
 
                 return h('div', { className: "space-y-6 animate-fade-in" },
@@ -783,25 +860,28 @@ const SettingsModal = ({
                                 Object.entries(categories).map(([category, voices]) => 
                                     h('div', { key: category, className: "mb-6 last:mb-0" },
                                         h('h5', { className: "text-[10px] text-gray-500 mb-3 font-medium uppercase tracking-widest" }, category),
-                                        h('div', { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" },
+                                        h('div', { className: "grid grid-cols-1 gap-3" },
                                             voices.map(v => 
                                                 h('div', { 
-                                                    key: v, 
-                                                    onClick: () => setVoices({...currentVoices, main: v}),
-                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group ${currentVoices.main === v ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
+                                                    key: v.id, 
+                                                    onClick: () => setVoices({...currentVoices, main: v.id}),
+                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group ${currentVoices.main === v.id ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
                                                 },
-                                                    h('div', { className: "flex items-center gap-3" },
-                                                        h('div', { className: `w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentVoices.main === v ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
-                                                            h(VoiceIcon, { className: "w-4 h-4" })
+                                                    h('div', { className: "flex items-center gap-4" },
+                                                        h('div', { className: `w-10 h-10 rounded-full flex items-center justify-center transition-colors ${currentVoices.main === v.id ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
+                                                            h(VoiceIcon, { className: "w-5 h-5" })
                                                         ),
-                                                        h('span', { className: `font-medium text-sm ${currentVoices.main === v ? 'text-cyan-400' : 'text-gray-300'}` }, v)
+                                                        h('div', null,
+                                                            h('span', { className: `block font-bold text-sm ${currentVoices.main === v.id ? 'text-cyan-400' : 'text-gray-200'}` }, v.name),
+                                                            h('span', { className: "text-xs text-gray-500" }, v.desc)
+                                                        )
                                                     ),
                                                     h('button', {
-                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v); },
-                                                        disabled: previewingVoice === v,
-                                                        className: `p-2 rounded-full transition-colors ${previewingVoice === v ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-500 hover:bg-white/10 hover:text-cyan-400'}`
+                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v.id); },
+                                                        disabled: previewingVoice === v.id,
+                                                        className: `p-2 rounded-full transition-colors ${previewingVoice === v.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-500 hover:bg-white/10 hover:text-cyan-400'}`
                                                     },
-                                                        previewingVoice === v ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
+                                                        previewingVoice === v.id ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
                                                     )
                                                 )
                                             )
@@ -816,25 +896,28 @@ const SettingsModal = ({
                                 Object.entries(categories).map(([category, voices]) => 
                                     h('div', { key: category, className: "mb-6 last:mb-0" },
                                         h('h5', { className: "text-[10px] text-gray-500 mb-3 font-medium uppercase tracking-widest" }, category),
-                                        h('div', { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" },
+                                        h('div', { className: "grid grid-cols-1 gap-3" },
                                             voices.map(v => 
                                                 h('div', { 
-                                                    key: v, 
-                                                    onClick: () => setVoices({...currentVoices, greeting: v}),
-                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group ${currentVoices.greeting === v ? 'bg-purple-900/20 border-purple-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
+                                                    key: v.id, 
+                                                    onClick: () => setVoices({...currentVoices, greeting: v.id}),
+                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group ${currentVoices.greeting === v.id ? 'bg-purple-900/20 border-purple-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
                                                 },
-                                                    h('div', { className: "flex items-center gap-3" },
-                                                        h('div', { className: `w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentVoices.greeting === v ? 'bg-purple-500 text-black' : 'bg-gray-800 text-gray-400'}` },
-                                                            h(VoiceIcon, { className: "w-4 h-4" })
+                                                    h('div', { className: "flex items-center gap-4" },
+                                                        h('div', { className: `w-10 h-10 rounded-full flex items-center justify-center transition-colors ${currentVoices.greeting === v.id ? 'bg-purple-500 text-black' : 'bg-gray-800 text-gray-400'}` },
+                                                            h(VoiceIcon, { className: "w-5 h-5" })
                                                         ),
-                                                        h('span', { className: `font-medium text-sm ${currentVoices.greeting === v ? 'text-purple-400' : 'text-gray-300'}` }, v)
+                                                        h('div', null,
+                                                            h('span', { className: `block font-bold text-sm ${currentVoices.greeting === v.id ? 'text-purple-400' : 'text-gray-200'}` }, v.name),
+                                                            h('span', { className: "text-xs text-gray-500" }, v.desc)
+                                                        )
                                                     ),
                                                     h('button', {
-                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v); },
-                                                        disabled: previewingVoice === v,
-                                                        className: `p-2 rounded-full transition-colors ${previewingVoice === v ? 'bg-purple-500/20 text-purple-400' : 'text-gray-500 hover:bg-white/10 hover:text-purple-400'}`
+                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v.id); },
+                                                        disabled: previewingVoice === v.id,
+                                                        className: `p-2 rounded-full transition-colors ${previewingVoice === v.id ? 'bg-purple-500/20 text-purple-400' : 'text-gray-500 hover:bg-white/10 hover:text-purple-400'}`
                                                     },
-                                                        previewingVoice === v ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
+                                                        previewingVoice === v.id ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
                                                     )
                                                 )
                                             )
@@ -1080,22 +1163,27 @@ export const App = () => {
   
   // -- State Definitions --
   const [user, setUser] = React.useState(null);
-  const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark');
-  const [gender, setGender] = usePersistentState('kaniska-gender', 'female');
-  const [assistantName, setAssistantName] = usePersistentState('kaniska-name', DEFAULT_ASSISTANT_NAME_FEMALE);
-  const [userName, setUserName] = usePersistentState('kaniska-user-name', '');
-  const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING);
-  const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS);
-  const [coreProtocol, setCoreProtocol] = usePersistentState('kaniska-core-protocol', DEFAULT_CORE_PROTOCOL);
-  const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '');
-  const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 50, empathy: 50, formality: 50, excitement: 50, sadness: 10, curiosity: 50 });
-  const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' });
-  const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' });
-  const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' });
-  const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-vol', 0.2);
-  const [connectionSound, setConnectionSound] = usePersistentState('kaniska-sfx-connect', null);
-  const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '');
-  const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free');
+  
+  // All persistent states now accept 'user' to enable Firestore sync
+  const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark', user);
+  const [gender, setGender] = usePersistentState('kaniska-gender', 'female', user);
+  const [assistantName, setAssistantName] = usePersistentState('kaniska-name', DEFAULT_ASSISTANT_NAME_FEMALE, user);
+  const [userName, setUserName] = usePersistentState('kaniska-user-name', '', user);
+  const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING, user);
+  const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS, user);
+  const [coreProtocol, setCoreProtocol] = usePersistentState('kaniska-core-protocol', DEFAULT_CORE_PROTOCOL, user);
+  const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '', user);
+  const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 60, empathy: 60, formality: 40, excitement: 50, sadness: 10, curiosity: 60 }, user);
+  const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' }, user);
+  const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' }, user);
+  const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' }, user);
+  const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-vol', 0.2, user);
+  const [connectionSound, setConnectionSound] = usePersistentState('kaniska-sfx-connect', null, user);
+  const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '', user);
+  const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free', user);
+  
+  // Usage tracking is persisted, but updating is throttled in useEffect below
+  const [usageData, setUsageData] = usePersistentState('kaniska-usage-data', { seconds: 0, period: new Date().toISOString().slice(0, 7) }, user);
   
   const [isConnected, setIsConnected] = React.useState(false);
   const [status, setStatus] = React.useState('idle');
@@ -1104,10 +1192,9 @@ export const App = () => {
   const [currentVideo, setCurrentVideo] = React.useState(null);
   const [isPlayerMinimized, setIsPlayerMinimized] = React.useState(false);
   
-  // Persistent Usage State (Monthly)
-  // Stores usage in seconds and the current month (YYYY-MM)
-  const [usageData, setUsageData] = usePersistentState('kaniska-usage-data', { seconds: 0, period: new Date().toISOString().slice(0, 7) });
-
+  // Track active session configuration to detect updates
+  const [activeSessionConfig, setActiveSessionConfig] = React.useState(null);
+  
   const sessionRef = React.useRef(null);
   const youtubePlayerRef = React.useRef(null);
   
@@ -1123,6 +1210,22 @@ export const App = () => {
      return onAuthStateChanged(auth, u => setUser(u));
   }, []);
 
+  // Compute current configuration object to compare with active session
+  const currentConfig = useMemo(() => ({
+      assistantName,
+      userName,
+      userBio,
+      gender,
+      customInstructions,
+      coreProtocol,
+      emotionTuning,
+      voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main,
+      greetingMessage
+  }), [assistantName, userName, userBio, gender, customInstructions, coreProtocol, emotionTuning, femaleVoices, maleVoices, greetingMessage]);
+
+  // Check if updates are available
+  const isUpdateAvailable = isConnected && activeSessionConfig && JSON.stringify(activeSessionConfig) !== JSON.stringify(currentConfig);
+
   // Usage Tracking & Limit Enforcement
   React.useEffect(() => {
       let interval;
@@ -1136,10 +1239,10 @@ export const App = () => {
                       return { period: currentPeriod, seconds: 0 };
                   }
                   
-                  // Increment usage
-                  return { ...prev, seconds: prev.seconds + 1 };
+                  // Increment usage (5 seconds)
+                  return { ...prev, seconds: prev.seconds + 5 };
               });
-          }, 1000);
+          }, 5000); // Reduced write frequency to 5s to save DB quota
       }
       return () => clearInterval(interval);
   }, [status]);
@@ -1192,12 +1295,12 @@ export const App = () => {
         cleanupAudio();
         setIsConnected(false);
         setStatus('idle');
+        setActiveSessionConfig(null);
         return;
     }
 
     // Check Usage Limit before connecting
     const currentPeriod = new Date().toISOString().slice(0, 7);
-    // If period changed since last load, reset logic is handled by effect, but we can double check here
     if (subscriptionPlan === 'free' && usageData.period === currentPeriod && usageData.seconds >= FREE_LIMIT_SECONDS) {
         setIsSettingsOpen(true);
         setActiveTab('subscription');
@@ -1206,6 +1309,7 @@ export const App = () => {
     }
     
     setStatus('listening');
+    setActiveSessionConfig(currentConfig); // Capture config at start of session
     
     // Resolve session promise to handle initial audio stream race condition
     let resolveSession;
@@ -1414,7 +1518,7 @@ export const App = () => {
         // Pass all config to connection logic
         const session = await connectLiveSession(callbacks, {
             customInstructions, 
-            coreProtocol, // Pass the editable protocol
+            coreProtocol, 
             voiceName, 
             apiKey: apiKeys.gemini,
             assistantName,
@@ -1436,6 +1540,14 @@ export const App = () => {
     }
   };
 
+  const handleUpdateSession = () => {
+      // Reconnect to apply new settings
+      cleanupAudio();
+      setIsConnected(false);
+      setStatus('idle');
+      setTimeout(() => connect(), 500);
+  };
+
   return h('div', { className: `w-screen h-screen overflow-hidden flex flex-col items-center justify-center relative bg-black ${theme === 'light' ? 'bg-white text-black' : 'text-white'}` },
         // Background Effects
         h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
@@ -1450,6 +1562,19 @@ export const App = () => {
             className: "absolute top-6 right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" 
         },
             h(SettingsIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
+        ),
+
+        // Update Prompt (Visible when settings change during live session)
+        isUpdateAvailable && h('div', { 
+            className: "absolute top-24 z-40 animate-fade-in" 
+        },
+            h('button', {
+                onClick: handleUpdateSession,
+                className: "flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:bg-yellow-500/30 transition-all font-bold text-sm backdrop-blur-md"
+            },
+                h('svg', { className: "w-4 h-4 animate-spin", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })),
+                "System Update Available"
+            )
         ),
 
         // Main Content Area
