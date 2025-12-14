@@ -391,6 +391,9 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
         
         const yRes = await validateYouTubeKey(localKeys.youtube);
         status.youtube = yRes;
+        
+        const aRes = await validateAuddioKey(localKeys.auddio);
+        status.auddio = aRes;
 
         setValidationStatus(status);
         setApiKeys(localKeys);
@@ -410,8 +413,8 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
             ),
             
             h('div', { className: "space-y-6 mt-6" },
-                // Only YouTube key
-                ['youtube'].map(keyType => 
+                // Only YouTube and Auddio keys are user-configurable. Weather and News are system managed.
+                ['youtube', 'auddio'].map(keyType => 
                     h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-white/5" },
                         h('div', { className: "flex justify-between items-center mb-2" },
                             h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, 
@@ -1328,6 +1331,7 @@ export const App = () => {
     // Initialize Audio Contexts
     try {
         outputAudioContextRef.current = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 24000 });
+        await outputAudioContextRef.current.resume(); // CRITICAL FIX: Ensure context is running (autoplay policy)
         inputAudioContextRef.current = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 16000 });
         nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
     } catch (e) {
