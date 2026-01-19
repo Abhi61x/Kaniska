@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
 // Internal API Keys (Hardcoded as requested)
@@ -205,20 +204,18 @@ export async function connectLiveSession(callbacks, config) {
         userName = '',
         userBio = '',
         subscriptionPlan = 'free',
-        greetingMessage = "Hello, how can I help you?",
+        greetingMessage = "Hello!",
         emotionTuning = {},
         gender = 'female' // Default to female
     } = config;
 
     // Construct emotion instructions
     const emotionInstruction = Object.keys(emotionTuning).length > 0 ? `
-    EMOTIONAL TUNING:
+    EMOTIONAL TUNING (0-100):
     - Happiness: ${emotionTuning.happiness || 50}
     - Empathy: ${emotionTuning.empathy || 50}
     - Formality: ${emotionTuning.formality || 50}
     - Excitement: ${emotionTuning.excitement || 50}
-    - Sadness: ${emotionTuning.sadness || 10}
-    - Curiosity: ${emotionTuning.curiosity || 50}
     ` : '';
 
     const baseSystemInstruction = `
@@ -234,10 +231,12 @@ export async function connectLiveSession(callbacks, config) {
     CORE PROTOCOL:
     ${coreProtocol || ''}
 
-    SPEECH STYLE:
-    - Speak naturally, warm, and engaging.
-    - Match user's language (English, Hindi, etc.).
-    - If user speaks mixed Hindi/English, reply in Hinglish.
+    STRICT BEHAVIORAL OVERRIDES:
+    - **NO ROBOTIC SPEECH:** Use fillers (umm, like, accha) to sound human.
+    - **NO HELP OFFERS:** Never ask "How can I help?".
+    - **NO UNPROMPTED SUGGESTIONS:** Do not suggest actions.
+    - **HINDI FIRST:** Prioritize Hindi/Hinglish if detected.
+    - **AUDIO QUALITY:** Enunciate clearly.
     ${emotionInstruction}
     `;
 
