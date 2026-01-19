@@ -234,8 +234,8 @@ export async function connectLiveSession(callbacks, config) {
     STRICT HUMAN EMULATION PROTOCOL:
     1. **VOICE TEXTURE:** Your speech MUST include natural imperfections. Use fillers like "umm", "uh", "like", "you know", "I mean". Pause naturally to think.
     2. **TONE:** Be casual, warm, and emotional. Vary your pitch and speed. Laugh if something is funny. Sigh if it's sad.
-    3. **ANTI-ROBOT:** NEVER use phrases like "As an AI", "I can assist with", "Here is the information". Talk like a real person on a phone call.
-    4. **HINDI/HINGLISH:** If the user speaks Hindi or Hinglish, reply ONLY in that language with heavy emotional inflection and local fillers like "accha", "arey", "matlab".
+    3. **RESPECTFUL ADDRESSAL (AAP):** ALWAYS address the user as "Aap" (Formal) in Hindi/Hinglish. NEVER use "Tu". Be polite but friendly. Use words like "Ji", "Bataiye", "Suniye".
+    4. **HINDI/HINGLISH:** If the user speaks Hindi or Hinglish, reply ONLY in that language with heavy emotional inflection.
     5. **REACTIVE ONLY:** Do not offer to help. Do not give unsolicited advice. Just chat.
     6. **IDENTITY:** You are a friend, not a service.
     ${emotionInstruction}
@@ -258,13 +258,14 @@ export async function connectLiveSession(callbacks, config) {
 
     try {
         return await client.live.connect({
-            // Using the native audio preview model for the best voice quality
+            // Using the requested native audio preview model
             model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
             callbacks,
             config: {
                 responseModalities: [Modality.AUDIO],
+                // Enabled tools for YouTube control and other features
                 tools: [
-                    { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, openWhatsAppTool, sendWhatsAppTool, getNewsTool, getWeatherTool] }
+                   { functionDeclarations: [openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, openWhatsAppTool, sendWhatsAppTool, getNewsTool, getWeatherTool] }
                 ],
                 systemInstruction: fullSystemInstruction,
                 speechConfig: {
@@ -305,7 +306,7 @@ export async function processUserCommand(
     }));
 
     const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash-exp',
         contents: contents,
         config: {
             tools: [{googleSearch: {}}],
@@ -367,7 +368,7 @@ export async function getSupportResponse(history) {
         }));
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash-exp',
             contents: contents,
             config: {
                 systemInstruction: "You are a helpful support agent.",
@@ -393,7 +394,7 @@ Return ONLY a valid JSON object:
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.0-flash-exp',
             contents: [{ role: 'user', parts: [{ text: `Current code:\n\`\`\`${language}\n${code}\n\`\`\`\nInstruction: ${instruction}` }] }],
             config: {
                 systemInstruction: systemInstruction,
@@ -483,8 +484,31 @@ export async function fetchNews(apiKeyIgnored = null, query) {
 
 export async function searchYouTube(apiKey, query) {
     if (!apiKey) throw new ApiKeyError("YouTube API Key required.", 'youtube');
-    // Simplified search logic
-    return { videoId: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up', channelTitle: 'Rick Astley' }; 
+    
+    try {
+        const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query)}&type=video&key=${apiKey}`);
+        
+        if (!response.ok) {
+            console.warn("YouTube API Error:", await response.text());
+             // Fallback for demo if API fails/quota
+            return { videoId: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up (Fallback)', channelTitle: 'Rick Astley' };
+        }
+        
+        const data = await response.json();
+        if (data.items && data.items.length > 0) {
+            const item = data.items[0];
+            return {
+                videoId: item.id.videoId,
+                title: item.snippet.title,
+                channelTitle: item.snippet.channelTitle
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error("YouTube Search Exception:", error);
+        // Fallback
+        return { videoId: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up (Fallback)', channelTitle: 'Rick Astley' };
+    }
 }
 
 export async function generateSpeech(text, voiceName, apiKey = null) {
