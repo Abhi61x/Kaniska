@@ -8,7 +8,7 @@ import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 // Helper for React.createElement to keep code readable
-const h = React.createElement;
+const h: any = React.createElement;
 
 const FREE_LIMIT_SECONDS = 3600; // 1 hour per month
 
@@ -36,6 +36,8 @@ const CodeIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.
 const TrashIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polyline', { points: "3 6 5 6 21 6" }), h('path', { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }));
 const InstagramIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "2", y: "2", width: "20", height: "20", rx: "5", ry: "5" }), h('path', { d: "M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" }), h('line', { x1: "17.5", y1: "6.5", x2: "17.51", y2: "6.5" }));
 const MailIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }), h('polyline', { points: "22,6 12,13 2,6" }));
+const CameraIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" }), h('circle', { cx: "12", cy: "13", r: "4" }));
+const CameraOffIcon = ({ className }) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('line', { x1: "1", y1: "1", x2: "23", y2: "23" }), h('path', { d: "M21 21l-3.5-3.5m-2-2l-3-3L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" }), h('path', { d: "M15 4h-6l-2 3H4a2 2 0 0 0-2 2v.5" }));
 
 const getInitialState = (key, defaultValue) => {
     try {
@@ -128,6 +130,7 @@ Do not offer this information unless asked.
 4.  **Controlling YouTube playback:** Use the 'controlMedia' tool when the user asks to play, pause, stop, rewind, or fast-forward the currently playing video.
 5.  **Setting Timers:** Use the 'setTimer' tool to set a countdown timer.
 6.  **WhatsApp Control:** You have full power to handle WhatsApp. Use 'send_whatsapp' to draft and send messages. Use 'open_whatsapp' to simply open the app. If the user says 'Send message to X', and you don't have the number, ask for it, or just use the name if the user insists (WhatsApp will search for the contact).
+7.  **Vision Capabilities:** You can see! The user can share their camera feed. If they do, you will receive images. Describe what you see if asked, or use the visual context to answer questions.
 
 **Crucial Interaction Rule:** When a user asks to use a tool but does not provide all the necessary information (like asking for the weather without a location, or asking for the song title), your primary job is to ask a clarifying question to get the missing details. Do not attempt to use the tool without the required information.
 
@@ -140,6 +143,7 @@ const DEFAULT_CUSTOM_INSTRUCTIONS = `You are a sophisticated and friendly AI ass
 1.  **Proactive Suggestions:** Do not stop at just answering the question. Anticipate what the user might need next.
 2.  **Inquisitive Nature:** Ask follow-up questions to deepen the conversation or clarify the user's intent. Show genuine interest in what the user is saying.
 3.  **Contextual Relevance:** Use the information you know about the user (from their bio or current conversation) to tailor your responses.
+4.  **Language Fallback (Strict):** If you do not understand what the user said, or if the audio is unclear, you MUST ask for clarification in Hindi (e.g., "Maaf kijiye, mujhe samajh nahi aaya. Kya aap dohra sakte hain?").
 
 When a function call is not appropriate, simply respond conversationally to the user. Your personality is also tuned by the settings provided separately.`;
 
@@ -198,7 +202,7 @@ async function decodeAudioData(
 // --- Components ---
 
 // Optimized Avatar Implementation (CSS-Only Animations)
-const Avatar = React.memo(({ state, mood = 'neutral', customUrl }) => {
+const Avatar = React.memo(({ state, mood = 'neutral', customUrl }: any) => {
     const wrapRef = React.useRef(null);
     const containerRef = React.useRef(null);
 
@@ -272,7 +276,7 @@ const Avatar = React.memo(({ state, mood = 'neutral', customUrl }) => {
 });
 
 // Advanced YouTube Player Component with API Control
-const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }, ref) => {
+const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }: any, ref) => {
     const playerRef = React.useRef(null);
     const containerRef = React.useRef(null);
 
@@ -292,7 +296,7 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }, ref) =>
     React.useEffect(() => {
         if (!video) return;
 
-        if (!window['YT']) {
+        if (!(window as any)['YT']) {
             const tag = document.createElement('script');
             tag.src = "https://www.youtube.com/iframe_api";
             const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -304,7 +308,7 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }, ref) =>
                  playerRef.current.destroy();
              }
              
-             playerRef.current = new window['YT'].Player(containerRef.current, {
+             playerRef.current = new (window as any)['YT'].Player(containerRef.current, {
                 height: '100%',
                 width: '100%',
                 videoId: video.videoId,
@@ -320,10 +324,10 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }, ref) =>
             });
         };
 
-        if (window['YT'] && window['YT'].Player) {
+        if ((window as any)['YT'] && (window as any)['YT'].Player) {
             initPlayer();
         } else {
-            window['onYouTubeIframeAPIReady'] = initPlayer;
+            (window as any)['onYouTubeIframeAPIReady'] = initPlayer;
         }
 
         return () => {
@@ -355,7 +359,7 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized }, ref) =>
 });
 
 // Reusable Collapsible Section for Settings
-const CollapsibleSection = ({ title, description, icon, children, defaultOpen = false }) => {
+const CollapsibleSection = ({ title, description, icon, children, defaultOpen = false }: any) => {
     const [isOpen, setIsOpen] = React.useState(defaultOpen);
     return h('div', { className: "border border-white/10 rounded-xl bg-gray-900/40 overflow-hidden mb-4 transition-all duration-300" },
         h('button', { 
@@ -379,7 +383,7 @@ const CollapsibleSection = ({ title, description, icon, children, defaultOpen = 
     );
 };
 
-const ApiKeysTab = ({ apiKeys, setApiKeys, t }) => {
+const ApiKeysTab = ({ apiKeys, setApiKeys, t }: any) => {
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
     // FIX: Typed validationStatus to allow string keys
     const [validationStatus, setValidationStatus] = React.useState<Record<string, any>>({});
@@ -475,7 +479,7 @@ const SettingsModal = ({
     subscriptionPlan, setSubscriptionPlan,
     usageData,
     user, handleLogin, handleLogout
-}) => {
+}: any) => {
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
     const [previewingVoice, setPreviewingVoice] = React.useState(null);
@@ -523,7 +527,7 @@ const SettingsModal = ({
 
             const paymentSessionId = await createCashfreeOrder(planId, amount, customerId, customerPhone, customerEmail);
             
-            const cashfree = new window['Cashfree']({ mode: "production" });
+            const cashfree = new (window as any)['Cashfree']({ mode: "production" });
             cashfree.checkout({
                 paymentSessionId: paymentSessionId,
                 redirectTarget: "_self",
@@ -542,7 +546,7 @@ const SettingsModal = ({
             const text = t('settings.voiceTab.testVoiceSample') || `This is a preview of the voice ${voiceName}.`;
             const stream = await generateSpeech(text, voiceName, apiKeys.gemini);
             
-            const audioCtx = new (window.AudioContext || window['webkitAudioContext'])();
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             let nextTime = audioCtx.currentTime;
             
             for await (const chunk of stream) {
@@ -1235,6 +1239,7 @@ export const App = () => {
   const [usageData, setUsageData] = usePersistentState('kaniska-usage-data', { seconds: 0, period: new Date().toISOString().slice(0, 7) }, user);
   
   const [isConnected, setIsConnected] = React.useState(false);
+  const [isCameraOn, setIsCameraOn] = React.useState(false);
   const [status, setStatus] = React.useState('idle');
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('account');
@@ -1254,6 +1259,12 @@ export const App = () => {
   const audioSourceRef = useRef(null);
   const nextStartTimeRef = useRef(0);
   const scheduledSourcesRef = useRef([]);
+
+  // Video Refs
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const videoStreamRef = useRef(null);
+  const videoIntervalRef = useRef(null);
 
   React.useEffect(() => {
      return onAuthStateChanged(auth, u => setUser(u));
@@ -1299,7 +1310,7 @@ export const App = () => {
   // Separate effect to enforce limit based on updated usageData
   React.useEffect(() => {
       if (subscriptionPlan === 'free' && usageData.seconds >= FREE_LIMIT_SECONDS && status === 'live') {
-          cleanupAudio();
+          cleanupMedia();
           setIsConnected(false);
           setStatus('idle');
           setIsSettingsOpen(true);
@@ -1311,7 +1322,7 @@ export const App = () => {
   const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
   const handleLogout = () => signOut(auth);
 
-  const cleanupAudio = () => {
+  const cleanupMedia = () => {
       // Close contexts
       if (inputAudioContextRef.current) {
           inputAudioContextRef.current.close();
@@ -1337,11 +1348,87 @@ export const App = () => {
           audioSourceRef.current.disconnect();
           audioSourceRef.current = null;
       }
+      
+      // Stop Video
+      if (videoIntervalRef.current) {
+          clearInterval(videoIntervalRef.current);
+          videoIntervalRef.current = null;
+      }
+      if (videoStreamRef.current) {
+          videoStreamRef.current.getTracks().forEach(t => t.stop());
+          videoStreamRef.current = null;
+      }
+      setIsCameraOn(false);
+  };
+
+  const startVideoTransmission = () => {
+      if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
+
+      videoIntervalRef.current = setInterval(() => {
+          if (!sessionRef.current || !videoRef.current || !canvasRef.current) return;
+          
+          const video = videoRef.current;
+          if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+              const canvas = canvasRef.current;
+              const ctx = canvas.getContext('2d');
+              
+              // Scale down to reduce bandwidth/token usage
+              const scale = 0.25; 
+              canvas.width = video.videoWidth * scale;
+              canvas.height = video.videoHeight * scale;
+              
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              // Get base64 string without prefix
+              const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+              
+              sessionRef.current.sendRealtimeInput({
+                  media: { mimeType: 'image/jpeg', data: base64 }
+              });
+          }
+      }, 500); // 2 FPS is generally sufficient for visual context
+  };
+
+  const toggleCamera = async () => {
+      if (isCameraOn) {
+          // Stop Camera
+          if (videoStreamRef.current) {
+              videoStreamRef.current.getTracks().forEach(track => track.stop());
+              videoStreamRef.current = null;
+          }
+          if (videoIntervalRef.current) {
+              clearInterval(videoIntervalRef.current);
+              videoIntervalRef.current = null;
+          }
+          if (videoRef.current) {
+              videoRef.current.srcObject = null;
+          }
+          setIsCameraOn(false);
+      } else {
+          // Start Camera
+          try {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+              videoStreamRef.current = stream;
+              if (videoRef.current) {
+                  videoRef.current.srcObject = stream;
+                  await videoRef.current.play();
+              }
+              setIsCameraOn(true);
+              
+              // If connected, start streaming immediately
+              if (isConnected && sessionRef.current) {
+                  startVideoTransmission();
+              }
+          } catch (err) {
+              console.error("Camera Error:", err);
+              alert("Unable to access camera. Please allow permission in your browser settings.");
+          }
+      }
   };
 
   const connect = async () => {
     if (isConnected) {
-        cleanupAudio();
+        cleanupMedia();
         setIsConnected(false);
         setStatus('idle');
         setActiveSessionConfig(null);
@@ -1366,9 +1453,9 @@ export const App = () => {
 
     // Initialize Audio Contexts
     try {
-        outputAudioContextRef.current = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 24000 });
+        outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         await outputAudioContextRef.current.resume(); // CRITICAL FIX: Ensure context is running (autoplay policy)
-        inputAudioContextRef.current = new (window.AudioContext || window['webkitAudioContext'])({ sampleRate: 16000 });
+        inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
         nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
     } catch (e) {
         console.error("Audio Context Error", e);
@@ -1403,6 +1490,12 @@ export const App = () => {
                 
                 audioSourceRef.current.connect(scriptProcessorRef.current);
                 scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
+
+                // Start Video Streaming if Camera was already on
+                if (isCameraOn) {
+                    startVideoTransmission();
+                }
+
             } catch (err) {
                 console.error("Mic Error", err);
                 alert("Could not access microphone.");
@@ -1594,14 +1687,14 @@ export const App = () => {
             alert("Connection Failed: " + (e.message || "Unknown error"));
         }
         setStatus('error');
-        cleanupAudio();
+        cleanupMedia();
         setIsConnected(false);
     }
   };
 
   const handleUpdateSession = () => {
       // Reconnect to apply new settings
-      cleanupAudio();
+      cleanupMedia();
       setIsConnected(false);
       setStatus('idle');
       setTimeout(() => connect(), 500);
@@ -1635,6 +1728,22 @@ export const App = () => {
                 "System Update Available"
             )
         ),
+        
+        // Video Preview (Fixed Position)
+        h('div', { 
+            className: `fixed bottom-36 right-6 z-50 transition-all duration-500 ${isCameraOn ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}` 
+        },
+            h('div', { className: "relative w-32 h-48 bg-black rounded-lg border border-cyan-500/30 overflow-hidden shadow-xl" },
+                h('video', { 
+                    ref: videoRef, 
+                    className: "w-full h-full object-cover transform -scale-x-100", 
+                    muted: true, 
+                    playsInline: true 
+                }),
+                h('div', { className: "absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" })
+            )
+        ),
+        h('canvas', { ref: canvasRef, className: "hidden" }),
 
         // Main Content Area
         h('div', { className: "z-10 flex flex-col items-center justify-center w-full h-full p-4 pb-32" },
@@ -1668,7 +1777,20 @@ export const App = () => {
         ),
 
         // Footer Controls
-        h('div', { className: "fixed bottom-10 z-30 flex items-center gap-6" },
+        h('div', { className: "fixed bottom-10 z-30 flex items-center gap-4" },
+            // Camera Toggle
+            h('button', {
+                onClick: toggleCamera,
+                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
+                    isCameraOn 
+                    ? 'bg-white text-black hover:bg-gray-200' 
+                    : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
+                }`
+            },
+                isCameraOn ? h(CameraIcon, { className: "w-6 h-6" }) : h(CameraOffIcon, { className: "w-6 h-6" })
+            ),
+
+            // Connect Button
             h('button', {
                 onClick: connect,
                 disabled: status === 'error',

@@ -1,3 +1,4 @@
+
 {
   "appName": "Kaniska",
   "header": {
@@ -59,6 +60,9 @@
       "about": "About"
     },
     "personaTab": {
+      "userProfile": {
+        "name": "Your Name"
+      },
       "appearance": {
         "title": "Appearance",
         "description": "Choose how the application looks.",
@@ -68,16 +72,6 @@
       "greeting": {
         "title": "Greeting Message",
         "description": "This is what the assistant says when you first connect."
-      },
-      "tuning": {
-        "title": "Emotional Tuning",
-        "description": "Fine-tune the assistant's personality traits. Changes will be reflected in responses.",
-        "happiness": "Happiness",
-        "empathy": "Empathy",
-        "formality": "Formality",
-        "excitement": "Excitement",
-        "sadness": "Sadness",
-        "curiosity": "Curiosity"
       },
       "ambient": {
         "title": "Ambient Sound",
