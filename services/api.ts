@@ -301,8 +301,11 @@ export async function connectLiveSession(callbacks: any, config: any) {
     
     const client = new GoogleGenAI({ apiKey: activeKey });
 
+    // Use AUDIO modality for real-time voice interaction.
+    const responseModalities = [Modality.AUDIO];
+
     const sessionConfig: any = {
-        responseModalities: useSystemVoice ? [Modality.TEXT] : [Modality.AUDIO],
+        responseModalities: responseModalities,
         tools: [
            { functionDeclarations: [
                openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, 
@@ -313,16 +316,14 @@ export async function connectLiveSession(callbacks: any, config: any) {
         systemInstruction: fullSystemInstruction,
     };
 
-    // Only add speechConfig if using Audio modality
-    if (!useSystemVoice) {
-        sessionConfig.speechConfig = {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
-        };
-    }
+    // Always add speechConfig for the audio model
+    sessionConfig.speechConfig = {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
+    };
 
     try {
         return await client.live.connect({
-            model: 'gemini-2.0-flash-exp', 
+            model: 'gemini-2.0-flash-exp', // Reverted to 2.0-flash-exp for stability
             callbacks,
             config: sessionConfig
         });
