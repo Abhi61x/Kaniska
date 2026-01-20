@@ -6,8 +6,11 @@ const WEATHER_API_KEY = "a9d473331d424f9699a82612250812"; // WeatherAPI.com
 const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 
 // Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
-// This is secure because it's bundled at build time and not exposed in the source code directly.
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
+
+// FIX: Securely retrieve Gemini Key for Vite/Vercel environments
+// Vercel requires VITE_ prefix for client-side environment variables
+const ENV_GEMINI_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -48,7 +51,7 @@ export class ServiceError extends Error {
 }
 
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: ENV_GEMINI_KEY });
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
 function handleGeminiError(error: any, context = 'processing your request') {
@@ -296,16 +299,14 @@ export async function connectLiveSession(callbacks: any, config: any) {
         ? `${baseSystemInstruction}\n\nUSER PREFERENCES/RULES:\n${customInstructions}` 
         : baseSystemInstruction;
 
-    const activeKey = apiKey || process.env.API_KEY;
-    if (!activeKey) throw new MainApiKeyError("No API Key available.");
+    // Use the correctly resolved key
+    const activeKey = apiKey || ENV_GEMINI_KEY;
+    if (!activeKey) throw new MainApiKeyError("No API Key available. Please check Vercel settings and add VITE_GEMINI_API_KEY.");
     
     const client = new GoogleGenAI({ apiKey: activeKey });
 
-    // Use AUDIO modality for real-time voice interaction.
-    const responseModalities = [Modality.AUDIO];
-
     const sessionConfig: any = {
-        responseModalities: responseModalities,
+        responseModalities: [Modality.AUDIO], // Strictly Audio for Live API
         tools: [
            { functionDeclarations: [
                openSettingsTool, setTimerTool, searchYouTubeTool, controlMediaTool, 
@@ -323,21 +324,20 @@ export async function connectLiveSession(callbacks: any, config: any) {
 
     try {
         return await client.live.connect({
-            model: 'gemini-2.0-flash-exp', // Reverted to 2.0-flash-exp for stability
+            model: 'gemini-2.0-flash-exp', 
             callbacks,
             config: sessionConfig
         });
     } catch (e: any) {
         const msg = e.toString().toLowerCase();
         if (msg.includes('network') || msg.includes('fetch')) {
-            throw new Error("Connection failed. Check network.");
+            throw new Error("Connection failed. Check network or API Key.");
         }
         throw e;
     }
 }
 
 export async function processUserCommand(history: any[], systemInstruction: string, temperature: number, emotionTuning: any, apiKey: string | null = null) {
-  // Simplified for brevity, same logic as before
   const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
   const contents = history.map(msg => ({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }));
   try {
