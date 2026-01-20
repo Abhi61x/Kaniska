@@ -10,7 +10,7 @@ const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
 // FIX: Securely retrieve Gemini Key for Vite/Vercel environments
 // Vercel requires VITE_ prefix for client-side environment variables
-const ENV_GEMINI_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.API_KEY;
+const ENV_GEMINI_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -341,7 +341,7 @@ export async function connectLiveSession(callbacks: any, config: any) {
 
     try {
         const connectOp = () => client.live.connect({
-            model: 'gemini-2.0-flash-exp', 
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
             callbacks,
             config: sessionConfig
         });
@@ -377,7 +377,7 @@ export async function processUserCommand(history: any[], systemInstruction: stri
   const contents = history.map(msg => ({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }));
   try {
     const response = await client.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-3-flash-preview',
         contents: contents,
         config: { tools: [{googleSearch: {}}], systemInstruction, temperature }
     });
