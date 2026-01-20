@@ -67,6 +67,9 @@ function handleGeminiError(error: any, context = 'processing your request') {
     if (errorMessage.includes('blocked') || errorMessage.includes('safety')) {
         return new Error("I am unable to provide a response to that due to my safety guidelines. Please try a different topic.");
     }
+    if (errorMessage.includes('unavailable') || errorMessage.includes('503')) {
+        return new ServiceError("The AI service is currently unavailable (High Load). Please try again in a few seconds.");
+    }
     if (error instanceof TypeError && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
          return new Error("I'm unable to connect to Gemini services. Please check your internet connection and try again.");
     }
@@ -253,7 +256,8 @@ export function speakWithBrowser(text: string, lang = 'hi-IN') {
 }
 
 // Helper for retrying async operations
-async function retryOperation(operation: () => Promise<any>, retries = 3, delay = 1000): Promise<any> {
+// Increased delay to 2000ms to better handle Service Unavailable (503) errors
+async function retryOperation(operation: () => Promise<any>, retries = 3, delay = 2000): Promise<any> {
     try {
         return await operation();
     } catch (error: any) {
@@ -383,7 +387,7 @@ export async function connectLiveSession(callbacks: any, config: any) {
         });
 
         // Use retry logic
-        const sessionPromise = await retryOperation(connectOp, 2, 1000);
+        const sessionPromise = await retryOperation(connectOp, 2, 2000);
 
         // Initialize session handling immediately after connection
         // Monkey-patch sendRealtimeInput to be safe against closed sockets

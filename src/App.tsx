@@ -1706,10 +1706,15 @@ export const App = () => {
         },
         onerror: (err) => {
              console.error("Session Error", err);
-             // More descriptive error
-             if (err.toString().includes("NetworkError") || err.toString().includes("fetch")) {
+             const errorStr = err.toString().toLowerCase();
+             
+             // More descriptive error handling
+             if (errorStr.includes("networkerror") || errorStr.includes("fetch")) {
                  alert("Network Connection Failed. Please refresh and try again.");
+             } else if (errorStr.includes("unavailable") || errorStr.includes("503")) {
+                 alert("Service Temporarily Unavailable. Please try connecting again in a few seconds.");
              }
+             
              setStatus('error');
              cleanupMedia();
              setIsConnected(false);
