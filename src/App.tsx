@@ -1,12 +1,11 @@
 
-
 import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession, speakWithBrowser } from '../services/api.ts';
 import { useTranslation, availableLanguages } from '../i18n/index.tsx';
 import { auth, db, googleProvider } from '../firebase.ts';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 // Helper for React.createElement to keep code readable
 const h: any = React.createElement;
@@ -43,6 +42,9 @@ const SearchIcon = ({ className }: any) => h('svg', { className, xmlns: "http://
 const ThumbsUpIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" }));
 const ThumbsDownIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" }));
 const YouTubeIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" }));
+const LockIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }), h('path', { d: "M7 11V7a5 5 0 0 1 10 0v4" }));
+const CrownIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" }));
+const ChevronRightIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polyline', { points: "9 18 15 12 9 6" }));
 
 const getInitialState = (key: string, defaultValue: any) => {
     try {
@@ -468,7 +470,28 @@ const CollapsibleSection = ({ title, description, icon, children, defaultOpen = 
     );
 };
 
-const ApiKeysTab = ({ apiKeys, setApiKeys, t }: any) => {
+const ApiKeysTab = ({ apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab }: any) => {
+    // API KEY LOCK LOGIC
+    if (subscriptionPlan === 'free') {
+        return h('div', { className: "flex flex-col items-center justify-center h-96 text-center animate-fade-in space-y-6" },
+            h('div', { className: "w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-2 shadow-2xl relative" },
+                h(LockIcon, { className: "w-12 h-12 text-gray-400" }),
+                h('div', { className: "absolute top-0 right-0 p-2 bg-yellow-500 rounded-full animate-pulse" },
+                    h(CrownIcon, { className: "w-4 h-4 text-black" })
+                )
+            ),
+            h('h3', { className: "text-2xl font-bold text-white" }, "Premium Feature Locked"),
+            h('p', { className: "text-gray-400 max-w-sm" }, "Entering custom API keys requires a subscription. Upgrade your plan to unlock this feature and power up your assistant."),
+            h('button', {
+                onClick: () => setActiveTab('subscription'),
+                className: "px-8 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black font-bold rounded-xl hover:scale-105 transition-transform flex items-center gap-2"
+            }, 
+                h(CrownIcon, { className: "w-5 h-5" }),
+                "Upgrade to Unlock"
+            )
+        );
+    }
+
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
     // FIX: Typed validationStatus to allow string keys
     const [validationStatus, setValidationStatus] = React.useState<Record<string, any>>({});
@@ -594,7 +617,11 @@ const SettingsModal = ({
     };
 
     const handlePlanSelection = async (planId) => {
-        // ... same logic
+        // In a real app, this would trigger payment flow.
+        // For now, we simulate upgrading by setting the plan immediately.
+        // This effectively "releases the lock".
+        setSubscriptionPlan(planId);
+        alert(`Successfully upgraded to ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan! API Key lock is released.`);
     };
 
     const playVoicePreview = async (voiceName) => {
@@ -906,7 +933,7 @@ const SettingsModal = ({
                     )
                 );
              case 'apiKeys':
-                 return h(ApiKeysTab, { apiKeys, setApiKeys, t });
+                 return h(ApiKeysTab, { apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab });
              case 'contact':
                 return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in" },
                     h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-md w-full text-center" },
@@ -974,16 +1001,63 @@ const SettingsModal = ({
                     )
                 );
              case 'subscription':
-                 // ... keep existing subscription rendering
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                     h('div', { className: "text-center mb-8" }, h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')), h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))),
-                     h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
-                        ['free', 'monthly', 'quarterly', 'halfYearly', 'yearly'].map((planId) => 
-                            h('button', { key: planId, onClick: () => handlePlanSelection(planId), className: `relative p-6 rounded-xl border transition-all text-left group ${subscriptionPlan === planId ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'}` },
-                                h('div', { className: "flex justify-between items-start mb-2" }, h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)), subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))),
-                                h('div', { className: "flex items-baseline gap-1" }, h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)), h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))),
-                                planId === 'yearly' && h('div', { className: "absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg" }, "BEST VALUE"),
-                            )
+                // NEW SUBSCRIPTION UI - GRID LAYOUT WITH ONLY 3 PLANS
+                return h('div', { className: "space-y-8 animate-fade-in" },
+                     h('div', { className: "text-center mb-8" }, 
+                        h('h3', { className: "text-3xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')), 
+                        h('p', { className: "text-gray-400 max-w-md mx-auto" }, t('settings.subscriptionTab.description'))
+                     ),
+                     h('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-6" },
+                        ['monthly', 'quarterly', 'yearly'].map((planId) => {
+                            const isYearly = planId === 'yearly';
+                            const isSelected = subscriptionPlan === planId;
+                            
+                            return h('button', { 
+                                key: planId, 
+                                onClick: () => handlePlanSelection(planId), 
+                                className: `relative p-6 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-full group hover:-translate-y-1 duration-300 ${
+                                    isSelected 
+                                    ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_30px_rgba(34,211,238,0.2)]' 
+                                    : isYearly 
+                                        ? 'bg-gradient-to-br from-gray-900 to-black border-yellow-500/50 hover:border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.1)]'
+                                        : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'
+                                }` 
+                            },
+                                isYearly && h('div', { className: "absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-yellow-500 to-amber-600 text-black text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1" },
+                                    h(CrownIcon, { className: "w-3 h-3" }), "BEST VALUE"
+                                ),
+                                h('div', { className: "mb-4" },
+                                    h('h4', { className: `text-lg font-bold uppercase tracking-wider mb-2 ${isYearly ? 'text-yellow-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)),
+                                    h('div', { className: "flex items-baseline gap-1" }, 
+                                        h('span', { className: "text-3xl font-extrabold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)), 
+                                        h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))
+                                    )
+                                ),
+                                h('div', { className: "space-y-3 mb-6" },
+                                    h('div', { className: "flex items-center gap-2 text-xs text-gray-400" }, h(CheckCircleIcon, { className: "w-4 h-4 text-green-500" }), "Unlimited Access"),
+                                    h('div', { className: "flex items-center gap-2 text-xs text-gray-400" }, h(CheckCircleIcon, { className: "w-4 h-4 text-green-500" }), "Priority Support"),
+                                    isYearly && h('div', { className: "flex items-center gap-2 text-xs text-yellow-200" }, h(CrownIcon, { className: "w-4 h-4 text-yellow-500" }), "Exclusive Avatars")
+                                ),
+                                h('div', { className: `w-full py-3 rounded-xl font-bold text-sm text-center transition-all ${
+                                    isSelected 
+                                    ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' 
+                                    : isYearly 
+                                        ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-black hover:brightness-110'
+                                        : 'bg-white/10 hover:bg-white/20 text-white'
+                                }` }, 
+                                    isSelected ? "Current Plan" : "Select Plan"
+                                )
+                            );
+                        })
+                     ),
+                     // UPGRADE MORE OPTION
+                     h('div', { className: "mt-12 pt-8 border-t border-white/10 text-center" },
+                        h('h4', { className: "text-white font-medium mb-4" }, "Need something else?"),
+                        h('button', {
+                            className: "inline-flex items-center gap-2 px-6 py-3 rounded-full border border-gray-700 hover:border-gray-500 hover:bg-white/5 transition-all text-gray-300 hover:text-white text-sm font-medium"
+                        },
+                            "Upgrade More Options",
+                            h(ChevronRightIcon, { className: "w-4 h-4" })
                         )
                      )
                  );
@@ -992,7 +1066,7 @@ const SettingsModal = ({
         }
     };
     
-    // ... rest of modal
+    // ... rest of modal (unchanged)
      return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity", onClick: onClose },
         h('div', { className: "bg-black md:bg-gray-900 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter", onClick: e => e.stopPropagation() },
             h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-white/10 h-full absolute md:relative z-20` },
@@ -1111,6 +1185,17 @@ export const App = () => {
   // Check if updates are available
   const isUpdateAvailable = isConnected && activeSessionConfig && JSON.stringify(activeSessionConfig) !== JSON.stringify(currentConfig);
 
+  // Preload Image to avoid flashing
+  useEffect(() => {
+      if (avatarUrl) {
+          const img = new Image();
+          img.src = avatarUrl;
+      } else {
+          const img = new Image();
+          img.src = "https://i.gifer.com/NTHO.gif";
+      }
+  }, [avatarUrl]);
+
   // Usage Tracking & Limit Enforcement
   React.useEffect(() => {
       let interval;
@@ -1146,6 +1231,17 @@ export const App = () => {
 
   const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
   const handleLogout = () => signOut(auth);
+
+  const saveToHistory = async (text, sender) => {
+      if (!user) return;
+      try {
+          await addDoc(collection(db, "users", user.uid, "chat_history"), {
+              text,
+              sender, // 'user' or 'assistant'
+              timestamp: serverTimestamp()
+          });
+      } catch (e) { console.error("History Save Error", e); }
+  };
 
   const cleanupMedia = () => {
       // Close contexts
@@ -1361,7 +1457,17 @@ export const App = () => {
             }
         },
         onmessage: async (msg) => {
-             // Audio Playback
+             // Handle Transcripts for History
+             if (msg.serverContent?.outputTranscription) {
+                 const text = msg.serverContent.outputTranscription.text;
+                 if (text) saveToHistory(text, 'assistant');
+             }
+             if (msg.serverContent?.inputTranscription) {
+                 const text = msg.serverContent.inputTranscription.text;
+                 if (text) saveToHistory(text, 'user');
+             }
+
+             // Audio Playback with Jitter Buffer Fix
              const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (audioData) {
                  setStatus('speaking');
@@ -1377,9 +1483,17 @@ export const App = () => {
                      source.buffer = buffer;
                      source.connect(outputAudioContextRef.current.destination);
                      
-                     // Scheduling
+                     // Improved Scheduling Logic to prevent crackling (Jitter Buffer)
                      const now = outputAudioContextRef.current.currentTime;
-                     const startTime = Math.max(now, nextStartTimeRef.current);
+                     // Ensure next start time is at least 'now'. 
+                     // Add a tiny offset (0.05s) to the very first chunk in a sequence to prevent overlap if latency fluctuates.
+                     let startTime = nextStartTimeRef.current;
+                     
+                     // Increased buffer from 0.05 to 0.08 for smoother playback (less "fatna")
+                     if (startTime < now) {
+                        startTime = now + 0.08; 
+                     }
+                     
                      source.start(startTime);
                      nextStartTimeRef.current = startTime + buffer.duration;
                      

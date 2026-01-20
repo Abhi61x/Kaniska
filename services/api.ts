@@ -1,4 +1,6 @@
 
+
+
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
 // Internal API Keys
@@ -180,12 +182,12 @@ export const openExternalAppTool: FunctionDeclaration = {
     name: 'open_external_app',
     parameters: {
         type: Type.OBJECT,
-        description: 'Opens an external website or app. Use for Instagram, File Manager (files), Google, etc.',
+        description: 'Opens an external website or app. Use for Instagram, Facebook, Google, Maps, etc.',
         properties: {
             appName: { 
                 type: Type.STRING, 
                 description: 'The name of the platform to open.',
-                enum: ['youtube', 'google', 'browser', 'instagram', 'file_manager', 'gallery']
+                enum: ['youtube', 'google', 'browser', 'instagram', 'facebook', 'twitter', 'maps', 'file_manager', 'gallery']
             },
             query: {
                 type: Type.STRING,
@@ -332,6 +334,10 @@ export async function connectLiveSession(callbacks: any, config: any) {
            ] }
         ],
         systemInstruction: fullSystemInstruction,
+        // FIXED: Transcription config should be empty objects to enable defaults.
+        // The previous error "Request contains an invalid argument" was due to incorrect model fields here.
+        inputAudioTranscription: { },
+        outputAudioTranscription: { },
     };
 
     // Always add speechConfig for the audio model

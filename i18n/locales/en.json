@@ -1,3 +1,4 @@
+
 {
   "appName": "Kaniska",
   "header": {
@@ -154,11 +155,9 @@
       "active": "Active",
       "upgrade": "Upgrade",
       "plans": {
-        "free": { "name": "Free", "price": "₹0", "duration": "/ forever" },
         "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" },
-        "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" },
-        "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" },
-        "yearly": { "name": "Yearly", "price": "₹500", "duration": "/ year" }
+        "quarterly": { "name": "Quarterly", "price": "₹250", "duration": "/ 3 months" },
+        "yearly": { "name": "Yearly", "price": "₹1,000", "duration": "/ year" }
       },
       "subscribeButton": "Subscribe Now",
       "featuresTitle": "All plans include:",

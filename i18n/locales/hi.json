@@ -1,3 +1,4 @@
+
 {
   "appName": "कनिष्का",
   "header": {
@@ -152,9 +153,8 @@
       "description": "वह योजना चुनें जो आपके लिए सबसे उपयुक्त हो।",
       "plans": {
         "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" },
-        "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" },
-        "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" },
-        "yearly": { "name": "वार्षिक", "price": "₹500", "duration": "/ वर्ष" }
+        "quarterly": { "name": "त्रैमासिक", "price": "₹250", "duration": "/ 3 महीने" },
+        "yearly": { "name": "वार्षिक", "price": "₹1,000", "duration": "/ वर्ष" }
       },
       "subscribeButton": "अभी सदस्यता लें",
       "featuresTitle": "सभी योजनाओं में शामिल हैं:",
