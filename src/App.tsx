@@ -1,6 +1,7 @@
-
 import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession, speakWithBrowser } from '../services/api.ts';
 import { useTranslation, availableLanguages } from '../i18n/index.tsx';
 import { auth, db, googleProvider } from '../firebase.ts';
@@ -1166,6 +1167,44 @@ export const App = () => {
      }
      return onAuthStateChanged(auth, u => setUser(u));
   }, []);
+
+  // CAPACITOR NATIVE HANDLERS (BACK BUTTON & STATUS BAR)
+  useEffect(() => {
+    // Make status bar transparent/dark
+    const configureNativeUI = async () => {
+        try {
+            await StatusBar.setStyle({ style: Style.Dark });
+            await StatusBar.setOverlaysWebView({ overlay: true });
+        } catch (e) {
+            // Not running in capacitor
+        }
+    };
+    configureNativeUI();
+
+    // Handle Hardware Back Button
+    const backListener = CapApp.addListener('backButton', (data) => {
+        if (isSettingsOpen) {
+            setIsSettingsOpen(false);
+        } else if (isFeedbackOpen) {
+            setIsFeedbackOpen(false);
+        } else if (isYouTubeOpen && !isPlayerMinimized) {
+            // Minimize player instead of closing app
+            setIsPlayerMinimized(true);
+        } else if (isConnected) {
+            // Optional: Confirm exit or background app?
+            // For now, let's just background it to keep the session alive
+            CapApp.minimizeApp(); 
+        } else {
+            // Exit app
+            CapApp.exitApp();
+        }
+    });
+
+    return () => {
+        backListener.then(h => h.remove());
+    };
+  }, [isSettingsOpen, isFeedbackOpen, isYouTubeOpen, isPlayerMinimized, isConnected]);
+
 
   // Compute current configuration object to compare with active session
   const currentConfig = useMemo(() => ({
