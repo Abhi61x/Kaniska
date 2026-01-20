@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
 // Internal API Keys
@@ -5,13 +6,13 @@ const WEATHER_API_KEY = "a9d473331d424f9699a82612250812"; // WeatherAPI.com
 const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 
 // Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
-// FIX: Cast import.meta to any to avoid "Property 'env' does not exist on type 'ImportMeta'" error.
+// This is secure because it's bundled at build time and not exposed in the source code directly.
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
   keyType: string;
-  constructor(message, keyType) {
+  constructor(message: string, keyType: string) {
     super(message);
     this.name = 'ApiKeyError';
     this.keyType = keyType;
@@ -21,7 +22,7 @@ export class ApiKeyError extends Error {
 
 // A custom error for the main, environment-set API key which the user cannot fix.
 export class MainApiKeyError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'MainApiKeyError';
     Object.setPrototypeOf(this, MainApiKeyError.prototype);
@@ -30,7 +31,7 @@ export class MainApiKeyError extends Error {
 
 // A custom error class for rate limit/quota issues.
 export class RateLimitError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'RateLimitError';
     Object.setPrototypeOf(this, RateLimitError.prototype);
@@ -39,7 +40,7 @@ export class RateLimitError extends Error {
 
 // A custom error class for general service-side issues (e.g., 5xx errors).
 export class ServiceError extends Error {
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = 'ServiceError';
     Object.setPrototypeOf(this, ServiceError.prototype);
@@ -48,14 +49,9 @@ export class ServiceError extends Error {
 
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const VALID_EMOTIONS = ['neutral', 'happy', 'sad', 'excited', 'empathetic', 'singing', 'formal', 'chirpy', 'surprised', 'curious', 'thoughtful', 'joking'];
-
-// --- Cashfree Configuration ---
-const CASHFREE_APP_ID = "1101869ed2c0377169521b1819d9681011";
-const CASHFREE_SECRET_KEY = "cfsk_ma_prod_2385fe07d4c1aab3e55ebc75d8e9fe76_de8436d3";
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
-function handleGeminiError(error, context = 'processing your request') {
+function handleGeminiError(error: any, context = 'processing your request') {
     console.error(`Error calling the Gemini API during ${context}:`, error);
     const errorMessage = (error.message || error.toString() || '').toLowerCase();
 
@@ -221,7 +217,7 @@ export const getWeatherTool: FunctionDeclaration = {
     },
 };
 
-export function speakWithBrowser(text, lang = 'hi-IN') {
+export function speakWithBrowser(text: string, lang = 'hi-IN') {
     return new Promise((resolve, reject) => {
         if (!window.speechSynthesis) return resolve(false);
         
@@ -253,7 +249,7 @@ export function speakWithBrowser(text, lang = 'hi-IN') {
     });
 }
 
-export async function connectLiveSession(callbacks, config) {
+export async function connectLiveSession(callbacks: any, config: any) {
     const { 
         customInstructions, 
         coreProtocol,
@@ -330,7 +326,7 @@ export async function connectLiveSession(callbacks, config) {
             callbacks,
             config: sessionConfig
         });
-    } catch (e) {
+    } catch (e: any) {
         const msg = e.toString().toLowerCase();
         if (msg.includes('network') || msg.includes('fetch')) {
             throw new Error("Connection failed. Check network.");
@@ -339,7 +335,7 @@ export async function connectLiveSession(callbacks, config) {
     }
 }
 
-export async function processUserCommand(history, systemInstruction, temperature, emotionTuning, apiKey = null) {
+export async function processUserCommand(history: any[], systemInstruction: string, temperature: number, emotionTuning: any, apiKey: string | null = null) {
   // Simplified for brevity, same logic as before
   const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
   const contents = history.map(msg => ({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }));
@@ -354,7 +350,7 @@ export async function processUserCommand(history, systemInstruction, temperature
 }
 
 // ... Keep existing exports (fetchWeatherSummary, fetchNews, etc.) exactly as they were ...
-export async function fetchWeatherSummary(location) {
+export async function fetchWeatherSummary(location: string) {
     const apiKey = WEATHER_API_KEY; 
     const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(location)}`;
     const res = await fetch(url);
@@ -363,15 +359,15 @@ export async function fetchWeatherSummary(location) {
     return `It is ${data.current.temp_c}°C in ${data.location.name}.`;
 }
 
-export async function fetchNews(apiKey, query) {
+export async function fetchNews(apiKey: string | null, query: string) {
     const url = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_API_KEY}&q=${encodeURIComponent(query)}&language=en`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("News error");
     const data = await res.json();
-    return data.results ? data.results.slice(0,3).map(a => a.title).join(". ") : "No news.";
+    return data.results ? data.results.slice(0,3).map((a: any) => a.title).join(". ") : "No news.";
 }
 
-export async function searchYouTube(userApiKey, query) {
+export async function searchYouTube(userApiKey: string, query: string) {
     // Prioritize Environment Key if user key is empty
     const apiKey = userApiKey || ENV_YOUTUBE_KEY;
 
@@ -382,7 +378,7 @@ export async function searchYouTube(userApiKey, query) {
     return data.items?.[0] ? { videoId: data.items[0].id.videoId, title: data.items[0].snippet.title, channelTitle: data.items[0].snippet.channelTitle } : null;
 }
 
-export async function generateSpeech(text, voiceName, apiKey) {
+export async function generateSpeech(text: string, voiceName: string, apiKey: string) {
     const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
     return await client.models.generateContentStream({
         model: "gemini-2.5-flash-preview-tts",
@@ -391,8 +387,8 @@ export async function generateSpeech(text, voiceName, apiKey) {
     });
 }
 
-export async function validateYouTubeKey(k) { return { success: !!k }; }
-export async function validateAuddioKey(k) { return { success: !!k }; }
+export async function validateYouTubeKey(k: string) { return { success: !!k }; }
+export async function validateAuddioKey(k: string) { return { success: !!k }; }
 export async function createCashfreeOrder(planId: string, amount: number, customerId: string, customerPhone: string, customerEmail: string) { return "mock_session"; } // Mocked
 export async function processCodeCommand() { return {}; }
 export async function getSupportResponse() { return ""; }

@@ -44,6 +44,7 @@ const SearchIcon = ({ className }: any) => h('svg', { className, xmlns: "http://
 const ThumbsUpIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" }));
 const ThumbsDownIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" }));
 const YouTubeIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" }));
+const LockIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }), h('path', { d: "M7 11V7a5 5 0 0 1 10 0v4" }));
 
 const getInitialState = (key: string, defaultValue: any) => {
     try {
@@ -466,11 +467,27 @@ const CollapsibleSection = ({ title, description, icon, children, defaultOpen = 
     );
 };
 
-const ApiKeysTab = ({ apiKeys, setApiKeys, t }: any) => {
+const ApiKeysTab = ({ apiKeys, setApiKeys, t, isLocked, onUpgrade }: any) => {
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
     // FIX: Typed validationStatus to allow string keys
     const [validationStatus, setValidationStatus] = React.useState<Record<string, any>>({});
     const [isValidating, setIsValidating] = React.useState(false);
+
+    if (isLocked) {
+        return h('div', { className: "flex flex-col items-center justify-center h-full py-12 animate-fade-in" },
+            h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-sm w-full text-center relative overflow-hidden" },
+                h('div', { className: "w-20 h-20 bg-gray-800 rounded-full mx-auto mb-6 flex items-center justify-center border border-gray-700" },
+                    h(LockIcon, { className: "w-10 h-10 text-gray-500" })
+                ),
+                h('h3', { className: "text-xl font-bold text-white mb-2" }, "Feature Locked"),
+                h('p', { className: "text-gray-400 text-sm mb-6" }, "Custom API Key configuration is available only for Premium users."),
+                h('button', {
+                    onClick: onUpgrade,
+                    className: "w-full py-3 bg-gradient-to-r from-yellow-600 to-yellow-500 text-black font-bold rounded-xl shadow-lg hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                }, "Upgrade Your Plan")
+            )
+        );
+    }
 
     const handleSaveKeys = async () => {
         setIsValidating(true);
@@ -905,7 +922,13 @@ const SettingsModal = ({
                     )
                 );
              case 'apiKeys':
-                 return h(ApiKeysTab, { apiKeys, setApiKeys, t });
+                 return h(ApiKeysTab, { 
+                     apiKeys, 
+                     setApiKeys, 
+                     t, 
+                     isLocked: subscriptionPlan === 'free', // Lock for free users
+                     onUpgrade: () => setActiveTab('subscription') 
+                 });
              case 'contact':
                 return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in" },
                     h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-md w-full text-center" },
