@@ -409,16 +409,23 @@ export const App = () => {
             setStatus('live');
             if (connectionSound) new Audio(connectionSound).play().catch(() => {});
             
+            // CRITICAL FIX: Capture refs in local variables to avoid race conditions/null errors
+            const ctx = inputAudioContextRef.current;
+            const activeStream = audioStreamRef.current;
+
             // Safety check for AudioContext and stream presence
-            if (!inputAudioContextRef.current || !audioStreamRef.current) {
-                console.error("Audio Context or Stream is missing in onopen");
+            if (!ctx || !activeStream) {
+                console.error("Audio Context or Stream is missing in onopen (Captured)");
+                // Force cleanup if something is wrong
+                cleanupMedia();
+                setStatus('error');
                 return;
             }
 
             try {
-                // USE PRE-ACQUIRED STREAM
-                audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(audioStreamRef.current);
-                scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
+                // USE LOCAL VARIABLES 'ctx' and 'activeStream'
+                audioSourceRef.current = ctx.createMediaStreamSource(activeStream);
+                scriptProcessorRef.current = ctx.createScriptProcessor(4096, 1, 1);
                 
                 scriptProcessorRef.current.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
@@ -430,12 +437,13 @@ export const App = () => {
                 };
                 
                 audioSourceRef.current.connect(scriptProcessorRef.current);
-                scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
+                scriptProcessorRef.current.connect(ctx.destination);
                 if (isCameraOn) startVideoTransmission();
 
             } catch (err) {
                 console.error("Audio Setup Error", err);
                 setStatus('error');
+                cleanupMedia(); // Cleanup on error
             }
         },
         onmessage: async (msg) => {
