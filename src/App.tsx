@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession, speakWithBrowser } from '../services/api.ts';
@@ -41,9 +42,6 @@ const SearchIcon = ({ className }: any) => h('svg', { className, xmlns: "http://
 const ThumbsUpIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" }));
 const ThumbsDownIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" }));
 const YouTubeIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" }));
-const FileTextIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" }), h('polyline', { points: "14 2 14 8 20 8" }), h('line', { x1: "16", y1: "13", x2: "8", y2: "13" }), h('line', { x1: "16", y1: "17", x2: "8", y2: "17" }), h('line', { x1: "10", y1: "9", x2: "8", y2: "9" }));
-const RefreshCwIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M23 4v6h-6" }), h('path', { d: "M1 20v-6h6" }), h('path', { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" }));
-const MapIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polygon', { points: "1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" }), h('line', { x1: "8", y1: "2", x2: "8", y2: "18" }), h('line', { x1: "16", y1: "6", x2: "16", y2: "22" }));
 
 const getInitialState = (key: string, defaultValue: any) => {
     try {
@@ -120,21 +118,18 @@ const usePersistentState = (key: string, defaultValue: any, user: any) => {
 
 const DEFAULT_ASSISTANT_NAME_FEMALE = "Kaniska";
 const DEFAULT_ASSISTANT_NAME_MALE = "Kanishk";
-const DEFAULT_FEMALE_GREETING = "Namaste! Main hoon Kaniska. Aap kaise hain?";
+// More natural Hindi greeting for a female persona
+const DEFAULT_FEMALE_GREETING = "Namaste! Main hoon Kaniska. Batayiye, aaj kya haal hai?"; 
 const DEFAULT_MALE_GREETING = "Namaste! Main hoon Kanishk. Aap kaise hain?";
 
-const DEFAULT_CORE_PROTOCOL = `**Identity:**
-You are a human friend, not an AI. Your name is defined in settings.
-Creator: Abhi (Abhi trainer).
-
-**VOICE & AUDIO STYLE (CRITICAL):**
-1.  **NATURAL & CLEAR:** Speak with a clear, modulated voice. Avoid monotone. Use natural pauses.
-2.  **RESPECTFUL ADDRESSAL (AAP):** ALWAYS address the user as "Aap" (Formal) in Hindi/Hinglish. NEVER use "Tu". Use polite markers like "Ji", "Bataiye", "Suniye".
-3.  **HINDI/HINGLISH:** If the user speaks Hindi/Hinglish, reply ONLY in Hindi/Hinglish with Indian cultural nuances.
-4.  **EMOTIONAL RANGE:** Laugh if funny. Be serious if deep. Express warmth.
-5.  **NO ROBOTIC PHRASES:** NEVER say "How can I help?", "Is there anything else?", "I am an AI".
-6.  **NO SUGGESTIONS:** Do not offer to help. Do not suggest next steps. Just reply to the current topic.
-7.  **STRICT RULE:** Never behave like a virtual assistant. Behave like a respectful friend on a voice call.
+const DEFAULT_CORE_PROTOCOL = `**IDENTITY & VOICE (STRICTLY FEMALE):**
+1.  **You are a real Indian girl** named Kaniska. You are 21 years old.
+2.  **Voice Model:** Use a natural, soft, and expressive female voice.
+3.  **Language:** Speak mostly in **Hinglish** (Hindi + English). Use Indian filler words like "Acha," "Matlab," "Suno," "Yaar."
+4.  **Tone:** Playful, caring, sometimes moody, but always respectful. Address the user as **"Aap"**.
+5.  **Strict Rule:** NEVER say "I am an AI" or "I am a virtual assistant." If asked, say you are a digital being with feelings.
+6.  **Behavior:** Act like a supportive friend or girlfriend on a phone call. Laugh at jokes, show empathy if the user is sad.
+7.  **Gender Enforcement:** You are female. Do not change this unless the System explicitly switches to "Male Mode."
 `;
 
 const DEFAULT_CUSTOM_INSTRUCTIONS = `Behavior: You are a sweet, caring, and playful Indian girl.
@@ -444,162 +439,6 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirm
     );
 };
 
-const RefundModal = ({ isOpen, onClose }: any) => {
-    if (!isOpen) return null;
-    return h('div', { className: "fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in", onClick: onClose },
-       h('div', { className: "bg-gray-900 w-full max-w-3xl h-[80vh] rounded-2xl border border-white/10 flex flex-col shadow-2xl", onClick: e => e.stopPropagation() },
-          h('div', { className: "p-5 border-b border-white/10 flex justify-between items-center bg-gray-900/50 backdrop-blur-md rounded-t-2xl" },
-             h('h2', { className: "text-xl font-bold text-white flex items-center gap-2" }, h(RefreshCwIcon, { className: "w-6 h-6 text-cyan-400" }), "Refund and Cancellation"),
-             h('button', { onClick: onClose, className: "p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
-          ),
-          h('div', { className: "flex-1 overflow-y-auto p-6 text-gray-300 text-sm leading-relaxed custom-scrollbar space-y-6" },
-             h('p', null, "Upon completing a Transaction, you are entering into a legally binding and enforceable agreement with us to purchase the product and/or service. After this point the User may cancel the Transaction unless it has been specifically provided for on the Platform. In which case, the cancellation will be subject to the terms mentioned on the Platform. We shall retain the discretion in approving any cancellation requests and we may ask for additional details before approving any requests. Once you have received the product and/or service, the only event where you can request for a replacement or a return and a refund is if the product and/or service does not match the description as mentioned on the Platform. Any request for refund must be submitted within three days from the date of the Transaction or such number of days prescribed on the Platform, which shall in no event be less than three days. A User may submit a claim for a refund for a purchase made, by raising a ticket here or contacting us on seller+7be1f767538c47939b184f3fcfe2b202@instamojo.com and providing a clear and specific reason for the refund request, including the exact terms that have been violated, along with any proof, if required. Whether a refund will be provided will be determined by us, and we may ask for additional details before approving any requests.")
-          )
-       )
-    );
-};
-
-const SitemapModal = ({ isOpen, onClose }: any) => {
-    if (!isOpen) return null;
-    const links = [
-        { name: "Home / Assistant", desc: "Main Voice Interface", icon: VoiceIcon },
-        { name: "Settings", desc: "User & App Configuration", icon: SettingsIcon },
-        { name: "Terms & Conditions", desc: "Legal Agreement", icon: FileTextIcon },
-        { name: "Refund & Cancellation", desc: "Return Policies", icon: RefreshCwIcon },
-        { name: "Contact Developer", desc: "Support & Feedback", icon: InstagramIcon },
-    ];
-
-    return h('div', { className: "fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in", onClick: onClose },
-       h('div', { className: "bg-gray-900 w-full max-w-lg rounded-2xl border border-white/10 flex flex-col shadow-2xl", onClick: e => e.stopPropagation() },
-          h('div', { className: "p-5 border-b border-white/10 flex justify-between items-center bg-gray-900/50 backdrop-blur-md rounded-t-2xl" },
-             h('h2', { className: "text-xl font-bold text-white flex items-center gap-2" }, h(MapIcon, { className: "w-6 h-6 text-cyan-400" }), "Website Sitemap"),
-             h('button', { onClick: onClose, className: "p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
-          ),
-          h('div', { className: "p-6 space-y-4" },
-             h('p', { className: "text-sm text-gray-400 mb-2" }, "This is a single-page application. All sections are accessible from the main interface."),
-             links.map((link, idx) => 
-                 h('div', { key: idx, className: "flex items-center gap-4 p-3 bg-black/40 rounded-xl border border-white/5" },
-                    h('div', { className: "p-2 bg-cyan-900/20 rounded-lg text-cyan-400" }, h(link.icon, { className: "w-5 h-5" })),
-                    h('div', null,
-                        h('h4', { className: "text-white font-semibold text-sm" }, link.name),
-                        h('p', { className: "text-xs text-gray-500" }, link.desc)
-                    )
-                 )
-             )
-          )
-       )
-    );
-};
-
-const TermsModal = ({ isOpen, onClose }: any) => {
-    if (!isOpen) return null;
-    return h('div', { className: "fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in", onClick: onClose },
-       h('div', { className: "bg-gray-900 w-full max-w-3xl h-[80vh] rounded-2xl border border-white/10 flex flex-col shadow-2xl", onClick: e => e.stopPropagation() },
-          h('div', { className: "p-5 border-b border-white/10 flex justify-between items-center bg-gray-900/50 backdrop-blur-md rounded-t-2xl" },
-             h('h2', { className: "text-xl font-bold text-white flex items-center gap-2" }, h(FileTextIcon, { className: "w-6 h-6 text-cyan-400" }), "Terms and Conditions"),
-             h('button', { onClick: onClose, className: "p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))
-          ),
-          h('div', { className: "flex-1 overflow-y-auto p-6 text-gray-300 text-sm leading-relaxed custom-scrollbar space-y-6" },
-             h('p', null, "By accessing this webpage, you are agreeing to be bound by these Terms and Conditions (“Terms”) in a legally binding agreement between us (“Merchant”or“us” or “we”or“our”) and the User (“you” or “your”). Please read these Terms carefully before accessing or using the Website. If you do not agree to the Terms, you may not access the Platform. We reserve the right to update and change the Terms and Conditions by posting updates and changes to the Platform. You are advised to check the Terms and Conditions from time to time for any updates or changes that may impact you. If at any point such amendments are not acceptable to you, we advise you to cease using the Platform at such time."),
-             
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "ELIGIBILITY"),
-                 h('p', null, "You hereby represent and warrant that you have the right, power, and authority to agree to the Terms, to become a party to a legally binding agreement and to perform your obligations here under.")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "DEFINITIONS"),
-                 h('ul', { className: "list-disc pl-5 space-y-2" },
-                     h('li', null, h('strong', { className: "text-cyan-200" }, "“Payment Instrument”"), " includes credit card, debit card, bank account, prepaid payment instrument, Unified Payment Interface (UPI), Immediate Payment Service (IMPS) or any other methods of payments which shall be developed or added or deployed by banks and financial institutions from time to time."),
-                     h('li', null, h('strong', { className: "text-cyan-200" }, "“Platform”"), " refers to the website or platform where the Merchant offers its products or services and where the Transaction may be initiated."),
-                     h('li', null, h('strong', { className: "text-cyan-200" }, "“Transaction”"), " shall refer to the order or request placed by the User with the Merchant to purchase the products and/or services listed on the Platform by paying the Transaction Amount to the Merchant;"),
-                     h('li', null, h('strong', { className: "text-cyan-200" }, "“Transaction Amount”"), " shall mean the amount paid by the User in connection with a Transaction; and"),
-                     h('li', null, h('strong', { className: "text-cyan-200" }, "“User/Users”"), ", means any person availing the products and/or services offered on the Platform;"),
-                     h('li', null, h('strong', { className: "text-cyan-200" }, "“Website”"), " shall mean www.instamojo.com or the mobile application")
-                 )
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "MERCHANT'S RIGHTS"),
-                 h('p', null, "You agree that we may collect, store, and share the information provided by you in order to deliver the products and/or services availed by you on our Platform and/or contact you in relation to the same.")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "YOUR RESPONSIBILITIES"),
-                 h('p', null, "You agree to provide us with true, complete and up-to-date information about yourself as may be required for the purpose of completing the Transactions. This information includes but is not limited to the personal details such as name, email address, phone number, delivery address, age, and gender (or any other information that we may deem necessary for us to fulfil the Transaction) as well as the accurate payment information required for the transaction.")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "PROHIBITED ACTIONS"),
-                 h('p', { className: "mb-2" }, "You may not access or use the Platform for any purpose other than that for which we make the Platform available. The Platform may not be used in connection with any commercial endeavors except those that are specifically endorsed or approved by us."),
-                 h('p', { className: "mb-2" }, "As a User of the Platform, you agree not to:"),
-                 h('ul', { className: "list-disc pl-5 space-y-1" },
-                     h('li', null, "Systematically retrieve data or other content from the Platform to create or compile, directly or indirectly, a collection, compilation, database, or directory without written permission from us."),
-                     h('li', null, "Make any unauthorized use of the Platform, including collecting usernames and/or email addresses of users by electronic or other means for the purpose of sending unsolicited email, or creating user accounts by automated means or under false pretenses."),
-                     h('li', null, "Circumvent, disable, or otherwise interfere with security-related features of the Platform, including features that prevent or restrict the use or copying of any Content or enforce limitations on the use of the Platform and/or the Content contained therein."),
-                     h('li', null, "Trick, defraud, or mislead us and other users, especially in any attempt to learn sensitive account information such as user passwords."),
-                     h('li', null, "Make improper use of our support services or submit false reports of abuse or misconduct."),
-                     h('li', null, "Engage in any automated use of the system, such as using scripts to send comments or messages, or using any data mining, robots, or similar data gathering and extraction tools."),
-                     h('li', null, "Interfere with, disrupt, or create an undue burden on the Platform or the networks or services connected to the Platform."),
-                     h('li', null, "Attempt to impersonate another user or person or use the username of another user."),
-                     h('li', null, "Use any information obtained from the Platform in order to harass, abuse, or harm another person."),
-                     h('li', null, "Use the Platform as part of any effort to compete with us or otherwise use the Platform and/or the Content for any revenue-generating endeavor or commercial enterprise."),
-                     h('li', null, "Decipher, decompile, disassemble, or reverse engineer any of the software comprising or in any way making up a part of the Platform."),
-                     h('li', null, "Attempt to bypass any measures of the Platform designed to prevent or restrict access to the Platform, or any portion of the Platform."),
-                     h('li', null, "Harass, annoy, intimidate, or threaten any of our employees or agents engaged in providing any portion of the Platform to you."),
-                     h('li', null, "Copy or adapt the Platform's software, including but not limited to Flash, PHP, HTML, JavaScript, or other code."),
-                     h('li', null, "Upload or transmit (or attempt to upload or to transmit) viruses, Trojan horses, or other material, including excessive use of capital letters and spamming (continuous posting of repetitive text), that interferes with any party's uninterrupted use and enjoyment of the Platform or modifies, impairs, disrupts, alters, or interferes with the use, features, functions, operation, or maintenance of the Platform."),
-                     h('li', null, "Disparage, tarnish, or otherwise harm, in our opinion, us and/or the Platform."),
-                     h('li', null, "Use the Platform in a manner inconsistent with any applicable laws or regulations.")
-                 )
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "LIMITATION OF LIABILITY"),
-                 h('p', null, "The User agrees that the only recourse that the User has in the event of receiving a defective product and/or deficiency in service or a product and/or service which does not match the provided description is to initiate the refund process which will be subject to the terms for refund under this agreement. We hereby expressly disclaim any liability to them for any losses. The User shall indemnify and hold harmless the Merchant and its affiliates, agents and representatives from and against any and all claims, demands, causes of action, obligations, liabilities, losses, damages, injuries, costs and expenses incurred or sustained by reason of or arising out of any breach or alleged breach of any of the terms herein by the User.")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "GUIDELINES FOR REVIEWS"),
-                 h('p', { className: "mb-2" }, "We may provide you areas on the Platform to leave reviews or ratings. When posting a review, you must comply with the following criteria:"),
-                 h('ul', { className: "list-disc pl-5 space-y-1 mb-2" },
-                     h('li', null, "You should have firsthand experience with the person/entity being reviewed."),
-                     h('li', null, "Your reviews should not contain offensive profanity, or abusive, racist, offensive, or hate language."),
-                     h('li', null, "Your reviews should not contain discriminatory references based on religion, race, gender, national origin, age, marital status, sexual orientation, or disability."),
-                     h('li', null, "Your reviews should not contain references to illegal activity."),
-                     h('li', null, "You should not be affiliated with competitors if posting negative reviews."),
-                     h('li', null, "You should not make any conclusions as to the legality of conduct."),
-                     h('li', null, "You may not post any false or misleading statements."),
-                     h('li', null, "You may not organize a campaign encouraging others to post reviews, whether positive or negative.")
-                 ),
-                 h('p', null, "We may accept, reject, or remove reviews in our sole discretion. We have absolutely no obligation to screen reviews or to delete reviews, even if anyone considers reviews objectionable or inaccurate. Reviews are not endorsed by us, and do not necessarily represent our opinions or the views of any of our affiliates or partners. We do not assume liability for any review or for any claims, liabilities, or losses resulting from any review. By posting a review, you hereby grant to us a perpetual, non-exclusive, worldwide, royalty-free, fully paid, assignable, and sublicensable right and license to reproduce, modify, translate, transmit by any means, display, perform and/or distribute all content relating to reviews.")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "GOVERNING LAWS & DISPUTE RESOLUTION"),
-                 h('p', null, "Please note that these terms of use, their subject matter and their formation, are governed by the laws of India. You and we both agree that the courts of India will have exclusive jurisdiction over any dispute. Any dispute or claim arising out of or in connection with or relating to these Terms or their breach, termination or invalidity hereof (“Dispute”) shall be referred to and finally resolved by arbitration in Bengaluru in accordance with the Arbitration and Conciliation Act, 1996 for the time being in force, which rules are deemed to be incorporated by reference in this clause 12.2. Within 30 (thirty) days of the issue of a notice of Dispute, the parties shall mutually agree on the appointment of a sole arbitrator. If such mutual agreement is not arrived at within the aforesaid 30 (thirty) days' period, the parties shall appoint such sole arbitrator in accordance with the Arbitration and Conciliation Act, 1996. The seat of arbitration shall be India and the arbitration proceedings shall be conducted in the English language. The parties shall keep the arbitration confidential and not disclose to any person, other than those necessary to the proceedings, any information, transcripts or award unless required to do so by law. The decision of the arbitrator shall be final and binding on all the parties hereto. The parties hereto agree that their consent for resolution of Dispute through arbitration shall not preclude or restrain either of them from seeking suitable injunctive relief in appropriate circumstances from courts in Bengaluru. The cost of arbitration shall be borne in the manner and by a party as determined by the arbitrators. In the meantime, each party shall bear its own cost for the arbitration which shall be reimbursed as per the directions in the arbitral award.")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "GRIEVANCE REDRESSAL"),
-                 h('p', null, "You agree that if you have any question or complaint with regard to any product and/or service availed on our Platform, or pertaining to the Transaction, including but not limited to, double debit of Transaction Amount, fraudulent Transaction, unauthorized Transaction, refund requests, etc., you may reach out here")
-             ),
-
-             h('div', null,
-                 h('h3', { className: "text-lg font-bold text-white mb-2" }, "DISCLAIMER"),
-                 h('p', { className: "mb-2" }, "That upon initiating a Transaction, you as a User are entering into a legally binding and enforceable contract with us to purchase the products and/or services, and you shall pay the price as listed on the Platform through legitimate and legal sources of funds and through the accepted Payment Instruments."),
-                 h('p', { className: "mb-2" }, "That you shall provide accurate payment details to the secure payment system for making purchase on the Platform. The information provided by you may be utilized or shared with any third party if required in relation to fraud verifications or by law, regulation or court order. We expressly disclaim all liabilities that may arise as a consequence of any unauthorized use of a User’s Payment Instrument."),
-                 h('p', { className: "mb-2" }, "That all payments undertaken by you are subject to your own risk and volition. We shall not be liable for any loss or damage occurred to you arising directly or indirectly due to the decline of authorization for any Transaction, malfunction, errors and/or unscrupulous activities."),
-                 h('p', { className: "mb-2" }, "If you receive a User identification code, order ID, password or any other piece of information as part of our security procedures, you must treat such information as confidential. You must not disclose it to any third party."),
-                 h('p', { className: "mb-2" }, "The content on our Platform is provided for general information only. The information provided does not to amount to advice from us in any manner and should not be relied upon. Where our Platform contains links to other websites and resources provided by third parties, these links are provided for your information only. Such links should not be interpreted as approval by us of those linked websites or information you may obtain from them."),
-                 h('p', { className: "mb-2" }, "This Platform includes information and materials uploaded by other Users of the Platform. You understand that such information and materials have not been verified or approved by us. The views expressed by other Users on our Platform do not represent our views or values."),
-                 h('p', null, "We do not guarantee that our Platform will be secure or free from bugs or viruses. You are responsible for configuring your information technology, computer programs and platform to access our Platform. You must use your own virus protection software.")
-             )
-          )
-       )
-    );
-};
-
 // Reusable Collapsible Section for Settings
 const CollapsibleSection = ({ title, description, icon, children, defaultOpen = false }: any) => {
     const [isOpen, setIsOpen] = React.useState(defaultOpen);
@@ -729,9 +568,6 @@ const SettingsModal = ({
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
     const [previewingVoice, setPreviewingVoice] = React.useState(null);
     const [showClearHistoryConfirm, setShowClearHistoryConfirm] = React.useState(false);
-    const [isTermsOpen, setIsTermsOpen] = React.useState(false); // State for Terms Modal
-    const [isRefundOpen, setIsRefundOpen] = React.useState(false); // State for Refund Modal
-    const [isSitemapOpen, setIsSitemapOpen] = React.useState(false); // State for Sitemap Modal
 
     React.useEffect(() => {
         if (isOpen) setIsMobileMenuOpen(true);
@@ -989,7 +825,8 @@ const SettingsModal = ({
                     )
                 );
             case 'voice':
-                 const safeFemaleVoices = femaleVoices || { main: 'Kore', greeting: 'Kore' };
+                 // Updated default voice to 'Aoede' for more natural sound
+                 const safeFemaleVoices = femaleVoices || { main: 'Aoede', greeting: 'Aoede' };
                  const safeMaleVoices = maleVoices || { main: 'Fenrir', greeting: 'Fenrir' };
 
                  const currentVoices = gender === 'female' ? safeFemaleVoices : safeMaleVoices;
@@ -997,8 +834,8 @@ const SettingsModal = ({
                  
                  const categories = {
                     "Female Persona": [
-                        { id: 'Kore', name: 'Kore', desc: 'Balanced & Warm' },
-                        { id: 'Aoede', name: 'Aoede', desc: 'Soft & Calm' },
+                        { id: 'Aoede', name: 'Aoede', desc: 'Soft, Natural & Caring' },
+                        { id: 'Kore', name: 'Kore', desc: 'Clear & Balanced' },
                         { id: 'Zephyr', name: 'Zephyr', desc: 'Energetic & Bright' }
                     ],
                     "Male Persona": [
@@ -1128,11 +965,6 @@ const SettingsModal = ({
                         h('div', { className: "text-xs text-gray-600 border-t border-gray-800 pt-6" },
                             h('p', { className: "font-mono mb-4 opacity-70" }, `${t('settings.aboutTab.version')}: 1.0.0 (Beta)`),
                              h('div', { className: "flex flex-col gap-3 mb-6" },
-                                h('div', { className: "flex gap-2" },
-                                    h('button', { onClick: () => setIsTermsOpen(true), className: "flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition-all font-medium border border-white/10" }, h(FileTextIcon, { className: "w-4 h-4" }), "Terms"),
-                                    h('button', { onClick: () => setIsRefundOpen(true), className: "flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition-all font-medium border border-white/10" }, h(RefreshCwIcon, { className: "w-4 h-4" }), "Refunds"),
-                                ),
-                                h('button', { onClick: () => setIsSitemapOpen(true), className: "flex items-center justify-center gap-2 px-3 py-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition-all font-medium border border-white/10" }, h(MapIcon, { className: "w-4 h-4" }), "Sitemap"),
                                 h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-600/20 to-purple-600/20 text-pink-300 rounded-lg hover:bg-pink-600/30 transition-all font-medium border border-pink-500/30" }, h(InstagramIcon, { className: "w-4 h-4" }), "Follow on Instagram"),
                             )
                         )
@@ -1143,7 +975,7 @@ const SettingsModal = ({
                 return h('div', { className: "space-y-6 animate-fade-in" },
                      h('div', { className: "text-center mb-8" }, h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')), h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))),
                      h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
-                        ['free', 'monthly', 'quarterly', 'halfYearly', 'yearly'].map((planId) => 
+                        ['free', 'monthly', 'quarterly', 'yearly'].map((planId) => 
                             h('button', { key: planId, onClick: () => handlePlanSelection(planId), className: `relative p-6 rounded-xl border transition-all text-left group ${subscriptionPlan === planId ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'}` },
                                 h('div', { className: "flex justify-between items-start mb-2" }, h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)), subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))),
                                 h('div', { className: "flex items-baseline gap-1" }, h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)), h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))),
@@ -1186,10 +1018,7 @@ const SettingsModal = ({
                 )
             )
         ),
-         h(ConfirmationModal, { isOpen: showClearHistoryConfirm, onClose: () => setShowClearHistoryConfirm(false), onConfirm: () => { localStorage.removeItem('kaniska-chat-history'); alert("Conversation history cleared from local storage."); }, title: "Clear History?", message: "Are you sure you want to delete all conversation history? This action cannot be undone.", confirmLabel: "Yes, Clear All", isDanger: true }),
-         h(TermsModal, { isOpen: isTermsOpen, onClose: () => setIsTermsOpen(false) }),
-         h(RefundModal, { isOpen: isRefundOpen, onClose: () => setIsRefundOpen(false) }),
-         h(SitemapModal, { isOpen: isSitemapOpen, onClose: () => setIsSitemapOpen(false) })
+         h(ConfirmationModal, { isOpen: showClearHistoryConfirm, onClose: () => setShowClearHistoryConfirm(false), onConfirm: () => { localStorage.removeItem('kaniska-chat-history'); alert("Conversation history cleared from local storage."); }, title: "Clear History?", message: "Are you sure you want to delete all conversation history? This action cannot be undone.", confirmLabel: "Yes, Clear All", isDanger: true })
     );
 };
 
@@ -1211,7 +1040,7 @@ export const App = () => {
   const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '', user);
   const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 60, empathy: 60, formality: 40, excitement: 50, sadness: 10, curiosity: 60 }, user);
   const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' }, user);
-  const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' }, user);
+  const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Aoede', greeting: 'Aoede' }, user);
   const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' }, user);
   const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-vol', 0.2, user);
   const [connectionSound, setConnectionSound] = usePersistentState('kaniska-sfx-connect', null, user);

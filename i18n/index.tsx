@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const en = {
@@ -72,7 +73,12 @@ const en = {
       "usage": "Daily Usage",
       "active": "Active",
       "upgrade": "Upgrade",
-      "plans": { "free": { "name": "Free", "price": "₹0", "duration": "/ forever" }, "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" }, "quarterly": { "name": "Quarterly", "price": "₹200", "duration": "/ 3 months" }, "halfYearly": { "name": "Half-Yearly", "price": "₹350", "duration": "/ 6 months" }, "yearly": { "name": "Yearly", "price": "₹500", "duration": "/ year" } },
+      "plans": { 
+          "free": { "name": "Free", "price": "₹0", "duration": "/ forever" }, 
+          "monthly": { "name": "Monthly", "price": "₹100", "duration": "/ month" }, 
+          "quarterly": { "name": "Quarterly", "price": "₹250", "duration": "/ 3 months" }, 
+          "yearly": { "name": "Yearly", "price": "₹1,000", "duration": "/ year" } 
+      },
       "subscribeButton": "Subscribe Now",
       "featuresTitle": "All plans include:",
       "featureFree": "1 hour of usage per day",
@@ -165,7 +171,12 @@ const hi = {
       "usage": "दैनिक उपयोग",
       "active": "सक्रिय",
       "upgrade": "अपग्रेड",
-      "plans": { "free": { "name": "निःशुल्क", "price": "₹0", "duration": "/ हमेशा के लिए" }, "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" }, "quarterly": { "name": "त्रैमासिक", "price": "₹200", "duration": "/ 3 महीने" }, "halfYearly": { "name": "अर्ध-वार्षिक", "price": "₹350", "duration": "/ 6 महीने" }, "yearly": { "name": "वार्षिक", "price": "₹500", "duration": "/ वर्ष" } },
+      "plans": { 
+          "free": { "name": "निःशुल्क", "price": "₹0", "duration": "/ हमेशा के लिए" }, 
+          "monthly": { "name": "मासिक", "price": "₹100", "duration": "/ माह" }, 
+          "quarterly": { "name": "त्रैमासिक", "price": "₹250", "duration": "/ 3 महीने" }, 
+          "yearly": { "name": "वार्षिक", "price": "₹1,000", "duration": "/ वर्ष" } 
+      },
       "subscribeButton": "अभी सदस्यता लें",
       "featuresTitle": "सभी योजनाओं में शामिल हैं:",
       "featureFree": "प्रति दिन 1 घंटे का उपयोग",
@@ -194,7 +205,7 @@ const hi = {
     },
     "aboutTab": { "title": "कनिष्का के बारे में", "description": "कनिष्का, एक विज्ञान-कथा से प्रेरित महिला वॉयस असिस्टेंट है जो जेमिनी का उपयोग करके हिंदी में कमांड समझने, यूट्यूब पर खोजने और ब्राउज़र के अंतर्निहित टेक्स्ट-टू-स्पीच का उपयोग करके वॉयस रिप्लाई प्रदान करती है।", "version": "संस्करण", "privacyPolicy": "गोपनीयता नीति", "termsOfService": "सेवा की शर्तें", "reportBug": "बग रिपोर्ट करें" },
     "common": { "save": "सहेजें", "saved": "सहेजा गया!", "copy": "कॉपी करें", "copied": "कॉपी किया गया!", "retry": "पुनः प्रयास करें" },
-    "errors": { "micNotAllowed": "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। जारी रखने के लिए कृपया इसे अपनी ब्राउज़र सेटिंग्स में सक्षम करें।", "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई। कृपया पुनः प्रयास करें। यदि यह जारी रहता है, तो पृष्ठ को ताज़ा करने का प्रयास करें।", "speechRecognitionNetwork": "नेटवर्क त्रुटि के कारण वाक् पहचान बाधित हुई। कृपया अपना कनेक्शन जांचें।", "connection": "लाइव कनेक्शन विफल हो गया। कृपया अपना इंटरनेट जांचें और फिर से प्रयास करें। सेवा अस्थायी रूप से अनुपलब्ध हो सकती है।", "youtubePlayback": "मुझे खेद है, लेकिन उस वीडियो को चलाने में एक त्रुटि हुई। यह निजी, हटा दिया गया, या एम्बेड करने से प्रतिबंधित हो सकता है। कृपया एक अलग खोज का प्रयास करें।", "auddioKeyMissing": "गाना पहचानने की सुविधा का उपयोग करने के लिए कृपया सेटिंग्स में अपनी Audd.io API कुंजी सेट करें।", "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डિંગ शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।", "dailyLimit": "जारी रखने के लिए, आपको सदस्यता लेनी होगी। कृपया अपनी योजना अपग्रेड करें।" }
+    "errors": { "micNotAllowed": "माइक्रोफ़ोन एक्सेस की अनुमति नहीं है। जारी रखने के लिए कृपया इसे अपनी ब्राउज़र सेटिंग्स में सक्षम करें।", "speechRecognitionGeneric": "वाक् पहचान में एक अप्रत्याशित त्रुटि हुई। कृपया पुनः प्रयास करें। यदि यह जारी रहता है, तो पृष्ठ को ताज़ा करने का प्रयास करें।", "speechRecognitionNetwork": "नेटवर्क त्रुटि के कारण वाक् पहचान बाधित हुई। कृपया अपना कनेक्शन जांचें।", "connection": "लाइव कनेक्शन विफल हो गया। कृपया अपना इंटरनेट जांचें और फिर से प्रयास करें। सेवा अस्थायी रूप से अनुपलब्ध हो सकती है।", "youtubePlayback": "मुझे खेद है, लेकिन उस वीडियो को चलाने में एक त्रुटि हुई। यह निजी, हटा दिया गया, या एम्बेड करने से प्रतिबंधित हो सकता है। कृपया एक अलग खोज का प्रयास करें।", "auddioKeyMissing": "गाना पहचानने की सुविधा का उपयोग करने के लिए कृपया सेटिंग्स में अपनी Audd.io API कुंजी सेट करें।", "auddioRecording": "मैं गाना पहचानने के लिए रिकॉर्डिंग शुरू नहीं कर सकी। कृपया सुनिश्चित करें कि आपकी ब्राउज़र सेटिंग्स में माइक्रोफ़ोन की अनुमति है और पुनः प्रयास करें।", "dailyLimit": "जारी रखने के लिए, आपको सदस्यता लेनी होगी। कृपया अपनी योजना अपग्रेड करें।" }
   }
 };
 
