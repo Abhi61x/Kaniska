@@ -323,11 +323,27 @@ export async function connectLiveSession(callbacks: any, config: any) {
     };
 
     try {
-        return await client.live.connect({
+        const sessionPromise = client.live.connect({
             model: 'gemini-2.0-flash-exp', 
             callbacks,
             config: sessionConfig
         });
+
+        // Initialize session handling
+        return sessionPromise.then(session => {
+            // Monkey-patch sendRealtimeInput to be safe against closed sockets
+            const originalSend = session.sendRealtimeInput.bind(session);
+            session.sendRealtimeInput = (input: any) => {
+                try {
+                    // Just a try-catch is often enough for the SDK, as checking readyState on the internal socket isn't exposed easily
+                    originalSend(input);
+                } catch (e) {
+                    console.debug("Socket send failed (benign if closing):", e);
+                }
+            };
+            return session;
+        });
+
     } catch (e: any) {
         const msg = e.toString().toLowerCase();
         if (msg.includes('network') || msg.includes('fetch')) {
