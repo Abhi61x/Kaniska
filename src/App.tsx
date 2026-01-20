@@ -10,7 +10,9 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 // Helper for React.createElement to keep code readable
 const h: any = React.createElement;
 
-const FREE_LIMIT_SECONDS = 3600; // 1 hour per month
+// --- LIMIT CONFIGURATION ---
+const FREE_TIME_LIMIT_SECONDS = 600; // 10 Minutes
+const FREE_COMMAND_LIMIT = 10; // 10 Voice Commands (Tool uses)
 
 // --- Icons ---
 const SettingsIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "3" }), h('path', { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" }));
@@ -974,6 +976,20 @@ const SettingsModal = ({
                  // ... keep existing subscription rendering
                 return h('div', { className: "space-y-6 animate-fade-in" },
                      h('div', { className: "text-center mb-8" }, h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')), h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))),
+                     
+                     // Display Free Plan Status
+                     usageData && h('div', { className: "bg-gray-800 p-4 rounded-xl mb-6 border border-gray-700" },
+                        h('h4', { className: "text-sm font-bold text-gray-300 mb-2" }, "Free Plan Usage Today"),
+                        h('div', { className: "flex justify-between text-xs text-gray-400 mb-1" }, h('span', null, "Time Used"), h('span', null, `${Math.floor(usageData.seconds / 60)} / ${FREE_TIME_LIMIT_SECONDS/60} mins`)),
+                        h('div', { className: "w-full bg-gray-700 h-2 rounded-full mb-3" }, 
+                            h('div', { className: `h-full rounded-full ${usageData.seconds >= FREE_TIME_LIMIT_SECONDS ? 'bg-red-500' : 'bg-cyan-500'}`, style: { width: `${Math.min(100, (usageData.seconds / FREE_TIME_LIMIT_SECONDS) * 100)}%`} })
+                        ),
+                        h('div', { className: "flex justify-between text-xs text-gray-400 mb-1" }, h('span', null, "Commands Used"), h('span', null, `${usageData.commands || 0} / ${FREE_COMMAND_LIMIT}`)),
+                        h('div', { className: "w-full bg-gray-700 h-2 rounded-full" }, 
+                            h('div', { className: `h-full rounded-full ${usageData.commands >= FREE_COMMAND_LIMIT ? 'bg-red-500' : 'bg-green-500'}`, style: { width: `${Math.min(100, ((usageData.commands || 0) / FREE_COMMAND_LIMIT) * 100)}%`} })
+                        )
+                     ),
+
                      h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
                         ['free', 'monthly', 'quarterly', 'yearly'].map((planId) => 
                             h('button', { key: planId, onClick: () => handlePlanSelection(planId), className: `relative p-6 rounded-xl border transition-all text-left group ${subscriptionPlan === planId ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'}` },
@@ -1048,8 +1064,9 @@ export const App = () => {
   const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free', user);
   const [useSystemVoice, setUseSystemVoice] = usePersistentState('kaniska-sys-voice', false, user);
   
-  // Usage tracking is persisted, but updating is throttled in useEffect below
-  const [usageData, setUsageData] = usePersistentState('kaniska-usage-data', { seconds: 0, period: new Date().toISOString().slice(0, 7) }, user);
+  // Usage tracking: { seconds: number, commands: number, period: YYYY-MM-DD }
+  // Daily reset logic added
+  const [usageData, setUsageData] = usePersistentState('kaniska-usage-data-daily', { seconds: 0, commands: 0, period: new Date().toISOString().slice(0, 10) }, user);
   
   const [isConnected, setIsConnected] = React.useState(false);
   const [isCameraOn, setIsCameraOn] = React.useState(false);
@@ -1114,11 +1131,11 @@ export const App = () => {
       if (status === 'live') {
           interval = setInterval(() => {
               setUsageData(prev => {
-                  const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
+                  const currentPeriod = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
                   
-                  // Reset if a new month
+                  // Reset if a new day
                   if (prev.period !== currentPeriod) {
-                      return { period: currentPeriod, seconds: 0 };
+                      return { period: currentPeriod, seconds: 0, commands: 0 };
                   }
                   
                   // Increment usage (5 seconds)
@@ -1131,18 +1148,31 @@ export const App = () => {
 
   // Separate effect to enforce limit based on updated usageData
   React.useEffect(() => {
-      if (subscriptionPlan === 'free' && usageData.seconds >= FREE_LIMIT_SECONDS && status === 'live') {
-          cleanupMedia();
-          setIsConnected(false);
-          setStatus('idle');
-          setIsSettingsOpen(true);
-          setActiveTab('subscription');
-          alert("You have reached your monthly free trial limit (1 hour). Please upgrade to continue using Kaniska.");
+      // Free limits logic: 10 mins OR 10 commands per day
+      if (subscriptionPlan === 'free' && status === 'live') {
+          const isTimeLimitReached = usageData.seconds >= FREE_TIME_LIMIT_SECONDS;
+          const isCommandLimitReached = (usageData.commands || 0) >= FREE_COMMAND_LIMIT;
+          
+          if (isTimeLimitReached || isCommandLimitReached) {
+            cleanupMedia();
+            setIsConnected(false);
+            setStatus('idle');
+            setIsSettingsOpen(true);
+            setActiveTab('subscription');
+            alert(`Daily Free Limit Reached.\n\nUsed: ${Math.floor(usageData.seconds / 60)} mins & ${usageData.commands} commands.\n\nPlease Upgrade to continue.`);
+          }
       }
-  }, [usageData.seconds, subscriptionPlan, status]);
+  }, [usageData, subscriptionPlan, status]);
 
   const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
   const handleLogout = () => signOut(auth);
+
+  const incrementCommandCount = () => {
+      setUsageData(prev => ({
+          ...prev,
+          commands: (prev.commands || 0) + 1
+      }));
+  };
 
   const cleanupMedia = () => {
       // Close contexts
@@ -1263,6 +1293,7 @@ export const App = () => {
                 setCurrentVideo(video);
                 setIsYouTubeOpen(true);
                 setIsPlayerMinimized(false);
+                incrementCommandCount(); // Count as usage
             } else {
                 alert("No video found for that query.");
             }
@@ -1281,12 +1312,14 @@ export const App = () => {
     }
 
     // Check Usage Limit before connecting
-    const currentPeriod = new Date().toISOString().slice(0, 7);
-    if (subscriptionPlan === 'free' && usageData.period === currentPeriod && usageData.seconds >= FREE_LIMIT_SECONDS) {
-        setIsSettingsOpen(true);
-        setActiveTab('subscription');
-        alert("Monthly usage limit reached. Please upgrade to continue.");
-        return;
+    const currentPeriod = new Date().toISOString().slice(0, 10);
+    if (subscriptionPlan === 'free' && usageData.period === currentPeriod) {
+        if (usageData.seconds >= FREE_TIME_LIMIT_SECONDS || usageData.commands >= FREE_COMMAND_LIMIT) {
+            setIsSettingsOpen(true);
+            setActiveTab('subscription');
+            alert("Daily free limit reached. Please upgrade to continue.");
+            return;
+        }
     }
     
     // Acquire Wake Lock to keep screen alive
@@ -1408,6 +1441,9 @@ export const App = () => {
              }
              
              if (msg.toolCall?.functionCalls) {
+                 // Increment usage for each tool call
+                 incrementCommandCount();
+
                  const responses = [];
                  for (const call of msg.toolCall.functionCalls) {
                      let result: Record<string, any> = { result: "ok" };

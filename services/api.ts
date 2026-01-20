@@ -1,10 +1,12 @@
-
-
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
 
-// Internal API Keys (Hardcoded as requested)
+// Internal API Keys
 const WEATHER_API_KEY = "a9d473331d424f9699a82612250812"; // WeatherAPI.com
 const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
+
+// Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
+// FIX: Cast import.meta to any to avoid "Property 'env' does not exist on type 'ImportMeta'" error.
+const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -369,7 +371,10 @@ export async function fetchNews(apiKey, query) {
     return data.results ? data.results.slice(0,3).map(a => a.title).join(". ") : "No news.";
 }
 
-export async function searchYouTube(apiKey, query) {
+export async function searchYouTube(userApiKey, query) {
+    // Prioritize Environment Key if user key is empty
+    const apiKey = userApiKey || ENV_YOUTUBE_KEY;
+
     if (!apiKey) throw new ApiKeyError("No YouTube Key", 'youtube');
     const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query)}&type=video&key=${apiKey}`);
     if (!res.ok) return null;

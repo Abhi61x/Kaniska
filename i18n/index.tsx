@@ -1,5 +1,4 @@
 
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const en = {
@@ -81,7 +80,7 @@ const en = {
       },
       "subscribeButton": "Subscribe Now",
       "featuresTitle": "All plans include:",
-      "featureFree": "1 hour of usage per day",
+      "featureFree": "10 minutes or 10 commands per day",
       "feature1": "Higher priority access during peak times",
       "feature2": "Access to advanced and experimental voice models",
       "feature3": "Exclusive avatar packs and visual customizations"
@@ -179,7 +178,7 @@ const hi = {
       },
       "subscribeButton": "अभी सदस्यता लें",
       "featuresTitle": "सभी योजनाओं में शामिल हैं:",
-      "featureFree": "प्रति दिन 1 घंटे का उपयोग",
+      "featureFree": "प्रति दिन 10 मिनट या 10 कमांड",
       "feature1": "व्यस्त समय के दौरान उच्च प्राथमिकता वाली पहुंच",
       "feature2": "उन्नत और प्रायोगिक आवाज मॉडल तक पहुंच",
       "feature3": "विशेष अवतार पैक और दृश्य अनुकूलन"
