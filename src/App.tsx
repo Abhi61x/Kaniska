@@ -182,6 +182,8 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ) {
+  // Safety check: Context might be closed/null if disconnected rapidly
+  if (!ctx) return null;
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
@@ -645,6 +647,7 @@ const SettingsModal = ({
                 if (base64) {
                      const bytes = decode(base64);
                      const buffer = await decodeAudioData(bytes, audioCtx, 24000, 1);
+                     if (!buffer) continue;
                      const source = audioCtx.createBufferSource();
                      source.buffer = buffer;
                      source.connect(audioCtx.destination);
@@ -1518,6 +1521,9 @@ export const App = () => {
                      // Decode raw PCM (16-bit little endian, 24kHz)
                      const buffer = await decodeAudioData(bytes, outputAudioContextRef.current, 24000, 1);
                      
+                     // Safety check: if decoding failed or context closed, do not proceed
+                     if (!buffer || !outputAudioContextRef.current) return;
+
                      const source = outputAudioContextRef.current.createBufferSource();
                      source.buffer = buffer;
                      source.connect(outputAudioContextRef.current.destination);
