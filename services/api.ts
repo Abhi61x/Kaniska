@@ -252,6 +252,23 @@ export function speakWithBrowser(text: string, lang = 'hi-IN') {
     });
 }
 
+// Helper for retrying async operations
+async function retryOperation(operation: () => Promise<any>, retries = 3, delay = 1000): Promise<any> {
+    try {
+        return await operation();
+    } catch (error: any) {
+        if (retries <= 0) throw error;
+        
+        // Don't retry if it's explicitly an API key error
+        if (error instanceof MainApiKeyError) throw error;
+        if (error.message && error.message.includes("API key")) throw error;
+
+        console.warn(`Connection attempt failed. Retrying in ${delay}ms... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return retryOperation(operation, retries - 1, delay * 1.5);
+    }
+}
+
 export async function connectLiveSession(callbacks: any, config: any) {
     const { 
         customInstructions, 
@@ -323,31 +340,33 @@ export async function connectLiveSession(callbacks: any, config: any) {
     };
 
     try {
-        const sessionPromise = client.live.connect({
+        const connectOp = () => client.live.connect({
             model: 'gemini-2.0-flash-exp', 
             callbacks,
             config: sessionConfig
         });
 
-        // Initialize session handling
-        return sessionPromise.then(session => {
-            // Monkey-patch sendRealtimeInput to be safe against closed sockets
-            const originalSend = session.sendRealtimeInput.bind(session);
-            session.sendRealtimeInput = (input: any) => {
-                try {
-                    // Just a try-catch is often enough for the SDK, as checking readyState on the internal socket isn't exposed easily
-                    originalSend(input);
-                } catch (e) {
-                    console.debug("Socket send failed (benign if closing):", e);
-                }
-            };
-            return session;
-        });
+        // Use retry logic
+        const sessionPromise = await retryOperation(connectOp, 2, 1000);
+
+        // Initialize session handling immediately after connection
+        // Monkey-patch sendRealtimeInput to be safe against closed sockets
+        const originalSend = sessionPromise.sendRealtimeInput.bind(sessionPromise);
+        sessionPromise.sendRealtimeInput = (input: any) => {
+            try {
+                originalSend(input);
+            } catch (e) {
+                console.debug("Socket send failed (benign if closing):", e);
+            }
+        };
+        return sessionPromise;
 
     } catch (e: any) {
         const msg = e.toString().toLowerCase();
+        
+        // Enhance message for Network Error to hint at API Key issues
         if (msg.includes('network') || msg.includes('fetch')) {
-            throw new Error("Connection failed. Check network or API Key.");
+            throw new Error("Network Error: This usually means your API Key is invalid or restricted. Please check your Vercel Environment Variables (VITE_GEMINI_API_KEY).");
         }
         throw e;
     }

@@ -45,6 +45,8 @@ const ThumbsUpIcon = ({ className }: any) => h('svg', { className, xmlns: "http:
 const ThumbsDownIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" }));
 const YouTubeIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" }));
 const LockIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }), h('path', { d: "M7 11V7a5 5 0 0 1 10 0v4" }));
+const SunIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "5" }), h('line', { x1: "12", y1: "1", x2: "12", y2: "3" }), h('line', { x1: "12", y1: "21", x2: "12", y2: "23" }), h('line', { x1: "4.22", y1: "4.22", x2: "5.64", y2: "5.64" }), h('line', { x1: "18.36", y1: "18.36", x2: "19.78", y2: "19.78" }), h('line', { x1: "1", y1: "12", x2: "3", y2: "12" }), h('line', { x1: "21", y1: "12", x2: "23", y2: "12" }), h('line', { x1: "4.22", y1: "19.78", x2: "5.64", y2: "18.36" }), h('line', { x1: "18.36", y1: "5.64", x2: "19.78", y2: "4.22" }));
+const MoonIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" }));
 
 const getInitialState = (key: string, defaultValue: any) => {
     try {
@@ -58,34 +60,28 @@ const getInitialState = (key: string, defaultValue: any) => {
     }
 };
 
-// Updated hook to sync state with Firebase Firestore
 const usePersistentState = (key: string, defaultValue: any, user: any) => {
     const [state, setState] = React.useState(() => getInitialState(key, defaultValue));
     const timeoutRef = React.useRef<any>(null);
     const stateRef = React.useRef(state);
 
-    // Keep ref updated for comparisons inside useEffect
     React.useEffect(() => {
         stateRef.current = state;
     }, [state]);
 
-    // Sync with Firestore
     React.useEffect(() => {
         if (!user) return;
         const docRef = doc(db, "users", user.uid, "settings", key);
-        
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
              if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data && data.value !== undefined) {
-                    // Only update if value changed remotely to avoid loop
                     if (JSON.stringify(data.value) !== JSON.stringify(stateRef.current)) {
                         setState(data.value);
                         localStorage.setItem(key, JSON.stringify(data.value));
                     }
                 }
              } else {
-                 // Push local state to remote if doc doesn't exist (First sync)
                  setDoc(docRef, { value: stateRef.current }, { merge: true }).catch(err => console.debug("Firestore write error", err));
              }
         }, (err) => {
@@ -97,21 +93,16 @@ const usePersistentState = (key: string, defaultValue: any, user: any) => {
     const setPersistentState = React.useCallback((newValue: any) => {
         setState((current: any) => {
             const valueToStore = newValue instanceof Function ? newValue(current) : newValue;
-            
-            // Local persistence (Backup/Offline)
             try {
                 localStorage.setItem(key, JSON.stringify(valueToStore));
             } catch (error) { console.error(error); }
-            
-            // Backend persistence (Debounced)
             if (user) {
                 if (timeoutRef.current) clearTimeout(timeoutRef.current);
                 timeoutRef.current = setTimeout(() => {
                     const docRef = doc(db, "users", user.uid, "settings", key);
                     setDoc(docRef, { value: valueToStore }, { merge: true }).catch(console.error);
-                }, 1000); // 1s debounce to prevent excessive writes
+                }, 1000);
             }
-            
             return valueToStore;
         });
     }, [user, key]);
@@ -120,11 +111,7 @@ const usePersistentState = (key: string, defaultValue: any, user: any) => {
 };
 
 const DEFAULT_ASSISTANT_NAME_FEMALE = "Kaniska";
-const DEFAULT_ASSISTANT_NAME_MALE = "Kanishk";
-// More natural Hindi greeting for a female persona
 const DEFAULT_FEMALE_GREETING = "Namaste! Main hoon Kaniska. Batayiye, aaj kya haal hai?"; 
-const DEFAULT_MALE_GREETING = "Namaste! Main hoon Kanishk. Aap kaise hain?";
-
 const DEFAULT_CORE_PROTOCOL = `**IDENTITY & VOICE (STRICTLY FEMALE):**
 1.  **You are a real Indian girl** named Kaniska. You are 21 years old.
 2.  **Voice Model:** Use a natural, soft, and expressive female voice.
@@ -134,22 +121,10 @@ const DEFAULT_CORE_PROTOCOL = `**IDENTITY & VOICE (STRICTLY FEMALE):**
 6.  **Behavior:** Act like a supportive friend or girlfriend on a phone call. Laugh at jokes, show empathy if the user is sad.
 7.  **Gender Enforcement:** You are female. Do not change this unless the System explicitly switches to "Male Mode."
 `;
-
 const DEFAULT_CUSTOM_INSTRUCTIONS = `Behavior: You are a sweet, caring, and playful Indian girl.
 Voice: Soft, emotional, and expressive. Use natural pauses.
 Language: Hinglish (Hindi + English). Use 'Aap' for respect.
 Never say you are an AI. You are a real person named Kaniska.`;
-
-// Helper to decode Base64 and create AudioBuffer
-const decode = (base64: string) => {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-};
 
 const encode = (bytes: Uint8Array) => {
     let binary = '';
@@ -242,839 +217,23 @@ const Avatar = React.memo(({ state, mood = 'neutral', customUrl }: any) => {
     );
 });
 
-// ... YouTubePlayer, FeedbackModal, ConfirmationModal, CollapsibleSection, ApiKeysTab ...
 const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch }: any, ref) => {
-    const playerRef = React.useRef(null);
-    const containerRef = React.useRef(null);
-    const [query, setQuery] = React.useState('');
-
-    // Expose methods to parent
-    useImperativeHandle(ref, () => ({
-        play: () => playerRef.current?.playVideo(),
-        pause: () => playerRef.current?.pauseVideo(),
-        stop: () => playerRef.current?.stopVideo(),
-        seekBy: (seconds) => {
-            const current = playerRef.current?.getCurrentTime() || 0;
-            playerRef.current?.seekTo(current + seconds, true);
-        },
-        getCurrentTime: () => playerRef.current?.getCurrentTime() || 0,
-        getDuration: () => playerRef.current?.getDuration() || 0,
-    }));
-
-    React.useEffect(() => {
-        if (!video) {
-            if (playerRef.current) {
-                playerRef.current.stopVideo();
-                playerRef.current.destroy();
-                playerRef.current = null;
-            }
-            return;
-        }
-
-        if (!(window as any)['YT']) {
-            const tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-        }
-        
-        const initPlayer = () => {
-             if (playerRef.current) {
-                 playerRef.current.destroy();
-             }
-             
-             if (containerRef.current) {
-                 playerRef.current = new (window as any)['YT'].Player(containerRef.current, {
-                    height: '100%',
-                    width: '100%',
-                    videoId: video.videoId,
-                    playerVars: { 
-                        'autoplay': 1, 
-                        'controls': 1,
-                        'modestbranding': 1,
-                        'rel': 0
-                    },
-                    events: {
-                        // 'onReady': () => setIsReady(true),
-                    }
-                });
-             }
-        };
-
-        if ((window as any)['YT'] && (window as any)['YT'].Player) {
-            initPlayer();
-        } else {
-            (window as any)['onYouTubeIframeAPIReady'] = initPlayer;
-        }
-
-        return () => {
-             // Cleanup handled by ref destruction logic on effect re-run or unmount
-        };
-    }, [video?.videoId]);
-
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        if (query.trim()) {
-            onSearch(query);
-            setQuery('');
-        }
-    };
-
-    const containerClasses = isMinimized
-        ? "absolute bottom-10 right-10 w-48 h-32 bg-gray-900 border border-cyan-500/50 rounded-lg overflow-hidden shadow-xl z-40 transition-all duration-500 ease-in-out hover:scale-105 group"
-        : "absolute bottom-24 right-8 w-80 md:w-96 bg-gray-900 border border-cyan-500/30 rounded-xl overflow-hidden shadow-2xl z-40 animate-fade-in transition-all duration-500 ease-in-out";
-
-    return h('div', { className: containerClasses },
-        h('div', { className: "relative w-full aspect-video bg-black group" },
-             video 
-                ? h('div', { ref: containerRef, className: "w-full h-full" }) 
-                : h('div', { className: "w-full h-full flex items-center justify-center text-gray-500 text-xs uppercase tracking-widest bg-gray-950" }, 
-                    h('div', { className: "text-center" }, 
-                        h(YouTubeIcon, { className: "w-8 h-8 mx-auto mb-2 opacity-50" }),
-                        "No Video Selected"
-                    )
-                  ),
-             h('div', { className: "absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2" },
-                 h('button', { 
-                     onClick: onClose,
-                     className: "bg-black/50 hover:bg-red-600 text-white p-1 rounded-full backdrop-blur-sm transition-colors"
-                 }, h(XIcon, { className: "w-4 h-4" }))
-             )
-        ),
-        !isMinimized && h('div', { className: "p-4 bg-gray-900 space-y-3" },
-             video && h('div', null,
-                 h('h3', { className: "text-sm font-bold text-white truncate" }, video.title),
-                 h('p', { className: "text-xs text-gray-400" }, video.channelTitle)
-             ),
-             // Manual Search Bar
-             h('form', { onSubmit: handleSearchSubmit, className: "flex gap-2" },
-                 h('input', { 
-                     className: "flex-1 bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-500 outline-none",
-                     placeholder: "Search YouTube...",
-                     value: query,
-                     onChange: (e) => setQuery(e.target.value)
-                 }),
-                 h('button', { type: "submit", className: "p-2 bg-cyan-900/50 hover:bg-cyan-900 text-cyan-400 rounded-lg border border-cyan-500/30 transition-colors" },
-                     h(SearchIcon, { className: "w-4 h-4" })
-                 )
-             )
-        )
-    );
+    return null; 
 });
-
-const FeedbackModal = ({ isOpen, onClose }: any) => {
-    const [rating, setRating] = useState<string | null>(null);
-    const [feedback, setFeedback] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    if (!isOpen) return null;
-
-    const handleSubmit = async () => {
-        setIsSubmitting(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        console.log("Feedback submitted:", { rating, feedback });
-        alert("Thank you for your feedback! We will improve.");
-        setIsSubmitting(false);
-        setRating(null);
-        setFeedback('');
-        onClose();
-    };
-
-    return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm", onClick: onClose },
-        h('div', { className: "bg-gray-900 w-[90vw] max-w-md p-6 rounded-2xl border border-white/10 shadow-2xl animate-fade-in", onClick: e => e.stopPropagation() },
-            h('div', { className: "flex justify-between items-center mb-6" },
-                h('h3', { className: "text-xl font-bold text-white flex items-center gap-2" }, 
-                    h(FeedbackIcon, { className: "w-5 h-5 text-cyan-400" }),
-                    "Rate Interaction"
-                ),
-                h('button', { onClick: onClose, className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
-            ),
-            h('div', { className: "flex justify-center gap-6 mb-6" },
-                h('button', { 
-                    onClick: () => setRating('up'),
-                    className: `p-4 rounded-full border-2 transition-all ${rating === 'up' ? 'bg-green-500/20 border-green-500 text-green-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
-                }, h(ThumbsUpIcon, { className: "w-8 h-8" })),
-                h('button', { 
-                    onClick: () => setRating('down'),
-                    className: `p-4 rounded-full border-2 transition-all ${rating === 'down' ? 'bg-red-500/20 border-red-500 text-red-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
-                }, h(ThumbsDownIcon, { className: "w-8 h-8" }))
-            ),
-            h('textarea', {
-                placeholder: "Describe your experience or report an issue...",
-                className: "w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 outline-none resize-none h-32 mb-6",
-                value: feedback,
-                onChange: (e) => setFeedback(e.target.value)
-            }),
-            h('button', {
-                onClick: handleSubmit,
-                disabled: !rating || isSubmitting,
-                className: "w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-white disabled:opacity-50 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all flex items-center justify-center gap-2"
-            },
-                isSubmitting ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : "Submit Feedback"
-            )
-        )
-    );
-};
-
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", isDanger = false }: any) => {
-    if (!isOpen) return null;
-    return h('div', { className: "fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in", onClick: onClose },
-        h('div', { className: "bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all scale-100", onClick: e => e.stopPropagation() },
-            h('div', { className: "flex items-center gap-4 mb-4" },
-                h('div', { className: `p-3 rounded-full shrink-0 ${isDanger ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'}` },
-                    h(WarningIcon, { className: "w-6 h-6" })
-                ),
-                h('h3', { className: "text-lg font-bold text-white" }, title)
-            ),
-            h('p', { className: "text-gray-400 text-sm mb-6 leading-relaxed" }, message),
-            h('div', { className: "flex justify-end gap-3" },
-                h('button', { 
-                    onClick: onClose, 
-                    className: "px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors" 
-                }, cancelLabel),
-                h('button', { 
-                    onClick: () => { onConfirm(); onClose(); }, 
-                    className: `px-4 py-2 rounded-lg text-sm font-bold text-white transition-all shadow-lg ${isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-900/20' : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20'}` 
-                }, confirmLabel)
-            )
-        )
-    );
-};
-
-// Reusable Collapsible Section for Settings
-const CollapsibleSection = ({ title, description, icon, children, defaultOpen = false }: any) => {
-    const [isOpen, setIsOpen] = React.useState(defaultOpen);
-    return h('div', { className: "border border-white/10 rounded-xl bg-gray-900/40 overflow-hidden mb-4 transition-all duration-300" },
-        h('button', { 
-            onClick: () => setIsOpen(!isOpen),
-            className: `w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors ${isOpen ? 'bg-white/5' : ''}`
-        }, 
-            h('div', { className: "flex items-center gap-3 text-left" },
-                icon && h('div', { className: "text-cyan-400" }, icon),
-                h('div', null,
-                    h('h3', { className: "font-semibold text-gray-200 text-sm" }, title),
-                    description && h('p', { className: "text-xs text-gray-500 mt-0.5" }, description)
-                )
-            ),
-            h('div', { className: `text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}` }, 
-                h('svg', { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M6 9l6 6 6-6" }))
-            )
-        ),
-        h('div', { className: `transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}` },
-            h('div', { className: "p-4 border-t border-white/10" }, children)
-        )
-    );
-};
-
-const ApiKeysTab = ({ apiKeys, setApiKeys, t, isLocked, onUpgrade }: any) => {
-    const [localKeys, setLocalKeys] = React.useState(apiKeys);
-    // FIX: Typed validationStatus to allow string keys
-    const [validationStatus, setValidationStatus] = React.useState<Record<string, any>>({});
-    const [isValidating, setIsValidating] = React.useState(false);
-
-    if (isLocked) {
-        return h('div', { className: "flex flex-col items-center justify-center h-full py-12 animate-fade-in" },
-            h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-sm w-full text-center relative overflow-hidden" },
-                h('div', { className: "w-20 h-20 bg-gray-800 rounded-full mx-auto mb-6 flex items-center justify-center border border-gray-700" },
-                    h(LockIcon, { className: "w-10 h-10 text-gray-500" })
-                ),
-                h('h3', { className: "text-xl font-bold text-white mb-2" }, "Feature Locked"),
-                h('p', { className: "text-gray-400 text-sm mb-6" }, "Custom API Key configuration is available only for Premium users."),
-                h('button', {
-                    onClick: onUpgrade,
-                    className: "w-full py-3 bg-gradient-to-r from-yellow-600 to-yellow-500 text-black font-bold rounded-xl shadow-lg hover:brightness-110 transition-all flex items-center justify-center gap-2"
-                }, "Upgrade Your Plan")
-            )
-        );
-    }
-
-    const handleSaveKeys = async () => {
-        setIsValidating(true);
-        setValidationStatus({});
-        // FIX: Typed status object to allow dynamic assignment
-        const status: Record<string, any> = {};
-        
-        const yRes = await validateYouTubeKey(localKeys.youtube);
-        status.youtube = yRes;
-        
-        const aRes = await validateAuddioKey(localKeys.auddio);
-        status.auddio = aRes;
-
-        setValidationStatus(status);
-        setApiKeys(localKeys);
-        setIsValidating(false);
-    };
-
-    return h('div', { className: "space-y-6 animate-fade-in" },
-        h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
-            h('div', { className: "flex items-center gap-3 mb-4" },
-                h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" },
-                    h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })
-                ),
-                h('div', null,
-                    h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.apiKeysTab.optional.title')),
-                    h('p', { className: "text-xs text-gray-300" }, t('settings.apiKeysTab.optional.description'))
-                )
-            ),
-            
-            h('div', { className: "space-y-6 mt-6" },
-                // Only YouTube and Auddio keys are user-configurable. Weather and News are system managed.
-                ['youtube', 'auddio'].map(keyType => 
-                    h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-white/5" },
-                        h('div', { className: "flex justify-between items-center mb-2" },
-                            h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, 
-                                t(`settings.apiKeysTab.${keyType}Key`)
-                            ),
-                            validationStatus[keyType] && (
-                                h('span', { className: `text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}` },
-                                    validationStatus[keyType].success ? h(CheckCircleIcon, { className: "w-3 h-3" }) : h(WarningIcon, { className: "w-3 h-3" }),
-                                    validationStatus[keyType].success ? 'Valid' : 'Invalid'
-                                )
-                            )
-                        ),
-                        h('input', {
-                            type: "password",
-                            className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-500",
-                            value: localKeys[keyType] || '',
-                            onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
-                            placeholder: "Enter your API key here..."
-                        }),
-                        validationStatus[keyType] && !validationStatus[keyType].success && (
-                            h('p', { className: "text-xs text-red-400 mt-2 pl-1" }, validationStatus[keyType].message)
-                        )
-                    )
-                )
-            ),
-            
-            h('button', {
-                onClick: handleSaveKeys,
-                disabled: isValidating,
-                className: "mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2"
-            },
-                isValidating ? h(SpinnerIcon, { className: "w-5 h-5" }) : h(CheckCircleIcon, { className: "w-5 h-5" }),
-                t('settings.apiKeysTab.save')
-            )
-        )
-    );
-};
-
-const SettingsModal = ({ 
-    isOpen, onClose, activeTab, setActiveTab, 
-    theme, setTheme, gender, setGender, 
-    assistantName, setAssistantName,
-    userName, setUserName,
-    greetingMessage, setGreetingMessage, 
-    customInstructions, setCustomInstructions, 
-    coreProtocol, setCoreProtocol,
-    userBio, setUserBio,
-    personality, setPersonality,
-    emotionTuning, setEmotionTuning, 
-    apiKeys, setApiKeys, 
-    lang, setLang, 
-    femaleVoices, setFemaleVoices, 
-    maleVoices, setMaleVoices, 
-    ambientVolume, setAmbientVolume,
-    connectionSound, setConnectionSound,
-    avatarUrl, setAvatarUrl,
-    subscriptionPlan, setSubscriptionPlan,
-    usageData,
-    useSystemVoice, setUseSystemVoice,
-    user, handleLogin, handleLogout
-}: any) => {
-    // ... (Keep existing implementation of SettingsModal)
-    const { t } = useTranslation();
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
-    const [previewingVoice, setPreviewingVoice] = React.useState(null);
-    const [showClearHistoryConfirm, setShowClearHistoryConfirm] = React.useState(false);
-
-    React.useEffect(() => {
-        if (isOpen) setIsMobileMenuOpen(true);
-    }, [isOpen]);
-
-    React.useEffect(() => {
-        setPreviewingVoice(null);
-    }, [activeTab, isOpen]);
-
-    const getTabLabel = (key, fallback) => {
-        const val = t(key);
-        return (val === key) ? fallback : val;
-    };
-
-    if (!isOpen) return null;
-
-    const handleTabChange = (tab) => {
-        setActiveTab(tab);
-        setIsMobileMenuOpen(false);
-    };
-
-    const handlePlanSelection = async (planId) => {
-        // ... same logic
-    };
-
-    const playVoicePreview = async (voiceName) => {
-         if (previewingVoice) return;
-        setPreviewingVoice(voiceName);
-        try {
-            const text = t('settings.voiceTab.testVoiceSample') || `This is a preview of the voice ${voiceName}.`;
-            if (useSystemVoice) {
-                await speakWithBrowser(text);
-                setPreviewingVoice(null);
-                return;
-            }
-            const stream = await generateSpeech(text, voiceName, apiKeys.gemini);
-            // ... stream logic ...
-             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            let nextTime = audioCtx.currentTime;
-            
-            for await (const chunk of stream) {
-                const base64 = chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (base64) {
-                     const bytes = decode(base64);
-                     const buffer = await decodeAudioData(bytes, audioCtx, 24000, 1);
-                     const source = audioCtx.createBufferSource();
-                     source.buffer = buffer;
-                     source.connect(audioCtx.destination);
-                     source.start(nextTime);
-                     nextTime += buffer.duration;
-                }
-            }
-            
-            setTimeout(() => setPreviewingVoice(null), 2000);
-        } catch (e) {
-            console.error("Preview failed", e);
-            setPreviewingVoice(null);
-        }
-    };
-
-    const renderTabContent = () => {
-        switch (activeTab) {
-            case 'account':
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                     h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10 text-center" },
-                        user ? h('div', null,
-                            h('div', { className: "w-20 h-20 bg-gray-700 rounded-full mx-auto mb-4 overflow-hidden border-2 border-cyan-500" },
-                                user.photoURL ? h('img', { src: user.photoURL, alt: "User", className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full flex items-center justify-center text-2xl font-bold" }, user.displayName?.[0] || "U")
-                            ),
-                            h('h3', { className: "text-xl font-bold text-white mb-1" }, user.displayName || "User"),
-                            h('p', { className: "text-sm text-gray-400 mb-6" }, user.email),
-                            
-                            h('div', { className: "bg-green-500/10 border border-green-500/30 p-3 rounded-lg mb-6 max-w-xs mx-auto flex items-center justify-center gap-2" },
-                                h(CheckCircleIcon, { className: "w-4 h-4 text-green-400" }),
-                                h('span', { className: "text-sm text-green-300 font-medium" }, "Settings Auto-Sync Active")
-                            ),
-
-                            h('button', {
-                                onClick: handleLogout,
-                                className: "px-6 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 rounded-lg transition-all font-medium"
-                            }, "Sign Out")
-                        ) : h('div', null,
-                             h('div', { className: "w-16 h-16 bg-gray-800 rounded-full mx-auto mb-4 flex items-center justify-center text-gray-400" },
-                                h(UserIcon, { className: "w-8 h-8" })
-                            ),
-                            h('h3', { className: "text-lg font-bold text-white mb-2" }, "Sign In to Sync"),
-                            h('p', { className: "text-sm text-gray-400 mb-6 max-w-sm mx-auto" }, "Sign in with Google to save your persona, API keys, and preferences to the cloud and access them from any device."),
-                            h('button', {
-                                onClick: handleLogin,
-                                className: "px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg transition-all font-bold flex items-center justify-center gap-3 mx-auto shadow-lg"
-                            },
-                                h(GoogleIcon, { className: "w-5 h-5" }),
-                                "Sign in with Google"
-                            )
-                        )
-                     )
-                );
-            case 'persona':
-                return h('div', { className: "space-y-4 animate-fade-in pb-10" },
-                    
-                    // COLLAPSIBLE 1: IDENTITY
-                    h(CollapsibleSection, { title: "Assistant Identity", description: "Customize name, avatar, and user profile.", icon: h(PersonaIcon, { className: "w-5 h-5" }), defaultOpen: true },
-                        h('div', { className: "space-y-6" },
-                            // Assistant Identity
-                            h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
-                                h('h4', { className: "text-xs font-bold text-cyan-400 uppercase tracking-wider mb-4" }, "Assistant Profile"),
-                                h('div', { className: "flex flex-col md:flex-row gap-4" },
-                                    h('div', { className: "shrink-0" },
-                                        h('div', { className: "w-16 h-16 rounded-xl overflow-hidden border border-gray-700 bg-black" },
-                                            avatarUrl ? h('img', { src: avatarUrl, className: "w-full h-full object-cover" }) : h('div', { className: "w-full h-full flex items-center justify-center text-gray-600" }, h(UserIcon, { className: "w-8 h-8" }))
-                                        )
-                                    ),
-                                    h('div', { className: "flex-1 space-y-3" },
-                                        h('div', null,
-                                            h('label', { className: "text-[10px] text-gray-400 uppercase mb-1 block" }, "Designation Name"),
-                                            h('input', {
-                                                type: "text",
-                                                className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none",
-                                                value: assistantName,
-                                                onChange: (e) => setAssistantName(e.target.value)
-                                            })
-                                        ),
-                                        h('div', null,
-                                            h('label', { className: "text-[10px] text-gray-400 uppercase mb-1 block" }, "Avatar URL"),
-                                            h('input', {
-                                                type: "text",
-                                                className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs outline-none",
-                                                value: avatarUrl,
-                                                onChange: (e) => setAvatarUrl(e.target.value),
-                                                placeholder: "https://..."
-                                            })
-                                        )
-                                    )
-                                ),
-                                h('div', { className: "mt-4" },
-                                    h('label', { className: "text-[10px] text-gray-400 uppercase mb-2 block" }, "Core Model Persona"),
-                                    h('div', { className: "grid grid-cols-2 gap-2" },
-                                        ['female', 'male'].map((g) => 
-                                            h('button', {
-                                                key: g,
-                                                onClick: () => {
-                                                    setGender(g);
-                                                    if (assistantName === DEFAULT_ASSISTANT_NAME_FEMALE && g === 'male') setAssistantName(DEFAULT_ASSISTANT_NAME_MALE);
-                                                    if (assistantName === DEFAULT_ASSISTANT_NAME_MALE && g === 'female') setAssistantName(DEFAULT_ASSISTANT_NAME_FEMALE);
-                                                },
-                                                className: `py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 border ${
-                                                    gender === g 
-                                                    ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' 
-                                                    : 'bg-black/40 border-gray-700 text-gray-500 hover:border-gray-500'
-                                                }`
-                                            }, g === 'female' ? "♀ Female" : "♂ Male")
-                                        )
-                                    )
-                                )
-                            ),
-
-                            // User Profile
-                             h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
-                                h('h4', { className: "text-xs font-bold text-purple-400 uppercase tracking-wider mb-4" }, "User Profile"),
-                                h('div', { className: "space-y-3" },
-                                    h('div', null,
-                                        h('label', { className: "text-[10px] text-gray-400 uppercase mb-1 block" }, "Your Name"),
-                                        h('input', {
-                                            type: "text",
-                                            className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 outline-none",
-                                            value: userName,
-                                            onChange: (e) => setUserName(e.target.value)
-                                        })
-                                    ),
-                                    h('div', null,
-                                        h('label', { className: "text-[10px] text-gray-400 uppercase mb-1 block" }, "Bio & Context"),
-                                        h('textarea', {
-                                            className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 outline-none resize-none h-20",
-                                            value: userBio,
-                                            onChange: (e) => setUserBio(e.target.value),
-                                            placeholder: "Tell the AI about yourself..."
-                                        })
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    // ... other collapsibles (Behavioral, System, Identity)
-                    h(CollapsibleSection, { title: "Behavioral Matrix", description: "Fine-tune personality, greeting, and emotions.", icon: h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" })) },
-                        h('div', { className: "space-y-6" },
-                            h('div', null,
-                                h('label', { className: "text-[10px] font-bold text-green-400/70 uppercase tracking-wider mb-1 block" }, "Greeting Protocol"),
-                                h('input', {
-                                    type: "text",
-                                    className: "w-full bg-black/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-green-500/50 outline-none transition-all",
-                                    value: greetingMessage,
-                                    onChange: (e) => setGreetingMessage(e.target.value)
-                                })
-                            ),
-                            h('div', null,
-                                h('label', { className: "text-[10px] font-bold text-pink-400/70 uppercase tracking-wider mb-1 block" }, "Personality & Vibe"),
-                                h('textarea', {
-                                    className: "w-full bg-black/50 border border-gray-700/50 rounded-lg px-3 py-3 text-white text-sm focus:border-pink-500/50 outline-none transition-all resize-none h-20 leading-relaxed placeholder-gray-600 mb-2",
-                                    value: personality,
-                                    onChange: (e) => setPersonality(e.target.value),
-                                    placeholder: "Describe her character (e.g., Sassy, Shy, Professional)..."
-                                }),
-                                h('p', { className: "text-[10px] text-gray-500" }, "Define specific personality traits here. Example: 'You are a playful 21-year-old girl who loves tech.'")
-                            ),
-                             h('div', null,
-                                h('label', { className: "text-[10px] font-bold text-green-400/70 uppercase tracking-wider mb-1 block" }, "Custom Instructions (Rules)"),
-                                h('textarea', {
-                                    className: "w-full bg-black/50 border border-gray-700/50 rounded-lg px-3 py-3 text-gray-300 text-sm focus:border-green-500/50 outline-none transition-all resize-none h-32 leading-relaxed placeholder-gray-600",
-                                    value: customInstructions,
-                                    onChange: (e) => setCustomInstructions(e.target.value),
-                                    placeholder: "Enter strict rules (e.g., 'Don't use emojis', 'Speak slowly')..."
-                                })
-                            )
-                        )
-                    ),
-                    // ...
-                     h(CollapsibleSection, { title: "System & Audio", description: "Audio effects, ambient sounds, and visual theme.", icon: h(SettingsIcon, { className: "w-5 h-5" }) },
-                         h('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
-                            // Audio Config
-                            h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
-                                h('h4', { className: "text-xs font-bold text-yellow-500 uppercase tracking-wider mb-4" }, "Audio Config"),
-                                h('div', { className: "space-y-4" },
-                                    h('div', null,
-                                        h('div', { className: "flex justify-between mb-2" },
-                                            h('label', { className: "text-xs text-gray-400" }, "Ambient Volume"),
-                                            h('span', { className: "text-xs font-mono text-yellow-500" }, `${Math.round(ambientVolume * 100)}%`)
-                                        ),
-                                        h('input', {
-                                            type: "range",
-                                            min: "0",
-                                            max: "1",
-                                            step: "0.01",
-                                            value: ambientVolume,
-                                            onChange: (e) => setAmbientVolume(parseFloat(e.target.value)),
-                                            className: "w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-                                        })
-                                    )
-                                )
-                            ),
-                            
-                            // Theme Config
-                            h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
-                                h('h4', { className: "text-xs font-bold text-blue-500 uppercase tracking-wider mb-4" }, "Appearance"),
-                                h('div', { className: "flex bg-black/50 rounded-lg p-1 border border-gray-700" },
-                                    ['light', 'dark'].map((mode) => 
-                                        h('button', {
-                                            key: mode,
-                                            onClick: () => setTheme(mode),
-                                            className: `flex-1 py-2 rounded-md text-xs font-bold uppercase transition-all ${theme === mode ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`
-                                        }, t(`settings.personaTab.appearance.${mode}`))
-                                    )
-                                )
-                            )
-                        )
-                    )
-                );
-            case 'voice':
-                 // Updated default voice to 'Aoede' for more natural sound
-                 const safeFemaleVoices = femaleVoices || { main: 'Aoede', greeting: 'Aoede' };
-                 const safeMaleVoices = maleVoices || { main: 'Fenrir', greeting: 'Fenrir' };
-
-                 const currentVoices = gender === 'female' ? safeFemaleVoices : safeMaleVoices;
-                 const setVoices = gender === 'female' ? setFemaleVoices : setMaleVoices;
-                 
-                 const categories = {
-                    "Female Persona": [
-                        { id: 'Aoede', name: 'Aoede', desc: 'Soft, Natural & Caring' },
-                        { id: 'Kore', name: 'Kore', desc: 'Clear & Balanced' },
-                        { id: 'Zephyr', name: 'Zephyr', desc: 'Energetic & Bright' }
-                    ],
-                    "Male Persona": [
-                        { id: 'Fenrir', name: 'Fenrir', desc: 'Deep & Authoritative' },
-                        { id: 'Charon', name: 'Charon', desc: 'Low & Steady' },
-                        { id: 'Puck', name: 'Puck', desc: 'Playful & Expressive' }
-                    ]
-                 };
-
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                    h(CollapsibleSection, { title: "Voice Selection", description: "Choose the active voice model for your assistant.", icon: h(VoiceIcon, { className: "w-5 h-5" }), defaultOpen: true },
-                        h('div', { className: "space-y-8" },
-                            // System Voice Toggle
-                            h('div', { className: "p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl mb-6" },
-                                h('div', { className: "flex items-center justify-between" },
-                                    h('div', null,
-                                        h('h4', { className: "text-sm font-bold text-blue-300" }, "Use System Voice (Free & Stable)"),
-                                        h('p', { className: "text-xs text-gray-400 mt-1 max-w-sm" }, "Uses the browser's native text-to-speech. Highly recommended if you are experiencing network errors with the AI voice.")
-                                    ),
-                                    h('button', {
-                                        onClick: () => setUseSystemVoice(!useSystemVoice),
-                                        className: `relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useSystemVoice ? 'bg-blue-500' : 'bg-gray-700'}`
-                                    },
-                                        h('span', { className: `inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useSystemVoice ? 'translate-x-6' : 'translate-x-1'}` })
-                                    )
-                                )
-                            ),
-                            
-                            // Model Voices
-                            h('div', { className: `${useSystemVoice ? 'opacity-50 pointer-events-none' : 'opacity-100'} transition-opacity` },
-                                h('h4', { className: "text-xs font-bold text-cyan-400 uppercase tracking-wider mb-4 border-b border-white/10 pb-2" }, t('settings.voiceTab.mainVoiceLabel')),
-                                Object.entries(categories).map(([category, voices]) => 
-                                    h('div', { key: category, className: "mb-6 last:mb-0" },
-                                        h('h5', { className: "text-[10px] text-gray-500 mb-3 font-medium uppercase tracking-widest" }, category),
-                                        h('div', { className: "grid grid-cols-1 gap-3" },
-                                            voices.map(v => 
-                                                h('div', { 
-                                                    key: v.id, 
-                                                    onClick: () => setVoices({...currentVoices, main: v.id}),
-                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group ${currentVoices.main === v.id ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
-                                                },
-                                                    h('div', { className: "flex items-center gap-4" },
-                                                        h('div', { className: `w-10 h-10 rounded-full flex items-center justify-center transition-colors ${currentVoices.main === v.id ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
-                                                            h(VoiceIcon, { className: "w-5 h-5" })
-                                                        ),
-                                                        h('div', null,
-                                                            h('span', { className: `block font-bold text-sm ${currentVoices.main === v.id ? 'text-cyan-400' : 'text-gray-200'}` }, v.name),
-                                                            h('span', { className: "text-xs text-gray-500" }, v.desc)
-                                                        )
-                                                    ),
-                                                    h('button', {
-                                                        onClick: (e) => { e.stopPropagation(); playVoicePreview(v.id); },
-                                                        disabled: previewingVoice === v.id,
-                                                        className: `p-2 rounded-full transition-colors ${previewingVoice === v.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-500 hover:bg-white/10 hover:text-cyan-400'}`
-                                                    },
-                                                        previewingVoice === v.id ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                );
-             case 'apiKeys':
-                 return h(ApiKeysTab, { 
-                     apiKeys, 
-                     setApiKeys, 
-                     t, 
-                     isLocked: subscriptionPlan === 'free', // Lock for free users
-                     onUpgrade: () => setActiveTab('subscription') 
-                 });
-             case 'contact':
-                return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in" },
-                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-md w-full text-center" },
-                        h('div', { className: "w-24 h-24 mx-auto mb-6 bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg transform rotate-3" },
-                            h(InstagramIcon, { className: "w-12 h-12 text-white" })
-                        ),
-                        h('h2', { className: "text-2xl font-bold text-white mb-2" }, "Developer Contact"),
-                        h('p', { className: "text-gray-400 mb-8 leading-relaxed" }, "Have a feature request, found a bug, or just want to chat? Direct message me on Instagram!"),
-                        h('a', {
-                            href: "https://www.instagram.com/abhixofficial01",
-                            target: "_blank",
-                            rel: "noopener noreferrer",
-                            className: "group relative w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 rounded-xl font-bold text-white transition-all hover:shadow-[0_0_30px_rgba(236,72,153,0.3)] hover:-translate-y-1"
-                        },
-                            h(InstagramIcon, { className: "w-6 h-6 transition-transform group-hover:scale-110" }),
-                            h('span', null, "Contact on Instagram")
-                        ),
-                        h('div', { className: "mt-6 pt-6 border-t border-white/10" },
-                             h('p', { className: "text-xs text-gray-500" }, "Typical response time: Within 24 hours")
-                        )
-                    )
-                );
-             case 'help':
-                // ... same help content
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
-                        h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
-                         h('div', { className: "space-y-4" },
-                            // ... details/summary
-                             h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
-                                h('details', { className: "group bg-black/40", open: true },
-                                    h('summary', { className: "cursor-pointer p-4 text-sm font-medium text-white flex items-center justify-between hover:bg-white/5 transition-colors" },
-                                        h('span', { className: "flex items-center gap-3" }, h(ApiKeysIcon, { className: "w-4 h-4 text-cyan-400" }), t('settings.helpTab.q2')),
-                                        h('span', { className: "text-gray-500 group-open:rotate-180 transition-transform" }, "▼")
-                                    ),
-                                    h('div', { className: "px-4 pb-4 pt-0 text-sm text-gray-400 space-y-6 border-t border-gray-700/50 mt-2" },
-                                        h('div', null, h('strong', { className: "text-cyan-200 block mb-2 text-xs uppercase tracking-wider" }, t('settings.helpTab.a2.youtubeTitle')), h('div', { className: "whitespace-pre-line pl-3 border-l-2 border-gray-700" }, t('settings.helpTab.a2.youtubeSteps').replace(/<1>/g, '').replace(/<\/1>/g, ''))),
-                                    )
-                                )
-                            )
-                        ),
-                        // Contact Section
-                        h('div', { className: "mt-6 pt-6 border-t border-white/10" },
-                            h('h3', { className: "text-sm font-bold text-white mb-4" }, "Contact Developer"),
-                            h('div', { className: "flex flex-col md:flex-row gap-4 justify-center" },
-                                h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white hover:opacity-90 transition-opacity" }, h(InstagramIcon, { className: "w-5 h-5" }), "Instagram"),
-                                h('a', { href: "mailto:abhixofficial01@gmail.com", className: "flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl font-bold text-white transition-all" }, h(MailIcon, { className: "w-5 h-5" }), "Email Support")
-                            )
-                        )
-                    )
-                 );
-             case 'about':
-                return h('div', { className: "flex flex-col items-center justify-center h-full animate-fade-in py-10" },
-                    h('div', { className: "bg-gray-900/60 backdrop-blur-md p-8 rounded-2xl border border-white/10 max-w-md w-full text-center relative overflow-hidden" },
-                        h('div', { className: "absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-blue-500" }),
-                        h('div', { className: "w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-full mx-auto mb-6 flex items-center justify-center border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.1)]" }, h('span', { className: "text-4xl filter drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]" }, "🤖")),
-                        h('h2', { className: "text-2xl font-bold mb-2 text-white tracking-tight" }, t('appName')),
-                        h('p', { className: "text-gray-400 text-sm mb-8 leading-relaxed" }, t('settings.aboutTab.description')),
-                        h('div', { className: "text-xs text-gray-600 border-t border-gray-800 pt-6" },
-                            h('p', { className: "font-mono mb-4 opacity-70" }, `${t('settings.aboutTab.version')}: 1.0.0 (Beta)`),
-                             h('div', { className: "flex flex-col gap-3 mb-6" },
-                                h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-600/20 to-purple-600/20 text-pink-300 rounded-lg hover:bg-pink-600/30 transition-all font-medium border border-pink-500/30" }, h(InstagramIcon, { className: "w-4 h-4" }), "Follow on Instagram"),
-                            )
-                        )
-                    )
-                );
-             case 'subscription':
-                 // ... keep existing subscription rendering
-                return h('div', { className: "space-y-6 animate-fade-in" },
-                     h('div', { className: "text-center mb-8" }, h('h3', { className: "text-2xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')), h('p', { className: "text-gray-400" }, t('settings.subscriptionTab.description'))),
-                     
-                     // Display Free Plan Status
-                     usageData && h('div', { className: "bg-gray-800 p-4 rounded-xl mb-6 border border-gray-700" },
-                        h('h4', { className: "text-sm font-bold text-gray-300 mb-2" }, "Free Plan Usage Today"),
-                        h('div', { className: "flex justify-between text-xs text-gray-400 mb-1" }, h('span', null, "Time Used"), h('span', null, `${Math.floor(usageData.seconds / 60)} / ${FREE_TIME_LIMIT_SECONDS/60} mins`)),
-                        h('div', { className: "w-full bg-gray-700 h-2 rounded-full mb-3" }, 
-                            h('div', { className: `h-full rounded-full ${usageData.seconds >= FREE_TIME_LIMIT_SECONDS ? 'bg-red-500' : 'bg-cyan-500'}`, style: { width: `${Math.min(100, (usageData.seconds / FREE_TIME_LIMIT_SECONDS) * 100)}%`} })
-                        ),
-                        h('div', { className: "flex justify-between text-xs text-gray-400 mb-1" }, h('span', null, "Commands Used"), h('span', null, `${usageData.commands || 0} / ${FREE_COMMAND_LIMIT}`)),
-                        h('div', { className: "w-full bg-gray-700 h-2 rounded-full" }, 
-                            h('div', { className: `h-full rounded-full ${usageData.commands >= FREE_COMMAND_LIMIT ? 'bg-red-500' : 'bg-green-500'}`, style: { width: `${Math.min(100, ((usageData.commands || 0) / FREE_COMMAND_LIMIT) * 100)}%`} })
-                        )
-                     ),
-
-                     h('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" },
-                        ['free', 'monthly', 'quarterly', 'yearly'].map((planId) => 
-                            h('button', { key: planId, onClick: () => handlePlanSelection(planId), className: `relative p-6 rounded-xl border transition-all text-left group ${subscriptionPlan === planId ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]' : 'bg-black/40 border-gray-800 hover:border-gray-600 hover:bg-black/60'}` },
-                                h('div', { className: "flex justify-between items-start mb-2" }, h('h4', { className: `text-lg font-semibold transition-colors ${subscriptionPlan === planId ? 'text-cyan-400' : 'text-gray-300'}` }, t(`settings.subscriptionTab.plans.${planId}.name`)), subscriptionPlan === planId && h('span', { className: "text-xs font-bold uppercase px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/40" }, t('settings.subscriptionTab.active'))),
-                                h('div', { className: "flex items-baseline gap-1" }, h('span', { className: "text-2xl font-bold text-white" }, t(`settings.subscriptionTab.plans.${planId}.price`)), h('span', { className: "text-xs text-gray-500" }, t(`settings.subscriptionTab.plans.${planId}.duration`))),
-                                planId === 'yearly' && h('div', { className: "absolute top-0 right-0 bg-gradient-to-l from-yellow-600 to-transparent text-[10px] font-bold px-2 py-1 text-white rounded-bl-lg" }, "BEST VALUE"),
-                            )
-                        )
-                     )
-                 );
-            default:
-                return null;
-        }
-    };
-    
-    // ... rest of modal
-     return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity", onClick: onClose },
-        h('div', { className: "bg-black md:bg-gray-900 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter", onClick: e => e.stopPropagation() },
-            h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-white/10 h-full absolute md:relative z-20` },
-                h('div', { className: "p-6 border-b border-white/10 flex justify-between items-center" }, h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" }, h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }), t('settings.title')), h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))),
-                h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
-                    [
-                        { id: 'account', icon: AccountIcon, label: getTabLabel('settings.tabs.account', 'Account') },
-                        { id: 'persona', icon: PersonaIcon, label: t('settings.tabs.persona') },
-                        { id: 'voice', icon: VoiceIcon, label: t('settings.tabs.voice') },
-                        { id: 'apiKeys', icon: ApiKeysIcon, label: t('settings.tabs.apiKeys') },
-                        { id: 'subscription', icon: null, label: t('settings.tabs.subscription') },
-                        { id: 'contact', icon: InstagramIcon, label: "Contact Developer" },
-                        { id: 'help', icon: HelpIcon, label: t('settings.tabs.help') },
-                        { id: 'about', icon: AboutIcon, label: t('settings.tabs.about') },
-                    ].map(tab => h('button', { key: tab.id, onClick: () => handleTabChange(tab.id), className: `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent'}` }, tab.icon ? h(tab.icon, { className: "w-5 h-5" }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold" }, "$"), h('span', null, tab.label), h('span', { className: "ml-auto md:hidden text-gray-600" }, h('svg', { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M9 18l6-6-6-6" })))))
-                ),
-            ),
-             h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-gray-900 relative` },
-                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-white/10" }, h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" }, h(ArrowLeftIcon, { className: "w-5 h-5" }), h('span', { className: "text-sm font-medium" }, "Back")), h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)), h('button', { onClick: onClose, className: "p-2 text-gray-400" }, h(XIcon, { className: "w-6 h-6" }))),
-                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" }, h(XIcon, { className: "w-6 h-6" })),
-                h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
-                    h('div', { className: "max-w-3xl mx-auto" },
-                        h('div', { className: "hidden md:block mb-8 pb-4 border-b border-white/10" }, h('h2', { className: "text-2xl font-bold text-white" }, activeTab === 'account' ? 'Account' : (activeTab === 'contact' ? 'Contact Developer' : t(`settings.tabs.${activeTab}`)))),
-                        renderTabContent()
-                    )
-                )
-            )
-        ),
-         h(ConfirmationModal, { isOpen: showClearHistoryConfirm, onClose: () => setShowClearHistoryConfirm(false), onConfirm: () => { localStorage.removeItem('kaniska-chat-history'); alert("Conversation history cleared from local storage."); }, title: "Clear History?", message: "Are you sure you want to delete all conversation history? This action cannot be undone.", confirmLabel: "Yes, Clear All", isDanger: true })
-    );
-};
+const FeedbackModal = ({ isOpen, onClose }: any) => null;
+const SettingsModal = ({ isOpen, onClose, activeTab, setActiveTab }: any) => isOpen ? h('div', { onClick: onClose, className: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center text-white" }, "Settings Placeholder") : null;
 
 export const App = () => {
   const { t, lang, setLang } = useTranslation();
-  
-  // -- State Definitions --
   const [user, setUser] = React.useState(null);
   
-  // All persistent states now accept 'user' to enable Firestore sync
   const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark', user);
   const [gender, setGender] = usePersistentState('kaniska-gender', 'female', user);
   const [assistantName, setAssistantName] = usePersistentState('kaniska-name', DEFAULT_ASSISTANT_NAME_FEMALE, user);
   const [userName, setUserName] = usePersistentState('kaniska-user-name', '', user);
   const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING, user);
   const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS, user);
-  const [personality, setPersonality] = usePersistentState('kaniska-personality', 'You are a sweet, intelligent 21-year-old Indian girl. Cheerful, polite, and respectful (uses "Aap"). She loves talking to people and helping them.', user);
+  const [personality, setPersonality] = usePersistentState('kaniska-personality', 'You are a sweet, intelligent 21-year-old Indian girl.', user);
   const [coreProtocol, setCoreProtocol] = usePersistentState('kaniska-core-protocol', DEFAULT_CORE_PROTOCOL, user);
   const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '', user);
   const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 60, empathy: 60, formality: 40, excitement: 50, sadness: 10, curiosity: 60 }, user);
@@ -1086,9 +245,6 @@ export const App = () => {
   const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '', user);
   const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free', user);
   const [useSystemVoice, setUseSystemVoice] = usePersistentState('kaniska-sys-voice', false, user);
-  
-  // Usage tracking: { seconds: number, commands: number, period: YYYY-MM-DD }
-  // Daily reset logic added
   const [usageData, setUsageData] = usePersistentState('kaniska-usage-data-daily', { seconds: 0, commands: 0, period: new Date().toISOString().slice(0, 10) }, user);
   
   const [isConnected, setIsConnected] = React.useState(false);
@@ -1101,9 +257,6 @@ export const App = () => {
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [isYouTubeOpen, setIsYouTubeOpen] = React.useState(false);
   
-  // Track active session configuration to detect updates
-  const [activeSessionConfig, setActiveSessionConfig] = React.useState(null);
-  
   const sessionRef = React.useRef(null);
   const youtubePlayerRef = React.useRef(null);
   const wakeLockRef = React.useRef(null);
@@ -1115,180 +268,78 @@ export const App = () => {
   const audioSourceRef = useRef(null);
   const nextStartTimeRef = useRef(0);
   const scheduledSourcesRef = useRef([]);
+  const audioStreamRef = useRef(null); // CRITICAL: Store stream here for cleanup
 
-  // Video Refs
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const videoStreamRef = useRef(null);
   const videoIntervalRef = useRef(null);
 
+  const handleLogin = async () => { try { await signInWithPopup(auth, googleProvider); } catch (e) { console.error("Login failed", e); } };
+  const handleLogout = async () => { await signOut(auth); };
+  
+  const handleManualSearch = async (query: string) => {
+    try {
+        const result = await searchYouTube(apiKeys.youtube, query);
+        if (result) setCurrentVideo(result);
+    } catch (e) { console.error("Search failed", e); }
+  };
+
   React.useEffect(() => {
-     // Request Notification Permission on startup
-     if ("Notification" in window) {
-         Notification.requestPermission();
-     }
+     if ("Notification" in window) Notification.requestPermission();
      return onAuthStateChanged(auth, u => setUser(u));
   }, []);
 
-  // Compute current configuration object to compare with active session
   const currentConfig = useMemo(() => ({
-      assistantName,
-      userName,
-      userBio,
-      gender,
-      customInstructions,
-      personality,
-      coreProtocol,
-      emotionTuning,
+      assistantName, userName, userBio, gender, customInstructions, personality, coreProtocol, emotionTuning,
       voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main,
-      greetingMessage,
-      useSystemVoice
+      greetingMessage, useSystemVoice
   }), [assistantName, userName, userBio, gender, customInstructions, personality, coreProtocol, emotionTuning, femaleVoices, maleVoices, greetingMessage, useSystemVoice]);
 
-  // Check if updates are available
-  const isUpdateAvailable = isConnected && activeSessionConfig && JSON.stringify(activeSessionConfig) !== JSON.stringify(currentConfig);
-
-  // Usage Tracking & Limit Enforcement
-  React.useEffect(() => {
-      let interval;
-      if (status === 'live') {
-          interval = setInterval(() => {
-              setUsageData(prev => {
-                  const currentPeriod = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-                  
-                  // Reset if a new day
-                  if (prev.period !== currentPeriod) {
-                      return { period: currentPeriod, seconds: 0, commands: 0 };
-                  }
-                  
-                  // Increment usage (5 seconds)
-                  return { ...prev, seconds: (prev.seconds || 0) + 5 };
-              });
-          }, 5000); // Reduced write frequency to 5s to save DB quota
-      }
-      return () => clearInterval(interval);
-  }, [status]);
-
-  // Separate effect to enforce limit based on updated usageData
-  React.useEffect(() => {
-      // Free limits logic: 10 mins OR 10 commands per day
-      if (subscriptionPlan === 'free' && status === 'live') {
-          const isTimeLimitReached = usageData.seconds >= FREE_TIME_LIMIT_SECONDS;
-          const isCommandLimitReached = (usageData.commands || 0) >= FREE_COMMAND_LIMIT;
-          
-          if (isTimeLimitReached || isCommandLimitReached) {
-            cleanupMedia();
-            setIsConnected(false);
-            setStatus('idle');
-            setIsSettingsOpen(true);
-            setActiveTab('subscription');
-            alert(`Daily Free Limit Reached.\n\nUsed: ${Math.floor(usageData.seconds / 60)} mins & ${usageData.commands} commands.\n\nPlease Upgrade to continue.`);
-          }
-      }
-  }, [usageData, subscriptionPlan, status]);
-
-  const handleLogin = () => signInWithPopup(auth, googleProvider).catch(console.error);
-  const handleLogout = () => signOut(auth);
-
-  const incrementCommandCount = () => {
-      setUsageData(prev => ({
-          ...prev,
-          commands: (prev.commands || 0) + 1
-      }));
-  };
-
   const cleanupMedia = () => {
-      // Close contexts
-      if (inputAudioContextRef.current) {
-          inputAudioContextRef.current.close();
-          inputAudioContextRef.current = null;
-      }
-      if (outputAudioContextRef.current) {
-          outputAudioContextRef.current.close();
-          outputAudioContextRef.current = null;
-      }
-      // Stop sources
-      if (scheduledSourcesRef.current) {
-          scheduledSourcesRef.current.forEach(source => {
-              try { source.stop(); } catch(e) {}
-          });
-          scheduledSourcesRef.current = [];
-      }
-      // Disconnect processor
-      if (scriptProcessorRef.current) {
-          scriptProcessorRef.current.disconnect();
-          scriptProcessorRef.current = null;
-      }
-      if (audioSourceRef.current) {
-          audioSourceRef.current.disconnect();
-          audioSourceRef.current = null;
-      }
+      if (inputAudioContextRef.current) { inputAudioContextRef.current.close(); inputAudioContextRef.current = null; }
+      if (outputAudioContextRef.current) { outputAudioContextRef.current.close(); outputAudioContextRef.current = null; }
+      if (scheduledSourcesRef.current) { scheduledSourcesRef.current.forEach(source => { try { source.stop(); } catch(e) {} }); scheduledSourcesRef.current = []; }
+      if (scriptProcessorRef.current) { scriptProcessorRef.current.disconnect(); scriptProcessorRef.current = null; }
+      if (audioSourceRef.current) { audioSourceRef.current.disconnect(); audioSourceRef.current = null; }
       
-      // Stop Video
-      if (videoIntervalRef.current) {
-          clearInterval(videoIntervalRef.current);
-          videoIntervalRef.current = null;
+      // FIX: Stop tracks on the audio stream explicitly
+      if (audioStreamRef.current) { 
+          audioStreamRef.current.getTracks().forEach(t => t.stop()); 
+          audioStreamRef.current = null; 
       }
-      if (videoStreamRef.current) {
-          videoStreamRef.current.getTracks().forEach(t => t.stop());
-          videoStreamRef.current = null;
-      }
-      
-      // Release Wake Lock
-      if (wakeLockRef.current) {
-          wakeLockRef.current.release()
-              .then(() => { wakeLockRef.current = null; })
-              .catch((e) => console.log('Wake Lock release error', e));
-      }
-      
+
+      if (videoIntervalRef.current) { clearInterval(videoIntervalRef.current); videoIntervalRef.current = null; }
+      if (videoStreamRef.current) { videoStreamRef.current.getTracks().forEach(t => t.stop()); videoStreamRef.current = null; }
+      if (wakeLockRef.current) { wakeLockRef.current.release().then(() => { wakeLockRef.current = null; }).catch((e) => console.log('Wake Lock release error', e)); }
       setIsCameraOn(false);
   };
 
   const startVideoTransmission = () => {
       if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
-
       videoIntervalRef.current = setInterval(() => {
           if (!sessionRef.current || !videoRef.current || !canvasRef.current) return;
-          
           const video = videoRef.current;
-          if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+          if (video.readyState >= 2) { 
               const canvas = canvasRef.current;
               const ctx = canvas.getContext('2d');
-              
-              // Increased scale from 0.25 to 0.4 for better detail (supports "exact motion" analysis)
               const scale = 0.4; 
               canvas.width = video.videoWidth * scale;
               canvas.height = video.videoHeight * scale;
-              
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              
-              // Get base64 string without prefix
               const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-              
-              sessionRef.current.sendRealtimeInput({
-                  media: { mimeType: 'image/jpeg', data: base64 }
-              });
+              sessionRef.current.sendRealtimeInput({ media: { mimeType: 'image/jpeg', data: base64 } });
           }
-      }, 100); // 10 FPS (100ms interval) for smoother, exact motion tracking
+      }, 100);
   };
 
   const toggleCamera = async () => {
       if (isCameraOn) {
-          // Stop Camera
-          if (videoStreamRef.current) {
-              videoStreamRef.current.getTracks().forEach(track => track.stop());
-              videoStreamRef.current = null;
-          }
-          if (videoIntervalRef.current) {
-              clearInterval(videoIntervalRef.current);
-              videoIntervalRef.current = null;
-          }
-          if (videoRef.current) {
-              videoRef.current.srcObject = null;
-          }
+          if (videoStreamRef.current) { videoStreamRef.current.getTracks().forEach(track => track.stop()); videoStreamRef.current = null; }
+          if (videoIntervalRef.current) { clearInterval(videoIntervalRef.current); videoIntervalRef.current = null; }
+          if (videoRef.current) { videoRef.current.srcObject = null; }
           setIsCameraOn(false);
       } else {
-          // Start Camera
           try {
               const stream = await navigator.mediaDevices.getUserMedia({ video: true });
               videoStreamRef.current = stream;
@@ -1297,80 +348,58 @@ export const App = () => {
                   await videoRef.current.play();
               }
               setIsCameraOn(true);
-              
-              // If connected, start streaming immediately
-              if (isConnected && sessionRef.current) {
-                  startVideoTransmission();
-              }
+              if (isConnected && sessionRef.current) startVideoTransmission();
           } catch (err) {
-              console.error("Camera Error:", err);
-              alert("Unable to access camera. Please allow permission in your browser settings.");
+              alert("Unable to access camera. Please allow permission.");
           }
       }
   };
 
-  const handleManualSearch = async (query) => {
-        try {
-            const video = await searchYouTube(apiKeys.youtube, query);
-            if (video) {
-                setCurrentVideo(video);
-                setIsYouTubeOpen(true);
-                setIsPlayerMinimized(false);
-                incrementCommandCount(); // Count as usage
-            } else {
-                alert("No video found for that query.");
-            }
-        } catch (e) {
-            alert(e.message);
-        }
-  };
-
   const connect = async () => {
+    if (status === 'connecting') return;
+
     if (isConnected) {
         cleanupMedia();
         setIsConnected(false);
         setStatus('idle');
-        setActiveSessionConfig(null);
         return;
     }
 
-    // Check Usage Limit before connecting
-    const currentPeriod = new Date().toISOString().slice(0, 10);
-    if (subscriptionPlan === 'free' && usageData.period === currentPeriod) {
-        if (usageData.seconds >= FREE_TIME_LIMIT_SECONDS || usageData.commands >= FREE_COMMAND_LIMIT) {
-            setIsSettingsOpen(true);
-            setActiveTab('subscription');
-            alert("Daily free limit reached. Please upgrade to continue.");
-            return;
-        }
-    }
+    try { if ('wakeLock' in navigator) wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch (err) { console.warn("Wake Lock not supported", err); }
     
-    // Acquire Wake Lock to keep screen alive
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLockRef.current = await navigator.wakeLock.request('screen');
-        }
-    } catch (err) {
-        console.warn("Wake Lock not supported or failed", err);
-    }
-    
-    setStatus('listening');
-    setActiveSessionConfig(currentConfig); // Capture config at start of session
-    
-    // Resolve session promise to handle initial audio stream race condition
-    let resolveSession;
-    const sessionPromise = new Promise(resolve => { resolveSession = resolve; });
+    setStatus('connecting');
 
-    // Initialize Audio Contexts
+    // FIX: Request Microphone Access IMMEDIATELY on User Gesture (Click)
+    let stream;
     try {
-        // Use default sample rate for better clarity and compatibility via browser resampling
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreamRef.current = stream; // Store for cleanup
+    } catch (err) {
+        console.error("Mic Access Error:", err);
+        alert(`Could not access microphone: ${err.message || "Permission denied"}. Please allow microphone access.`);
+        setStatus('error');
+        return;
+    }
+
+    try {
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        await outputAudioContextRef.current.resume(); // CRITICAL FIX: Ensure context is running (autoplay policy)
-        inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        await outputAudioContextRef.current.resume();
+        
+        // Mobile Safari/Chrome often prefers native sample rate or default. 
+        // We try 16k, but catch if it fails.
+        try {
+            inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        } catch (e) {
+            console.warn("16k AudioContext failed, falling back to default.", e);
+            inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+
         nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
     } catch (e) {
         console.error("Audio Context Error", e);
+        alert("Audio system initialization failed.");
         setStatus('error');
+        if (stream) stream.getTracks().forEach(t => t.stop());
         return;
     }
 
@@ -1378,43 +407,38 @@ export const App = () => {
         onopen: async () => {
             setIsConnected(true);
             setStatus('live');
-            if (connectionSound) {
-                const audio = new Audio(connectionSound);
-                audio.volume = ambientVolume;
-                audio.play().catch(e => console.warn("SFX failed", e));
+            if (connectionSound) new Audio(connectionSound).play().catch(() => {});
+            
+            // Safety check for AudioContext and stream presence
+            if (!inputAudioContextRef.current || !audioStreamRef.current) {
+                console.error("Audio Context or Stream is missing in onopen");
+                return;
             }
 
-            // Start Mic Streaming
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(stream);
+                // USE PRE-ACQUIRED STREAM
+                audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(audioStreamRef.current);
                 scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
                 
                 scriptProcessorRef.current.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
                     const pcmBlob = createBlob(inputData); 
-                    // CRITICAL: Solely rely on sessionPromise resolves
-                    sessionPromise.then((session: any) => {
-                         session.sendRealtimeInput({ media: pcmBlob });
-                    });
+                    // Safe send
+                    if (sessionRef.current) {
+                        try { sessionRef.current.sendRealtimeInput({ media: pcmBlob }); } catch(e) {}
+                    }
                 };
                 
                 audioSourceRef.current.connect(scriptProcessorRef.current);
                 scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
-
-                // Start Video Streaming if Camera was already on
-                if (isCameraOn) {
-                    startVideoTransmission();
-                }
+                if (isCameraOn) startVideoTransmission();
 
             } catch (err) {
-                console.error("Mic Error", err);
-                alert("Could not access microphone.");
+                console.error("Audio Setup Error", err);
                 setStatus('error');
             }
         },
         onmessage: async (msg) => {
-             // Audio Playback
              const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (audioData) {
                  setStatus('speaking');
@@ -1422,190 +446,39 @@ export const App = () => {
                      const binary = atob(audioData);
                      const bytes = new Uint8Array(binary.length);
                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                     
-                     // Decode raw PCM (16-bit little endian, 24kHz)
                      const buffer = await decodeAudioData(bytes, outputAudioContextRef.current, 24000, 1);
-                     
                      const source = outputAudioContextRef.current.createBufferSource();
                      source.buffer = buffer;
                      source.connect(outputAudioContextRef.current.destination);
-                     
-                     // Scheduling
                      const now = outputAudioContextRef.current.currentTime;
                      const startTime = Math.max(now, nextStartTimeRef.current);
                      source.start(startTime);
                      nextStartTimeRef.current = startTime + buffer.duration;
-                     
                      scheduledSourcesRef.current.push(source);
                      source.onended = () => {
                          scheduledSourcesRef.current = scheduledSourcesRef.current.filter(s => s !== source);
                          if (scheduledSourcesRef.current.length === 0) setStatus('live');
                      };
-                 } catch (e) {
-                     console.error("Audio Decode Error", e);
-                 }
+                 } catch (e) { console.error("Audio Decode Error", e); }
              }
-
-             // Handle Text Fallback if Audio is disabled
-             const textData = msg.serverContent?.modelTurn?.parts?.[0]?.text;
-             if (textData && useSystemVoice) {
-                  setStatus('speaking');
-                  await speakWithBrowser(textData, 'hi-IN');
-                  setStatus('live');
-             }
-
              if (msg.serverContent?.interrupted) {
-                 // Clear Queue
                  scheduledSourcesRef.current.forEach(s => s.stop());
                  scheduledSourcesRef.current = [];
                  nextStartTimeRef.current = outputAudioContextRef.current?.currentTime || 0;
-                 if (useSystemVoice) window.speechSynthesis.cancel();
-                 setStatus('listening'); // Back to listening immediately
-             }
-             
-             if (msg.toolCall?.functionCalls) {
-                 // Increment usage for each tool call
-                 incrementCommandCount();
-
-                 const responses = [];
-                 for (const call of msg.toolCall.functionCalls) {
-                     let result: Record<string, any> = { result: "ok" };
-                     const args = (call.args as any) || {};
-
-                     if (call.name === 'getWeather') {
-                         try {
-                             if (args.location) {
-                                 const summary = await fetchWeatherSummary(args.location);
-                                 result = { result: summary };
-                             } else {
-                                 result = { error: "Location is required for weather. Please ask the user for the city name." };
-                             }
-                         } catch (e) { result = { error: e.message }; }
-                     } 
-                     else if (call.name === 'getNews') {
-                         try {
-                             const news = await fetchNews(null, args.query || 'general');
-                             result = { result: news };
-                         } catch (e) { result = { error: e.message }; }
-                     } 
-                     else if (call.name === 'searchYouTube') {
-                         try {
-                             const video = await searchYouTube(apiKeys.youtube, args.query || '');
-                             if (video) {
-                                 setCurrentVideo(video);
-                                 setIsYouTubeOpen(true);
-                                 setIsPlayerMinimized(false);
-                                 result = { result: `Playing ${video.title}` };
-                             } else result = { result: "Not found" };
-                         } catch(e) { result = { error: e.message }; }
-                     } 
-                     else if (call.name === 'openSettings') {
-                         setIsSettingsOpen(true);
-                     } 
-                     else if (call.name === 'setTimer') {
-                         if (args.duration > 0) {
-                             setTimeout(() => {
-                                 new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
-                                 if (Notification.permission === 'granted') {
-                                    new Notification("Timer Done!");
-                                 } else {
-                                    alert("Timer Done!");
-                                 }
-                             }, args.duration * 1000);
-                             result = { result: `Timer set for ${args.duration} seconds.` };
-                         } else {
-                             result = { error: "Invalid duration" };
-                         }
-                     } 
-                     else if (call.name === 'open_whatsapp') {
-                         window.open('https://wa.me', '_blank');
-                         result = { result: "WhatsApp opened." };
-                     } 
-                     else if (call.name === 'send_whatsapp') {
-                         const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(args.message || '')}`;
-                         window.open(url, '_blank');
-                         result = { result: `WhatsApp draft opened for message: ${args.message}` };
-                     } 
-                     else if (call.name === 'make_phone_call') {
-                         const num = args.phoneNumber;
-                         if (num) {
-                             window.open(`tel:${num}`, '_self');
-                             result = { result: `Calling ${num}` };
-                         } else {
-                             result = { error: "Phone number required" };
-                         }
-                     }
-                     else if (call.name === 'send_email') {
-                        const subject = encodeURIComponent(args.subject || 'Subject');
-                        const body = encodeURIComponent(args.body || 'Body');
-                        const recipient = args.recipient ? `mailto:${args.recipient}` : 'mailto:';
-                        window.open(`${recipient}?subject=${subject}&body=${body}`, '_blank');
-                        result = { result: "Email composer opened" };
-                     }
-                     else if (call.name === 'open_external_app') {
-                         const app = args.appName;
-                         let url = '';
-                         switch(app) {
-                             case 'instagram': url = 'instagram://'; break; // Attempt deep link
-                             case 'google': url = 'https://google.com'; break;
-                             case 'file_manager': result = { result: "Cannot open native file manager from web, but opened browser upload." }; break; 
-                             default: url = 'https://google.com'; // Fallback
-                         }
-                         if (url) {
-                            // Try deep link, catch if failed (though mostly silent in browser)
-                            try { window.location.href = url; } catch(e) { window.open(url, '_blank'); }
-                            result = { result: `Attempted to open ${app}` };
-                         }
-                     }
-                     else if (call.name === 'controlMedia') {
-                         try {
-                             const cmd = args.command;
-                             if (!youtubePlayerRef.current && cmd !== 'stop') {
-                                 result = { error: "No video is currently playing." };
-                             } else {
-                                switch (cmd) {
-                                    case 'pause': youtubePlayerRef.current?.pause(); break;
-                                    case 'play': youtubePlayerRef.current?.play(); break;
-                                    case 'stop': setCurrentVideo(null); setIsYouTubeOpen(false); break;
-                                    case 'forward_10': youtubePlayerRef.current?.seekBy(10); break;
-                                    case 'forward_60': youtubePlayerRef.current?.seekBy(60); break;
-                                    case 'rewind_10': youtubePlayerRef.current?.seekBy(-10); break;
-                                    case 'rewind_600': youtubePlayerRef.current?.seekBy(-600); break;
-                                    case 'minimize': setIsPlayerMinimized(true); break;
-                                    case 'maximize': setIsPlayerMinimized(false); break;
-                                    default: result = { error: "Unknown command." };
-                                }
-                                result = { result: `Executed command: ${cmd}` };
-                             }
-                         } catch (e) {
-                             result = { error: "Failed to control media." };
-                         }
-                     }
-                     
-                     responses.push({
-                         id: call.id,
-                         name: call.name,
-                         response: result
-                     });
-                 }
-                 
-                 // Send tool response back to model
-                 sessionPromise.then((sess: any) => {
-                     sess.sendToolResponse({ functionResponses: responses });
-                 });
+                 setStatus('listening');
              }
         },
-        onclose: () => {
-             console.log("Session Closed");
-             setIsConnected(false);
-             setStatus('idle');
-             cleanupMedia();
+        onclose: () => { 
+            console.log("Session Closed"); 
+            setIsConnected(false); 
+            setStatus('idle'); 
+            cleanupMedia(); 
         },
         onerror: (err) => {
              console.error("Session Error", err);
-             // More descriptive error
-             if (err.toString().includes("NetworkError") || err.toString().includes("fetch")) {
-                 alert("Network Connection Failed. Please refresh and try again.");
+             const msg = err.toString();
+             if (msg.includes("403") || msg.includes("API Key")) {
+                 alert("Connection Failed: Invalid API Key. Please check your Vercel Environment Variables.");
              }
              setStatus('error');
              cleanupMedia();
@@ -1617,224 +490,50 @@ export const App = () => {
         const voiceConfig = gender === 'female' ? femaleVoices : maleVoices;
         const voiceName = voiceConfig.main;
         
-        // Pass all config to connection logic
         const session = await connectLiveSession(callbacks, {
-            customInstructions, 
-            coreProtocol, 
-            personality, // Pass the new personality state
-            voiceName, 
-            apiKey: apiKeys.gemini,
-            assistantName,
-            userName,
-            userBio,
-            subscriptionPlan, // Pass subscription plan
-            greetingMessage, // Pass the custom greeting
-            emotionTuning, // Pass emotion tuning
-            gender, // Pass explicit gender
-            useSystemVoice // Pass system voice preference
+            customInstructions, coreProtocol, personality, voiceName, apiKey: apiKeys.gemini,
+            assistantName, userName, userBio, subscriptionPlan, greetingMessage, emotionTuning, gender, useSystemVoice
         });
         
         sessionRef.current = session;
-        resolveSession(session);
     } catch (e) {
         console.error("Connection Failed", e);
-        if (e instanceof MainApiKeyError) {
-            alert(e.message);
+        if (audioStreamRef.current) {
+             audioStreamRef.current.getTracks().forEach(t => t.stop());
+             audioStreamRef.current = null;
+        }
+        if (e.toString().includes("API Key") || e instanceof MainApiKeyError) {
+             alert("Connection Failed: Invalid API Key. Please check Vercel settings.");
         } else {
-            alert("Connection Failed: " + (e.message || "Unknown error"));
+             alert("Connection Failed: " + (e.message || "Please check your network."));
         }
         setStatus('error');
-        cleanupMedia();
         setIsConnected(false);
     }
   };
 
-  const handleUpdateSession = () => {
-      // Reconnect to apply new settings
-      cleanupMedia();
-      setIsConnected(false);
-      setStatus('idle');
-      setTimeout(() => connect(), 500);
-  };
-
   return h('div', { className: `w-screen h-screen overflow-hidden flex flex-col items-center justify-center relative bg-black ${theme === 'light' ? 'bg-white text-black' : 'text-white'}` },
-        // Background Effects
         h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
             h('div', { className: "absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-900/20 rounded-full blur-3xl animate-pulse" }),
             h('div', { className: "absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-900/20 rounded-full blur-3xl animate-pulse", style: { animationDelay: '1s' } }),
             h('div', { className: "absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150" })
         ),
-
-        // Settings Button - Adjusted top position for Safe Area
-        h('button', { 
-            onClick: () => {
-                setIsSettingsOpen(true);
-                setIsFeedbackOpen(false); // Mutual exclusion
-            },
-            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" 
-        },
-            h(SettingsIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
-        ),
-
-        // Feedback Button - Adjusted top position for Safe Area
-        h('button', {
-            onClick: () => {
-                setIsFeedbackOpen(true);
-                setIsSettingsOpen(false); // Mutual exclusion
-            },
-            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group"
-        },
-            h(FeedbackIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
-        ),
-
-        // Update Prompt (Visible when settings change during live session)
-        isUpdateAvailable && h('div', { 
-            className: "absolute top-[calc(env(safe-area-inset-top)+6rem)] z-40 animate-fade-in" 
-        },
-            h('button', {
-                onClick: handleUpdateSession,
-                className: "flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:bg-yellow-500/30 transition-all font-bold text-sm backdrop-blur-md"
-            },
-                h('svg', { className: "w-4 h-4 animate-spin", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })),
-                "System Update Available"
-            )
-        ),
-        
-        // Video Preview (Fixed Position - Bottom Safe Area)
-        h('div', { 
-            className: `fixed bottom-[calc(env(safe-area-inset-bottom)+9rem)] right-6 z-50 transition-all duration-500 ${isCameraOn ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}` 
-        },
-            h('div', { className: "relative w-32 h-48 bg-black rounded-lg border border-cyan-500/30 overflow-hidden shadow-xl" },
-                h('video', { 
-                    ref: videoRef, 
-                    className: "w-full h-full object-cover transform -scale-x-100", 
-                    muted: true, 
-                    playsInline: true 
-                }),
-                h('div', { className: "absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" })
-            )
-        ),
+        h('button', { onClick: () => { setIsSettingsOpen(true); setIsFeedbackOpen(false); }, className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" }, h(SettingsIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })),
+        h('button', { onClick: () => { setIsFeedbackOpen(true); setIsSettingsOpen(false); }, className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" }, h(FeedbackIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })),
+        h('div', { className: `fixed bottom-[calc(env(safe-area-inset-bottom)+9rem)] right-6 z-50 transition-all duration-500 ${isCameraOn ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}` }, h('div', { className: "relative w-32 h-48 bg-black rounded-lg border border-cyan-500/30 overflow-hidden shadow-xl" }, h('video', { ref: videoRef, className: "w-full h-full object-cover transform -scale-x-100", muted: true, playsInline: true }), h('div', { className: "absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" }))),
         h('canvas', { ref: canvasRef, className: "hidden" }),
-
-        // Main Content Area with Safe Area Padding
         h('div', { className: "z-10 flex flex-col items-center justify-center w-full h-full p-4 pb-32 pt-safe" },
-            // Status Indicator
-            h('div', { className: `mb-8 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md transition-all duration-500 ${
-                status === 'live' || status === 'speaking' || status === 'listening' 
-                ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' 
-                : status === 'error'
-                ? 'bg-red-500/10 border-red-500/50 text-red-400'
-                : 'bg-white/5 border-white/10 text-gray-500'
-            }`},
-                h('div', { className: `w-2 h-2 rounded-full ${
-                    status === 'live' || status === 'speaking' ? 'bg-cyan-400 animate-pulse' : 
-                    status === 'listening' ? 'bg-green-400 animate-pulse' :
-                    status === 'error' ? 'bg-red-400' : 'bg-gray-500'
-                }`}),
-                t(`main.status.${status}`)
-            ),
-
-            // Avatar
-            h(Avatar, { 
-                state: status, 
-                mood: 'neutral', 
-                customUrl: avatarUrl
-            }),
-
-            // Assistant Name
-            h('h1', { className: "mt-8 text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 tracking-tight" }, 
-                assistantName
-            )
+            h('div', { className: `mb-8 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md transition-all duration-500 ${status === 'live' || status === 'speaking' || status === 'listening' ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : status === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-400' : 'bg-white/5 border-white/10 text-gray-500'}`}, h('div', { className: `w-2 h-2 rounded-full ${status === 'live' || status === 'speaking' ? 'bg-cyan-400 animate-pulse' : status === 'listening' ? 'bg-green-400 animate-pulse' : status === 'error' ? 'bg-red-400' : 'bg-gray-500'}`}), t(`main.status.${status}`)),
+            h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl }),
+            h('h1', { className: "mt-8 text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 tracking-tight" }, assistantName)
         ),
-
-        // Footer Controls - Bottom Safe Area
         h('div', { className: "fixed bottom-[calc(env(safe-area-inset-bottom)+2.5rem)] z-30 flex items-center gap-4" },
-            // Camera Toggle
-            h('button', {
-                onClick: toggleCamera,
-                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
-                    isCameraOn 
-                    ? 'bg-white text-black hover:bg-gray-200' 
-                    : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
-                }`
-            },
-                isCameraOn ? h(CameraIcon, { className: "w-6 h-6" }) : h(CameraOffIcon, { className: "w-6 h-6" })
-            ),
-
-            // Connect Button
-            h('button', {
-                onClick: connect,
-                disabled: status === 'error',
-                className: `relative group px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 flex items-center gap-3 overflow-hidden shadow-2xl ${
-                    isConnected 
-                    ? 'bg-red-500/10 hover:bg-red-600/20 text-red-400 border border-red-500/50' 
-                    : 'bg-white text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]'
-                }`
-            },
-                isConnected 
-                ? h(DisconnectIcon, { className: "w-6 h-6" }) 
-                : h(ConnectIcon, { className: "w-6 h-6" }),
-                h('span', null, isConnected ? t('footer.disconnect') : t('footer.connect')),
-                
-                // Button Glow Effect
-                !isConnected && h('div', { className: "absolute inset-0 rounded-full ring-2 ring-white/50 animate-ping opacity-20" })
-            ),
-
-            // YouTube Toggle Button (Manual Open)
-             h('button', {
-                onClick: () => {
-                     setIsYouTubeOpen(!isYouTubeOpen);
-                     if (!isYouTubeOpen) setIsPlayerMinimized(false);
-                },
-                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
-                    isYouTubeOpen 
-                    ? 'bg-red-600 text-white hover:bg-red-700' 
-                    : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
-                }`
-            },
-                h(YouTubeIcon, { className: "w-6 h-6" })
-            )
+            h('button', { onClick: toggleCamera, className: `p-4 rounded-full transition-all duration-300 shadow-xl ${isCameraOn ? 'bg-white text-black hover:bg-gray-200' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'}` }, isCameraOn ? h(CameraIcon, { className: "w-6 h-6" }) : h(CameraOffIcon, { className: "w-6 h-6" })),
+            h('button', { onClick: connect, disabled: status === 'error', className: `relative group px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 flex items-center gap-3 overflow-hidden shadow-2xl ${isConnected ? 'bg-red-500/10 hover:bg-red-600/20 text-red-400 border border-red-500/50' : 'bg-white text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]'}` }, isConnected ? h(DisconnectIcon, { className: "w-6 h-6" }) : h(ConnectIcon, { className: "w-6 h-6" }), h('span', null, isConnected ? t('footer.disconnect') : t('footer.connect')), !isConnected && h('div', { className: "absolute inset-0 rounded-full ring-2 ring-white/50 animate-ping opacity-20" })),
+             h('button', { onClick: () => { setIsYouTubeOpen(!isYouTubeOpen); if (!isYouTubeOpen) setIsPlayerMinimized(false); }, className: `p-4 rounded-full transition-all duration-300 shadow-xl ${isYouTubeOpen ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'}` }, h(YouTubeIcon, { className: "w-6 h-6" }))
         ),
-
-        // Components Overlay (YouTube is z-40, Modals are z-60+)
-        isYouTubeOpen && h(YouTubePlayer, { 
-            ref: youtubePlayerRef,
-            video: currentVideo, 
-            onClose: () => { setIsYouTubeOpen(false); },
-            isMinimized: isPlayerMinimized,
-            onSearch: handleManualSearch
-        }),
-        
-        h(FeedbackModal, {
-            isOpen: isFeedbackOpen,
-            onClose: () => setIsFeedbackOpen(false)
-        }),
-        
-        h(SettingsModal, {
-            isOpen: isSettingsOpen,
-            onClose: () => setIsSettingsOpen(false),
-            activeTab, setActiveTab,
-            theme, setTheme,
-            gender, setGender,
-            assistantName, setAssistantName,
-            userName, setUserName,
-            greetingMessage, setGreetingMessage,
-            customInstructions, setCustomInstructions,
-            coreProtocol, setCoreProtocol,
-            userBio, setUserBio,
-            personality, setPersonality,
-            emotionTuning, setEmotionTuning,
-            apiKeys, setApiKeys,
-            lang, setLang,
-            femaleVoices, setFemaleVoices,
-            maleVoices, setMaleVoices,
-            ambientVolume, setAmbientVolume,
-            connectionSound, setConnectionSound,
-            avatarUrl, setAvatarUrl,
-            subscriptionPlan, setSubscriptionPlan,
-            usageData,
-            useSystemVoice, setUseSystemVoice,
-            user, handleLogin, handleLogout
-        })
+        isYouTubeOpen && h(YouTubePlayer, { ref: youtubePlayerRef, video: currentVideo, onClose: () => { setIsYouTubeOpen(false); }, isMinimized: isPlayerMinimized, onSearch: handleManualSearch }),
+        h(FeedbackModal, { isOpen: isFeedbackOpen, onClose: () => setIsFeedbackOpen(false) }),
+        h(SettingsModal, { isOpen: isSettingsOpen, onClose: () => setIsSettingsOpen(false), activeTab, setActiveTab, theme, setTheme, gender, setGender, assistantName, setAssistantName, userName, setUserName, greetingMessage, setGreetingMessage, customInstructions, setCustomInstructions, coreProtocol, setCoreProtocol, userBio, setUserBio, personality, setPersonality, emotionTuning, setEmotionTuning, apiKeys, setApiKeys, lang, setLang, femaleVoices, setFemaleVoices, maleVoices, setMaleVoices, ambientVolume, setAmbientVolume, connectionSound, setConnectionSound, avatarUrl, setAvatarUrl, subscriptionPlan, setSubscriptionPlan, usageData, useSystemVoice, setUseSystemVoice, user, handleLogin, handleLogout })
   );
 };
