@@ -1,4 +1,3 @@
-
 {
   "appName": "कनिष्का",
   "header": {
@@ -193,6 +192,8 @@
       "version": "संस्करण",
       "privacyPolicy": "गोपनीयता नीति",
       "termsOfService": "सेवा की शर्तें",
+      "refundPolicy": "धन वापसी नीति",
+      "sitemap": "साइटमैप",
       "reportBug": "बग रिपोर्ट करें"
     },
     "common": {
