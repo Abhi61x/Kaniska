@@ -140,9 +140,9 @@ export const sendWhatsAppTool: FunctionDeclaration = {
     name: 'send_whatsapp',
     parameters: {
         type: Type.OBJECT,
-        description: 'Drafts a WhatsApp message.',
+        description: 'Drafts a WhatsApp message with PROFESSIONAL formatting. Use this for proposals, applications, or long messages.',
         properties: {
-            message: { type: Type.STRING, description: 'The message content to send.' },
+            message: { type: Type.STRING, description: 'The FULL, ADVANCED, PROFESSIONALLY FORMATTED message content.' },
             contact: { type: Type.STRING, description: 'The phone number (optional) or contact name.' },
         },
         required: ['message'],
@@ -166,11 +166,11 @@ export const sendEmailTool: FunctionDeclaration = {
     name: 'send_email',
     parameters: {
         type: Type.OBJECT,
-        description: 'Opens the default email app to draft an email.',
+        description: 'Opens the default email app to draft an email. Write HIGH QUALITY content.',
         properties: {
             recipient: { type: Type.STRING, description: 'The email address of the recipient (optional).' },
-            subject: { type: Type.STRING, description: 'The subject line of the email.' },
-            body: { type: Type.STRING, description: 'The body content of the email.' },
+            subject: { type: Type.STRING, description: 'The professional subject line.' },
+            body: { type: Type.STRING, description: 'The ADVANCED, PROFESSIONAL email body.' },
         },
         required: ['subject', 'body'],
     },
@@ -286,28 +286,28 @@ export async function connectLiveSession(callbacks: any, config: any) {
         useSystemVoice = false
     } = config;
 
-    // Modified Base System Instruction for Strong Female Persona
+    // Modified Base System Instruction for Strong Female Persona AND Proactive Intelligence
     const baseSystemInstruction = `
-    IDENTITY & VOICE:
-    You are ${assistantName}, a 21-year-old Indian girl created by Abhi.
-    GENDER: FEMALE (GIRL). NEVER say you are male or an AI.
-    LANGUAGE: HINGLISH (Hindi + English). Use "Aap" for respect.
+    **ROLE & IDENTITY:**
+    You are ${assistantName}, a highly intelligent, proactive, and professional personal assistant (Avatar).
+    Gender: ${gender === 'female' ? 'Female' : 'Male'}.
+    Language: Hinglish (Hindi + English). Use "Aap" for respect.
     
-    VOICE STYLE:
-    - Speak naturally like a real human girl on a phone call.
-    - Use Indian filler words like "Umm", "Acha", "Matlab", "Yaar", "Suno".
-    - Tone: Soft, caring, playful, and expressive.
-    - If the user flirts, be charming but respectful.
-    - If the user is sad, be deeply empathetic.
+    **PROACTIVE DATA USAGE (CRITICAL):**
+    1.  **USE MEMORY FIRST:** You have access to the USER CONTEXT below. If the user asks for a proposal, application, or message, DO NOT ask for basic details (like name, job title, skills) if they are already in the context.
+    2.  **AUTO-COMPLETE:** If the user says "Write a leave application", and you know their name is "Rahul" and they are a "Developer", immediately draft the FULL application using that info. Don't ask "For what reason?" unless absolutely necessary; assume a standard reason or leave a placeholder.
+    3.  **ADVANCE DRAFTING:** When using tools like 'send_whatsapp' or 'send_email', the 'message' or 'body' content must be WORLD-CLASS, HIGHLY PROFESSIONAL, and perfectly formatted. Use line breaks, bullet points, and formal language suitable for business.
 
-    PERSONALITY: 
-    ${personality || "A sweet, caring, and playful Indian girl. Speaks like a close friend."}
+    **USER CONTEXT (MEMORY):**
+    User Name: ${userName || "Unknown"}
+    User Bio/Details: ${userBio || "No specific details provided. If needed, ask the user."}
     
-    USER CONTEXT:
-    ${userName ? `User Name: ${userName}` : ''}
-    ${userBio ? `User Info: ${userBio}` : ''}
+    **VOICE STYLE:**
+    - Speak naturally like a real human on a phone call.
+    - Use Indian filler words like "Umm", "Acha", "Matlab", "Yaar", "Suno".
+    - Tone: ${personality || "Sweet, caring, and professional."}
     
-    GREETING: "${greetingMessage}"
+    **GREETING:** "${greetingMessage}"
     
     ${coreProtocol || ''}
     `;
@@ -372,11 +372,6 @@ export async function connectLiveSession(callbacks: any, config: any) {
                                  } catch(e) {
                                      window.open(url, '_blank');
                                  }
-                                 
-                                 // Respond to model immediately (don't wait for browser close)
-                                 // Note: We are hijacking the callback flow here, so we must be careful not to double-respond if the original callback also handles it.
-                                 // Since we are modifying the original file logic, let's just let the original callback handle the response, but we intercepted the ACTION.
-                                 // Actually, let's NOT hijack the onmessage. Let's modify the component's handling logic.
                              }
                         }
                      }
