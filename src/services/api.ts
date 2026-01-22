@@ -6,11 +6,12 @@ const WEATHER_API_KEY = "a9d473331d424f9699a82612250812"; // WeatherAPI.com
 const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 
 // Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
+// अगर आप चाहते हैं कि बिना सेटिंग में डाले YouTube चले, तो अपनी Key यहाँ "" के बीच में पेस्ट कर दें।
+// उदाहरण: ... || "AIzaSyD_zp_YOUR_KEY_HERE";
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
-// FIX: Securely retrieve Gemini Key for Vite/Vercel environments
-// Vercel requires VITE_ prefix for client-side environment variables
-const ENV_GEMINI_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+// This variable is configured in vite.config.ts to pull from .env (VITE_GEMINI_API_KEY).
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -50,15 +51,17 @@ export class ServiceError extends Error {
   }
 }
 
-
-const ai = new GoogleGenAI({ apiKey: ENV_GEMINI_KEY });
+// Initialize the GoogleGenAI client
+// We use a fallback 'missing_key' if process.env.API_KEY is empty to prevent the app from crashing immediately on load.
+// The actual API call will fail gracefully with an authentication error, which is caught by handleGeminiError.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || 'missing_key' });
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
 function handleGeminiError(error: any, context = 'processing your request') {
     console.error(`Error calling the Gemini API during ${context}:`, error);
     const errorMessage = (error.message || error.toString() || '').toLowerCase();
 
-    if (errorMessage.includes('api key not valid') || errorMessage.includes('api_key')) {
+    if (errorMessage.includes('api key not valid') || errorMessage.includes('api_key') || errorMessage.includes('api key must be set')) {
         return new MainApiKeyError("I can't connect to my core services. This app's main API key seems to be invalid or missing.");
     }
     if (errorMessage.includes('rate limit')) {
@@ -321,8 +324,14 @@ export async function connectLiveSession(callbacks: any, config: any) {
         : baseSystemInstruction;
 
     // Use the correctly resolved key
-    const activeKey = apiKey || ENV_GEMINI_KEY;
-    if (!activeKey) throw new MainApiKeyError("No API Key available. Please check Vercel settings and add VITE_GEMINI_API_KEY.");
+    const activeKey = apiKey || process.env.API_KEY || 'missing_key';
+    
+    // Check key before creating client to throw specific error if missing (user-provided override)
+    // Note: The global 'ai' instance uses the dummy key, so we only throw if activeKey is explicitly bad in session.
+    // However, we want to allow the call to fail at the SDK level or checking here.
+    if (!activeKey || activeKey === 'missing_key') {
+         throw new MainApiKeyError("No API Key available. Please check Vercel settings and add VITE_GEMINI_API_KEY.");
+    }
     
     const client = new GoogleGenAI({ apiKey: activeKey });
 
@@ -444,14 +453,27 @@ export async function fetchNews(apiKey: string | null, query: string) {
 }
 
 export async function searchYouTube(userApiKey: string, query: string) {
-    // Prioritize Environment Key if user key is empty
-    const apiKey = userApiKey || ENV_YOUTUBE_KEY;
+    // Prioritize User Key -> Then Environment Key
+    // If userApiKey is empty, it falls back to ENV_YOUTUBE_KEY automatically.
+    const apiKey = userApiKey?.trim() ? userApiKey : ENV_YOUTUBE_KEY;
 
-    if (!apiKey) throw new ApiKeyError("No YouTube Key", 'youtube');
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query)}&type=video&key=${apiKey}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.items?.[0] ? { videoId: data.items[0].id.videoId, title: data.items[0].snippet.title, channelTitle: data.items[0].snippet.channelTitle } : null;
+    if (!apiKey) throw new ApiKeyError("No YouTube Key Available. Please check settings or .env file.", 'youtube');
+    
+    try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query)}&type=video&key=${apiKey}`);
+        
+        if (!res.ok) {
+             const errData = await res.json();
+             console.error("YouTube API Error:", errData);
+             throw new Error("YouTube API Request Failed");
+        }
+        
+        const data = await res.json();
+        return data.items?.[0] ? { videoId: data.items[0].id.videoId, title: data.items[0].snippet.title, channelTitle: data.items[0].snippet.channelTitle } : null;
+    } catch (e) {
+        console.error("YouTube Search Error:", e);
+        return null;
+    }
 }
 
 export async function generateSpeech(text: string, voiceName: string, apiKey: string) {
@@ -463,7 +485,16 @@ export async function generateSpeech(text: string, voiceName: string, apiKey: st
     });
 }
 
-export async function validateYouTubeKey(k: string) { return { success: !!k }; }
+// Modified validation to return success if empty (implies using system key)
+export async function validateYouTubeKey(k: string) { 
+    if (!k || k.trim() === '') {
+        // If ENV key exists, this is valid as "System Default"
+        if (ENV_YOUTUBE_KEY) return { success: true, message: "Using System Key" };
+        return { success: false, message: "No key provided" };
+    }
+    return { success: !!k }; 
+}
+
 export async function validateAuddioKey(k: string) { return { success: !!k }; }
 export async function createCashfreeOrder(planId: string, amount: number, customerId: string, customerPhone: string, customerEmail: string) { return "mock_session"; } // Mocked
 export async function processCodeCommand() { return {}; }

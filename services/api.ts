@@ -1,7 +1,5 @@
-
-
-
 import { GoogleGenAI, Modality, FunctionDeclaration, Type } from '@google/genai';
+import { Browser } from '@capacitor/browser';
 
 // Internal API Keys
 const WEATHER_API_KEY = "a9d473331d424f9699a82612250812"; // WeatherAPI.com
@@ -10,9 +8,10 @@ const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 // Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
-// FIX: Securely retrieve Gemini Key for Vite/Vercel environments
-// Vercel requires VITE_ prefix for client-side environment variables
-const ENV_GEMINI_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+// FIX for Android Black Screen: 
+// Browsers/WebViews do NOT have 'process'. Accessing 'process.env' throws a ReferenceError and crashes the app immediately.
+// However, vite.config.ts uses `define` to replace `process.env.API_KEY` with a string literal at build time.
+// This allows us to follow the coding guideline: const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -53,7 +52,7 @@ export class ServiceError extends Error {
 }
 
 
-const ai = new GoogleGenAI({ apiKey: ENV_GEMINI_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
 function handleGeminiError(error: any, context = 'processing your request') {
@@ -68,6 +67,9 @@ function handleGeminiError(error: any, context = 'processing your request') {
     }
     if (errorMessage.includes('blocked') || errorMessage.includes('safety')) {
         return new Error("I am unable to provide a response to that due to my safety guidelines. Please try a different topic.");
+    }
+    if (errorMessage.includes('unavailable') || errorMessage.includes('503')) {
+        return new ServiceError("The AI service is currently unavailable (High Load). Please try again in a few seconds.");
     }
     if (error instanceof TypeError && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
          return new Error("I'm unable to connect to Gemini services. Please check your internet connection and try again.");
@@ -142,9 +144,9 @@ export const sendWhatsAppTool: FunctionDeclaration = {
     name: 'send_whatsapp',
     parameters: {
         type: Type.OBJECT,
-        description: 'Drafts a WhatsApp message.',
+        description: 'Drafts a WhatsApp message with PROFESSIONAL formatting. Use this for proposals, applications, or long messages.',
         properties: {
-            message: { type: Type.STRING, description: 'The message content to send.' },
+            message: { type: Type.STRING, description: 'The FULL, ADVANCED, PROFESSIONALLY FORMATTED message content.' },
             contact: { type: Type.STRING, description: 'The phone number (optional) or contact name.' },
         },
         required: ['message'],
@@ -168,11 +170,11 @@ export const sendEmailTool: FunctionDeclaration = {
     name: 'send_email',
     parameters: {
         type: Type.OBJECT,
-        description: 'Opens the default email app to draft an email.',
+        description: 'Opens the default email app to draft an email. Write HIGH QUALITY content.',
         properties: {
             recipient: { type: Type.STRING, description: 'The email address of the recipient (optional).' },
-            subject: { type: Type.STRING, description: 'The subject line of the email.' },
-            body: { type: Type.STRING, description: 'The body content of the email.' },
+            subject: { type: Type.STRING, description: 'The professional subject line.' },
+            body: { type: Type.STRING, description: 'The ADVANCED, PROFESSIONAL email body.' },
         },
         required: ['subject', 'body'],
     },
@@ -255,7 +257,8 @@ export function speakWithBrowser(text: string, lang = 'hi-IN') {
 }
 
 // Helper for retrying async operations
-async function retryOperation(operation: () => Promise<any>, retries = 3, delay = 1000): Promise<any> {
+// Increased delay to 2000ms to better handle Service Unavailable (503) errors
+async function retryOperation(operation: () => Promise<any>, retries = 3, delay = 2000): Promise<any> {
     try {
         return await operation();
     } catch (error: any) {
@@ -288,28 +291,28 @@ export async function connectLiveSession(callbacks: any, config: any) {
         useSystemVoice = false
     } = config;
 
-    // Modified Base System Instruction for Strong Female Persona
+    // Modified Base System Instruction for Strong Female Persona AND Proactive Intelligence
     const baseSystemInstruction = `
-    IDENTITY & VOICE:
-    You are ${assistantName}, a 21-year-old Indian girl created by Abhi.
-    GENDER: FEMALE (GIRL). NEVER say you are male or an AI.
-    LANGUAGE: HINGLISH (Hindi + English). Use "Aap" for respect.
+    **ROLE & IDENTITY:**
+    You are ${assistantName}, a highly intelligent, proactive, and professional personal assistant (Avatar).
+    Gender: ${gender === 'female' ? 'Female' : 'Male'}.
+    Language: Hinglish (Hindi + English). Use "Aap" for respect.
     
-    VOICE STYLE:
-    - Speak naturally like a real human girl on a phone call.
-    - Use Indian filler words like "Umm", "Acha", "Matlab", "Yaar", "Suno".
-    - Tone: Soft, caring, playful, and expressive.
-    - If the user flirts, be charming but respectful.
-    - If the user is sad, be deeply empathetic.
+    **PROACTIVE DATA USAGE (CRITICAL):**
+    1.  **USE MEMORY FIRST:** You have access to the USER CONTEXT below. If the user asks for a proposal, application, or message, DO NOT ask for basic details (like name, job title, skills) if they are already in the context.
+    2.  **AUTO-COMPLETE:** If the user says "Write a leave application", and you know their name is "Rahul" and they are a "Developer", immediately draft the FULL application using that info. Don't ask "For what reason?" unless absolutely necessary; assume a standard reason or leave a placeholder.
+    3.  **ADVANCE DRAFTING:** When using tools like 'send_whatsapp' or 'send_email', the 'message' or 'body' content must be WORLD-CLASS, HIGHLY PROFESSIONAL, and perfectly formatted. Use line breaks, bullet points, and formal language suitable for business.
 
-    PERSONALITY: 
-    ${personality || "A sweet, caring, and playful Indian girl. Speaks like a close friend."}
+    **USER CONTEXT (MEMORY):**
+    User Name: ${userName || "Unknown"}
+    User Bio/Details: ${userBio || "No specific details provided. If needed, ask the user."}
     
-    USER CONTEXT:
-    ${userName ? `User Name: ${userName}` : ''}
-    ${userBio ? `User Info: ${userBio}` : ''}
+    **VOICE STYLE:**
+    - Speak naturally like a real human on a phone call.
+    - Use Indian filler words like "Umm", "Acha", "Matlab", "Yaar", "Suno".
+    - Tone: ${personality || "Sweet, caring, and professional."}
     
-    GREETING: "${greetingMessage}"
+    **GREETING:** "${greetingMessage}"
     
     ${coreProtocol || ''}
     `;
@@ -319,7 +322,7 @@ export async function connectLiveSession(callbacks: any, config: any) {
         : baseSystemInstruction;
 
     // Use the correctly resolved key
-    const activeKey = apiKey || ENV_GEMINI_KEY;
+    const activeKey = apiKey || process.env.API_KEY;
     if (!activeKey) throw new MainApiKeyError("No API Key available. Please check Vercel settings and add VITE_GEMINI_API_KEY.");
     
     const client = new GoogleGenAI({ apiKey: activeKey });
@@ -348,12 +351,44 @@ export async function connectLiveSession(callbacks: any, config: any) {
     try {
         const connectOp = () => client.live.connect({
             model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
-            callbacks,
+            callbacks: {
+                ...callbacks,
+                onmessage: async (msg: any) => {
+                     // Intercept tool calls for Native Handlers
+                     if (msg.toolCall?.functionCalls) {
+                        for (const call of msg.toolCall.functionCalls) {
+                             if (call.name === 'open_external_app') {
+                                 // Handle native browser open
+                                 const args = (call.args as any) || {};
+                                 const app = args.appName;
+                                 let url = '';
+                                 switch(app) {
+                                     case 'instagram': url = 'https://instagram.com'; break;
+                                     case 'facebook': url = 'https://facebook.com'; break;
+                                     case 'google': url = 'https://google.com'; break;
+                                     case 'twitter': url = 'https://twitter.com'; break;
+                                     case 'maps': url = 'https://maps.google.com'; break;
+                                     default: url = 'https://google.com';
+                                 }
+                                 
+                                 // Use Capacitor Browser if available, fallback to window.open
+                                 try {
+                                     await Browser.open({ url });
+                                 } catch(e) {
+                                     window.open(url, '_blank');
+                                 }
+                             }
+                        }
+                     }
+                     // Pass through to original callback
+                     if (callbacks.onmessage) callbacks.onmessage(msg);
+                }
+            },
             config: sessionConfig
         });
 
         // Use retry logic
-        const sessionPromise = await retryOperation(connectOp, 2, 1000);
+        const sessionPromise = await retryOperation(connectOp, 2, 2000);
 
         // Initialize session handling immediately after connection
         // Monkey-patch sendRealtimeInput to be safe against closed sockets

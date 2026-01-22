@@ -25,7 +25,12 @@
         -webkit-user-select: none;
         touch-action: manipulation; /* Optimize touch */
         -webkit-tap-highlight-color: transparent; /* Remove blue tap box */
-        padding-top: env(safe-area-inset-top); /* Status bar protection */
+        overscroll-behavior: none; /* Prevent rubber banding */
+      }
+      
+      /* Prevent iOS Zoom on focus */
+      input, select, textarea {
+        font-size: 16px !important;
       }
       
       /* Theme Variables */
@@ -152,13 +157,16 @@
     "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.1",
     "@capacitor/status-bar": "https://esm.sh/@capacitor/status-bar@^8.0.0",
     "@capacitor/browser": "https://esm.sh/@capacitor/browser@^8.0.0",
-    "@capacitor/app": "https://esm.sh/@capacitor/app@^8.0.0"
+    "@capacitor/app": "https://esm.sh/@capacitor/app@^8.0.0",
+    "path": "https://esm.sh/path@^0.12.7"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>
