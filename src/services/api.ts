@@ -8,7 +8,6 @@ const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 
 /**
  * YouTube API Key Retrieval
- * Prioritizes VITE_ prefix for browser safety, falls back to standard name
  */
 const ENV_YOUTUBE_KEY = 
   (import.meta as any).env?.VITE_YOUTUBE_API_KEY || 
@@ -57,21 +56,12 @@ function handleGeminiError(error: any, context = 'processing your request') {
     const errorMessage = (error.message || error.toString() || '').toLowerCase();
 
     if (errorMessage.includes('api key not valid') || errorMessage.includes('api_key')) {
-        return new MainApiKeyError("I can't connect to my core services. This app's main API key seems to be invalid or missing.");
+        return new MainApiKeyError("I can't connect to my core services. API key is invalid.");
     }
     if (errorMessage.includes('rate limit')) {
-        return new RateLimitError("I'm receiving a lot of requests right now. To avoid interruptions, please wait a moment before trying again.");
+        return new RateLimitError("I'm receiving too many requests. Please wait.");
     }
-    if (errorMessage.includes('blocked') || errorMessage.includes('safety')) {
-        return new Error("I am unable to provide a response to that due to my safety guidelines. Please try a different topic.");
-    }
-    if (errorMessage.includes('unavailable') || errorMessage.includes('503')) {
-        return new ServiceError("The AI service is currently unavailable (High Load). Please try again in a few seconds.");
-    }
-    if (error instanceof TypeError && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
-         return new Error("I'm unable to connect to Gemini services. Please check your internet connection and try again.");
-    }
-    return new ServiceError(`I encountered an unexpected issue while ${context}. The service might be temporarily busy.`);
+    return new ServiceError(`Unexpected issue: ${context}`);
 }
 
 export const openSettingsTool: FunctionDeclaration = {
@@ -183,11 +173,9 @@ export async function connectLiveSession(callbacks: any, config: any) {
     const baseSystemInstruction = `
     **IDENTITY:**
     You are ${assistantName}. You can control the phone via 'automatePhone'.
-    
     **USER:** ${userName}
     **PERSONALITY:** ${personality}
     **GREETING:** "${greetingMessage}"
-    
     ${coreProtocol || ''}
     `;
 
@@ -205,7 +193,12 @@ export async function connectLiveSession(callbacks: any, config: any) {
                 openExternalAppTool, automatePhoneTool
             ] }],
             systemInstruction: baseSystemInstruction,
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+            // FIX: Using explicit casting to 'any' to satisfy TypeScript compiler on Vercel
+            speechConfig: { 
+                voiceConfig: { 
+                    prebuiltVoiceConfig: { voiceName } 
+                } 
+            } as any,
         }
     };
 
@@ -228,8 +221,7 @@ export async function connectLiveSession(callbacks: any, config: any) {
             config: sessionConfig.config
         });
 
-        const session = await retryOperation(connectOp);
-        return session;
+        return await retryOperation(connectOp);
     } catch (e: any) {
         throw handleGeminiError(e, 'connecting to session');
     }
@@ -241,7 +233,6 @@ export async function fetchNews(apiKey: string | null, query: string) { return "
 export async function searchYouTube(userApiKey: string, query: string) {
     const apiKey = userApiKey || ENV_YOUTUBE_KEY;
     if (!apiKey) throw new ApiKeyError("Missing YouTube API Key", 'youtube');
-    
     const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=${encodeURIComponent(query)}&type=video&key=${apiKey}`);
     if (!res.ok) return null;
     const data = await res.json();
@@ -257,7 +248,10 @@ export async function generateSpeech(text: string, voiceName: string) {
     return await client.models.generateContentStream({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text }] }],
-        config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { voiceName } } },
+        config: { 
+            responseModalities: [Modality.AUDIO], 
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } as any
+        },
     });
 }
 
