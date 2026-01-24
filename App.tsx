@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useRef, useImperativeHandle } from 'react';
 import { Modality } from '@google/genai';
+// FIX: Updated import path to point to the more complete service file in src/
 import { 
     processUserCommand, 
     generateSpeech, 
@@ -8,7 +10,7 @@ import {
     createCashfreeOrder, 
     connectLiveSession,
     searchYouTube
-} from './services/api.ts';
+} from './src/services/api.ts';
 import { useTranslation, availableLanguages } from './i18n/index.tsx';
 import { auth, db, googleProvider } from './firebase.ts';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -280,7 +282,8 @@ export const App = () => {
     const [userName, setUserName] = usePersistentState('kaniska-user-name', 'User', user);
     const [greetingMessage, setGreetingMessage] = usePersistentState('kaniska-greeting', DEFAULT_FEMALE_GREETING, user);
     const [customInstructions, setCustomInstructions] = usePersistentState('kaniska-instructions', DEFAULT_CUSTOM_INSTRUCTIONS, user);
-    const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' }, user);
+    // REMOVED: Gemini API Key from persistent state as it must come from process.env.API_KEY exclusively.
+    const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '' }, user);
     const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' }, user);
     const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' }, user);
     const [avatarUrl, setAvatarUrl] = usePersistentState('kaniska-avatar', '', user);
@@ -315,7 +318,8 @@ export const App = () => {
                 onerror: () => { setStatus('error'); setIsConnected(false); }
             }, {
                 customInstructions, voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main,
-                assistantName, userName, greetingMessage, apiKey: apiKeys.gemini
+                // REMOVED: apiKey passing as connectLiveSession will use process.env.API_KEY directly.
+                assistantName, userName, greetingMessage
             });
             sessionRef.current = session;
         } catch (e) { setStatus('error'); }

@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession, speakWithBrowser } from '../services/api.ts';
+// FIX: Updated import path to use the more complete sibling file in src/services/
+import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession, speakWithBrowser } from './services/api.ts';
 import { useTranslation, availableLanguages } from '../i18n/index.tsx';
 import { auth, db, googleProvider } from '../firebase.ts';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -20,7 +22,7 @@ const DisconnectIcon = ({ className }: any) => h('svg', { className, xmlns: "htt
 const PersonaIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "8", r: "5" }), h('path', { d: "M20 21a8 8 0 0 0-16 0" }));
 const VoiceIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), h('path', { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), h('line', { x1: "12", y1: "19", x2: "12", y2: "22" }));
 const ApiKeysIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19.9 5a1 1 0 0 0-1.4 0l-2.1 2.1a1 1 0 0 0 0 1.4z" }), h('path', { d: "m4 6 2-2" }), h('path', { d: "m10.5 10.5 5 5" }), h('path', { d: "m8.5 8.5 2 2" }), h('path', { d: "m14.5 14.5 2 2" }), h('path', { d: "M7 21a4 4 0 0 0 4-4" }), h('path', { d: "M12 12v4a4 4 0 0 0 4 4h4" }));
-const AboutIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "10" }), h('line', { x1: "12", y1: "16", x2: "12", y2: "12" }), h('line', { x1: "12", y1: "8", x2: "12.01", y2: "8" }));
+const AboutIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "10" }), h('line', { x1: "12", y1: "16", x2: "12", y2: "12" }), h('line', { x1: "12", y1: "16", x2: "12", y2: "12" }), h('line', { x1: "12", y1: "8", x2: "12.01", y2: "8" }));
 const HelpIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "10" }), h('path', { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }), h('line', { x1: "12", y1: "17", x2: "12.01", y2: "17" }));
 const PlayIcon = ({className}: any) => h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", stroke: "currentColor", strokeWidth: "1", strokeLinecap: "round", strokeLinejoin: "round", className }, h('polygon', { points: "5 3 19 12 5 21 5 3" }));
 const CheckCircleIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }), h('polyline', { points: "22 4 12 14.01 9 11.01" }));
@@ -343,7 +345,7 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch 
              h('div', { className: "absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2" },
                  h('button', { 
                      onClick: onClose,
-                     className: "bg-black/50 hover:bg-red-600 text-white p-1 rounded-full backdrop-blur-sm transition-colors active:scale-95"
+                     className: "bg-black/50 hover:bg-red-600 text-white p-1 rounded-full backdrop-blur-sm transition-colors"
                  }, h(XIcon, { className: "w-4 h-4" }))
              )
         ),
@@ -360,7 +362,7 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch 
                      value: query,
                      onChange: (e) => setQuery(e.target.value)
                  }),
-                 h('button', { type: "submit", className: "p-2 bg-cyan-900/50 hover:bg-cyan-900 text-cyan-400 rounded-lg border border-cyan-500/30 transition-colors active:scale-95" },
+                 h('button', { type: "submit", className: "p-2 bg-cyan-900/50 hover:bg-cyan-900 text-cyan-400 rounded-lg border border-cyan-500/30 transition-colors" },
                      h(SearchIcon, { className: "w-4 h-4" })
                  )
              )
@@ -399,11 +401,11 @@ const FeedbackModal = ({ isOpen, onClose }: any) => {
             h('div', { className: "flex justify-center gap-6 mb-6" },
                 h('button', { 
                     onClick: () => setRating('up'),
-                    className: `p-4 rounded-full border-2 transition-all active:scale-95 ${rating === 'up' ? 'bg-green-500/20 border-green-500 text-green-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
+                    className: `p-4 rounded-full border-2 transition-all ${rating === 'up' ? 'bg-green-500/20 border-green-500 text-green-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
                 }, h(ThumbsUpIcon, { className: "w-8 h-8" })),
                 h('button', { 
                     onClick: () => setRating('down'),
-                    className: `p-4 rounded-full border-2 transition-all active:scale-95 ${rating === 'down' ? 'bg-red-500/20 border-red-500 text-red-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
+                    className: `p-4 rounded-full border-2 transition-all ${rating === 'down' ? 'bg-red-500/20 border-red-500 text-red-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
                 }, h(ThumbsDownIcon, { className: "w-8 h-8" }))
             ),
             h('textarea', {
@@ -415,7 +417,7 @@ const FeedbackModal = ({ isOpen, onClose }: any) => {
             h('button', {
                 onClick: handleSubmit,
                 disabled: !rating || isSubmitting,
-                className: "w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-white disabled:opacity-50 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all flex items-center justify-center gap-2 active:scale-95"
+                className: "w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-white disabled:opacity-50 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all flex items-center justify-center gap-2"
             },
                 isSubmitting ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : "Submit Feedback"
             )
@@ -437,11 +439,11 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirm
             h('div', { className: "flex justify-end gap-3" },
                 h('button', { 
                     onClick: onClose, 
-                    className: "px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors active:scale-95" 
+                    className: "px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors" 
                 }, cancelLabel),
                 h('button', { 
                     onClick: () => { onConfirm(); onClose(); }, 
-                    className: `px-4 py-2 rounded-lg text-sm font-bold text-white transition-all shadow-lg active:scale-95 ${isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-900/20' : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20'}` 
+                    className: `px-4 py-2 rounded-lg text-sm font-bold text-white transition-all shadow-lg ${isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-900/20' : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20'}` 
                 }, confirmLabel)
             )
         )
@@ -454,7 +456,7 @@ const CollapsibleSection = ({ title, description, icon, children, defaultOpen = 
     return h('div', { className: "border border-white/10 rounded-xl bg-gray-900/40 overflow-hidden mb-4 transition-all duration-300" },
         h('button', { 
             onClick: () => setIsOpen(!isOpen),
-            className: `w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors active:bg-white/10 ${isOpen ? 'bg-white/5' : ''}`
+            className: `w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors ${isOpen ? 'bg-white/5' : ''}`
         }, 
             h('div', { className: "flex items-center gap-3 text-left" },
                 icon && h('div', { className: "text-cyan-400" }, icon),
@@ -487,7 +489,7 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab }: 
             h('p', { className: "text-gray-400 max-w-sm" }, "Entering custom API keys requires a subscription. Upgrade your plan to unlock this feature and power up your assistant."),
             h('button', {
                 onClick: () => setActiveTab('subscription'),
-                className: "px-8 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black font-bold rounded-xl hover:scale-105 active:scale-95 transition-transform flex items-center gap-2"
+                className: "px-8 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black font-bold rounded-xl hover:scale-105 transition-transform flex items-center gap-2"
             }, 
                 h(CrownIcon, { className: "w-5 h-5" }),
                 "Upgrade to Unlock"
@@ -531,27 +533,16 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab }: 
             
             h('div', { className: "space-y-6 mt-6" },
                 // Only YouTube and Auddio keys are user-configurable. Weather and News are system managed.
-                ['youtube', 'auddio'].map(keyType => {
-                    // Check if it's falling back to system key (empty input for youtube)
-                    const isSystemKey = keyType === 'youtube' && (!localKeys.youtube || localKeys.youtube.trim() === '');
-                    
-                    return h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-white/5" },
+                ['youtube', 'auddio'].map(keyType => 
+                    h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-white/5" },
                         h('div', { className: "flex justify-between items-center mb-2" },
                             h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, 
                                 t(`settings.apiKeysTab.${keyType}Key`)
                             ),
-                            // Show System Key Badge if empty
-                            isSystemKey ? (
-                                h('span', { className: "text-xs flex items-center gap-1 text-green-400" },
-                                    h(CheckCircleIcon, { className: "w-3 h-3" }),
-                                    "System Default Active"
-                                )
-                            ) : (
-                                validationStatus[keyType] && (
-                                    h('span', { className: `text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}` },
-                                        validationStatus[keyType].success ? h(CheckCircleIcon, { className: "w-3 h-3" }) : h(WarningIcon, { className: "w-3 h-3" }),
-                                        validationStatus[keyType].success ? 'Valid' : 'Invalid'
-                                    )
+                            validationStatus[keyType] && (
+                                h('span', { className: `text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}` },
+                                    validationStatus[keyType].success ? h(CheckCircleIcon, { className: "w-3 h-3" }) : h(WarningIcon, { className: "w-3 h-3" }),
+                                    validationStatus[keyType].success ? 'Valid' : 'Invalid'
                                 )
                             )
                         ),
@@ -560,19 +551,19 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab }: 
                             className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-500",
                             value: localKeys[keyType] || '',
                             onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
-                            placeholder: keyType === 'youtube' ? "Leave empty to use System Key" : "Enter your API key here..."
+                            placeholder: "Enter your API key here..."
                         }),
                         validationStatus[keyType] && !validationStatus[keyType].success && (
                             h('p', { className: "text-xs text-red-400 mt-2 pl-1" }, validationStatus[keyType].message)
                         )
                     )
-                })
+                )
             ),
             
             h('button', {
                 onClick: handleSaveKeys,
                 disabled: isValidating,
-                className: "mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2 active:scale-95"
+                className: "mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2"
             },
                 isValidating ? h(SpinnerIcon, { className: "w-5 h-5" }) : h(CheckCircleIcon, { className: "w-5 h-5" }),
                 t('settings.apiKeysTab.save')
@@ -648,7 +639,8 @@ const SettingsModal = ({
                 setPreviewingVoice(null);
                 return;
             }
-            const stream = await generateSpeech(text, voiceName, apiKeys.gemini);
+            // REMOVED: Passing gemini API key as generateSpeech will use process.env.API_KEY directly.
+            const stream = await generateSpeech(text, voiceName);
             // ... stream logic ...
              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             let nextTime = audioCtx.currentTime;
@@ -693,7 +685,7 @@ const SettingsModal = ({
 
                             h('button', {
                                 onClick: handleLogout,
-                                className: "px-6 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 rounded-lg transition-all font-medium active:scale-95"
+                                className: "px-6 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 rounded-lg transition-all font-medium"
                             }, "Sign Out")
                         ) : h('div', null,
                              h('div', { className: "w-16 h-16 bg-gray-800 rounded-full mx-auto mb-4 flex items-center justify-center text-gray-400" },
@@ -703,7 +695,7 @@ const SettingsModal = ({
                             h('p', { className: "text-sm text-gray-400 mb-6 max-w-sm mx-auto" }, "Sign in with Google to save your persona, API keys, and preferences to the cloud and access them from any device."),
                             h('button', {
                                 onClick: handleLogin,
-                                className: "px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg transition-all font-bold flex items-center justify-center gap-3 mx-auto shadow-lg active:scale-95"
+                                className: "px-6 py-3 bg-white text-black hover:bg-gray-100 rounded-lg transition-all font-bold flex items-center justify-center gap-3 mx-auto shadow-lg"
                             },
                                 h(GoogleIcon, { className: "w-5 h-5" }),
                                 "Sign in with Google"
@@ -759,7 +751,7 @@ const SettingsModal = ({
                                                     if (assistantName === DEFAULT_ASSISTANT_NAME_FEMALE && g === 'male') setAssistantName(DEFAULT_ASSISTANT_NAME_MALE);
                                                     if (assistantName === DEFAULT_ASSISTANT_NAME_MALE && g === 'female') setAssistantName(DEFAULT_ASSISTANT_NAME_FEMALE);
                                                 },
-                                                className: `py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 border active:scale-95 ${
+                                                className: `py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 border ${
                                                     gender === g 
                                                     ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' 
                                                     : 'bg-black/40 border-gray-700 text-gray-500 hover:border-gray-500'
@@ -862,7 +854,7 @@ const SettingsModal = ({
                                         h('button', {
                                             key: mode,
                                             onClick: () => setTheme(mode),
-                                            className: `flex-1 py-2 rounded-md text-xs font-bold uppercase transition-all active:scale-95 ${theme === mode ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`
+                                            className: `flex-1 py-2 rounded-md text-xs font-bold uppercase transition-all ${theme === mode ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-white'}`
                                         }, t(`settings.personaTab.appearance.${mode}`))
                                     )
                                 )
@@ -920,7 +912,7 @@ const SettingsModal = ({
                                                 h('div', { 
                                                     key: v.id, 
                                                     onClick: () => setVoices({...currentVoices, main: v.id}),
-                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group active:scale-[0.98] ${currentVoices.main === v.id ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
+                                                    className: `p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between group ${currentVoices.main === v.id ? 'bg-cyan-900/20 border-cyan-500 shadow-md' : 'bg-black/40 border-gray-700 hover:border-gray-500'}`
                                                 },
                                                     h('div', { className: "flex items-center gap-4" },
                                                         h('div', { className: `w-10 h-10 rounded-full flex items-center justify-center transition-colors ${currentVoices.main === v.id ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-gray-400'}` },
@@ -934,7 +926,7 @@ const SettingsModal = ({
                                                     h('button', {
                                                         onClick: (e) => { e.stopPropagation(); playVoicePreview(v.id); },
                                                         disabled: previewingVoice === v.id,
-                                                        className: `p-2 rounded-full transition-colors active:scale-95 ${previewingVoice === v.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-500 hover:bg-white/10 hover:text-cyan-400'}`
+                                                        className: `p-2 rounded-full transition-colors ${previewingVoice === v.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-500 hover:bg-white/10 hover:text-cyan-400'}`
                                                     },
                                                         previewingVoice === v.id ? h(SpinnerIcon, { className: "w-4 h-4 animate-spin" }) : h(PlayIcon, { className: "w-4 h-4" })
                                                     )
@@ -961,7 +953,7 @@ const SettingsModal = ({
                             href: "https://www.instagram.com/abhixofficial01",
                             target: "_blank",
                             rel: "noopener noreferrer",
-                            className: "group relative w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 rounded-xl font-bold text-white transition-all hover:shadow-[0_0_30px_rgba(236,72,153,0.3)] hover:-translate-y-1 active:scale-95"
+                            className: "group relative w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 rounded-xl font-bold text-white transition-all hover:shadow-[0_0_30px_rgba(236,72,153,0.3)] hover:-translate-y-1"
                         },
                             h(InstagramIcon, { className: "w-6 h-6 transition-transform group-hover:scale-110" }),
                             h('span', null, "Contact on Instagram")
@@ -994,8 +986,8 @@ const SettingsModal = ({
                         h('div', { className: "mt-6 pt-6 border-t border-white/10" },
                             h('h3', { className: "text-sm font-bold text-white mb-4" }, "Contact Developer"),
                             h('div', { className: "flex flex-col md:flex-row gap-4 justify-center" },
-                                h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white hover:opacity-90 transition-opacity active:scale-95" }, h(InstagramIcon, { className: "w-5 h-5" }), "Instagram"),
-                                h('a', { href: "mailto:abhixofficial01@gmail.com", className: "flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl font-bold text-white transition-all active:scale-95" }, h(MailIcon, { className: "w-5 h-5" }), "Email Support")
+                                h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl font-bold text-white hover:opacity-90 transition-opacity" }, h(InstagramIcon, { className: "w-5 h-5" }), "Instagram"),
+                                h('a', { href: "mailto:abhixofficial01@gmail.com", className: "flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl font-bold text-white transition-all" }, h(MailIcon, { className: "w-5 h-5" }), "Email Support")
                             )
                         )
                     )
@@ -1010,7 +1002,7 @@ const SettingsModal = ({
                         h('div', { className: "text-xs text-gray-600 border-t border-gray-800 pt-6" },
                             h('p', { className: "font-mono mb-4 opacity-70" }, `${t('settings.aboutTab.version')}: 1.0.0 (Beta)`),
                              h('div', { className: "flex flex-col gap-3 mb-6" },
-                                h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-600/20 to-purple-600/20 text-pink-300 rounded-lg hover:bg-pink-600/30 transition-all font-medium border border-pink-500/30 active:scale-95" }, h(InstagramIcon, { className: "w-4 h-4" }), "Follow on Instagram"),
+                                h('a', { href: "https://www.instagram.com/abhixofficial01", target: "_blank", rel: "noopener noreferrer", className: "flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-600/20 to-purple-600/20 text-pink-300 rounded-lg hover:bg-pink-600/30 transition-all font-medium border border-pink-500/30" }, h(InstagramIcon, { className: "w-4 h-4" }), "Follow on Instagram"),
                             )
                         )
                     )
@@ -1030,7 +1022,7 @@ const SettingsModal = ({
                             return h('button', { 
                                 key: planId, 
                                 onClick: () => handlePlanSelection(planId), 
-                                className: `relative p-6 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-full group hover:-translate-y-1 duration-300 active:scale-95 ${
+                                className: `relative p-6 rounded-2xl border-2 transition-all text-left flex flex-col justify-between h-full group hover:-translate-y-1 duration-300 ${
                                     isSelected 
                                     ? 'bg-cyan-900/20 border-cyan-500 shadow-[0_0_30px_rgba(34,211,238,0.2)]' 
                                     : isYearly 
@@ -1069,7 +1061,7 @@ const SettingsModal = ({
                      h('div', { className: "mt-12 pt-8 border-t border-white/10 text-center" },
                         h('h4', { className: "text-white font-medium mb-4" }, "Need something else?"),
                         h('button', {
-                            className: "inline-flex items-center gap-2 px-6 py-3 rounded-full border border-gray-700 hover:border-gray-500 hover:bg-white/5 transition-all text-gray-300 hover:text-white text-sm font-medium active:scale-95"
+                            className: "inline-flex items-center gap-2 px-6 py-3 rounded-full border border-gray-700 hover:border-gray-500 hover:bg-white/5 transition-all text-gray-300 hover:text-white text-sm font-medium"
                         },
                             "Upgrade More Options",
                             h(ChevronRightIcon, { className: "w-4 h-4" })
@@ -1082,10 +1074,10 @@ const SettingsModal = ({
     };
     
     // ... rest of modal (unchanged)
-     return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity pt-safe", onClick: onClose },
+     return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity", onClick: onClose },
         h('div', { className: "bg-black md:bg-gray-900 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter", onClick: e => e.stopPropagation() },
             h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-white/10 h-full absolute md:relative z-20` },
-                h('div', { className: "p-6 border-b border-white/10 flex justify-between items-center" }, h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" }, h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }), t('settings.title')), h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white active:scale-95" }, h(XIcon, { className: "w-6 h-6" }))),
+                h('div', { className: "p-6 border-b border-white/10 flex justify-between items-center" }, h('h2', { className: "text-xl font-bold flex items-center gap-3 text-cyan-400" }, h(SettingsIcon, { className: "w-6 h-6 text-cyan-100" }), t('settings.title')), h('button', { onClick: onClose, className: "md:hidden p-2 text-gray-400 hover:text-white" }, h(XIcon, { className: "w-6 h-6" }))),
                 h('div', { className: "flex-1 overflow-y-auto p-4 space-y-1" },
                     [
                         { id: 'account', icon: AccountIcon, label: getTabLabel('settings.tabs.account', 'Account') },
@@ -1096,12 +1088,12 @@ const SettingsModal = ({
                         { id: 'contact', icon: InstagramIcon, label: "Contact Developer" },
                         { id: 'help', icon: HelpIcon, label: t('settings.tabs.help') },
                         { id: 'about', icon: AboutIcon, label: t('settings.tabs.about') },
-                    ].map(tab => h('button', { key: tab.id, onClick: () => handleTabChange(tab.id), className: `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${activeTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent'}` }, tab.icon ? h(tab.icon, { className: "w-5 h-5" }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold" }, "$"), h('span', null, tab.label), h('span', { className: "ml-auto md:hidden text-gray-600" }, h('svg', { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M9 18l6-6-6-6" })))))
+                    ].map(tab => h('button', { key: tab.id, onClick: () => handleTabChange(tab.id), className: `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent'}` }, tab.icon ? h(tab.icon, { className: "w-5 h-5" }) : h('span', { className: "w-5 h-5 flex items-center justify-center font-bold" }, "$"), h('span', null, tab.label), h('span', { className: "ml-auto md:hidden text-gray-600" }, h('svg', { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M9 18l6-6-6-6" })))))
                 ),
             ),
              h('div', { className: `${!isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-1 flex-col h-full overflow-hidden bg-black md:bg-gray-900 relative` },
-                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-white/10" }, h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white active:scale-95" }, h(ArrowLeftIcon, { className: "w-5 h-5" }), h('span', { className: "text-sm font-medium" }, "Back")), h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)), h('button', { onClick: onClose, className: "p-2 text-gray-400 active:scale-95" }, h(XIcon, { className: "w-6 h-6" }))),
-                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors active:scale-95" }, h(XIcon, { className: "w-6 h-6" })),
+                h('div', { className: "md:hidden flex items-center justify-between p-4 border-b border-white/10" }, h('button', { onClick: () => setIsMobileMenuOpen(true), className: "flex items-center gap-2 text-gray-400 hover:text-white" }, h(ArrowLeftIcon, { className: "w-5 h-5" }), h('span', { className: "text-sm font-medium" }, "Back")), h('h3', { className: "font-semibold text-white capitalize" }, activeTab === 'account' ? 'Account' : t(`settings.tabs.${activeTab}`)), h('button', { onClick: onClose, className: "p-2 text-gray-400" }, h(XIcon, { className: "w-6 h-6" }))),
+                h('button', { onClick: onClose, className: "hidden md:block absolute top-4 right-4 p-2 text-gray-500 hover:text-white z-10 rounded-full hover:bg-white/10 transition-colors" }, h(XIcon, { className: "w-6 h-6" })),
                 h('div', { className: "flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8" },
                     h('div', { className: "max-w-3xl mx-auto" },
                         h('div', { className: "hidden md:block mb-8 pb-4 border-b border-white/10" }, h('h2', { className: "text-2xl font-bold text-white" }, activeTab === 'account' ? 'Account' : (activeTab === 'contact' ? 'Contact Developer' : t(`settings.tabs.${activeTab}`)))),
@@ -1131,7 +1123,8 @@ export const App = () => {
   const [coreProtocol, setCoreProtocol] = usePersistentState('kaniska-core-protocol', DEFAULT_CORE_PROTOCOL, user);
   const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '', user);
   const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 60, empathy: 60, formality: 40, excitement: 50, sadness: 10, curiosity: 60 }, user);
-  const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '', gemini: '' }, user);
+  // REMOVED: Gemini API Key from persistent state.
+  const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '' }, user);
   const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' }, user);
   const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' }, user);
   const [ambientVolume, setAmbientVolume] = usePersistentState('kaniska-ambient-vol', 0.2, user);
@@ -1249,23 +1242,30 @@ export const App = () => {
       }
   }, [avatarUrl]);
 
-  // Usage tracking logic ...
+  // Usage Tracking & Limit Enforcement
   React.useEffect(() => {
       let interval;
       if (status === 'live') {
           interval = setInterval(() => {
               setUsageData(prev => {
                   const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
-                  if (prev.period !== currentPeriod) return { period: currentPeriod, seconds: 0 };
+                  
+                  // Reset if a new month
+                  if (prev.period !== currentPeriod) {
+                      return { period: currentPeriod, seconds: 0 };
+                  }
+                  
+                  // Increment usage (5 seconds)
                   return { ...prev, seconds: (prev.seconds || 0) + 5 };
               });
-          }, 5000);
+          }, 5000); // Reduced write frequency to 5s to save DB quota
       }
       return () => clearInterval(interval);
   }, [status]);
 
+  // Separate effect to enforce limit based on updated usageData
   React.useEffect(() => {
-      if (subscriptionPlan === 'free' && usageData.period === new Date().toISOString().slice(0, 7) && usageData.seconds >= FREE_LIMIT_SECONDS && status === 'live') {
+      if (subscriptionPlan === 'free' && usageData.seconds >= FREE_LIMIT_SECONDS && status === 'live') {
           cleanupMedia();
           setIsConnected(false);
           setStatus('idle');
@@ -1347,22 +1347,26 @@ export const App = () => {
               const canvas = canvasRef.current;
               const ctx = canvas.getContext('2d');
               
+              // Increased scale from 0.25 to 0.4 for better detail (supports "exact motion" analysis)
               const scale = 0.4; 
               canvas.width = video.videoWidth * scale;
               canvas.height = video.videoHeight * scale;
               
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              // Get base64 string without prefix
               const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
               
               sessionRef.current.sendRealtimeInput({
                   media: { mimeType: 'image/jpeg', data: base64 }
               });
           }
-      }, 100); 
+      }, 100); // 10 FPS (100ms interval) for smoother, exact motion tracking
   };
 
   const toggleCamera = async () => {
       if (isCameraOn) {
+          // Stop Camera
           if (videoStreamRef.current) {
               videoStreamRef.current.getTracks().forEach(track => track.stop());
               videoStreamRef.current = null;
@@ -1376,6 +1380,7 @@ export const App = () => {
           }
           setIsCameraOn(false);
       } else {
+          // Start Camera
           try {
               const stream = await navigator.mediaDevices.getUserMedia({ video: true });
               videoStreamRef.current = stream;
@@ -1384,6 +1389,8 @@ export const App = () => {
                   await videoRef.current.play();
               }
               setIsCameraOn(true);
+              
+              // If connected, start streaming immediately
               if (isConnected && sessionRef.current) {
                   startVideoTransmission();
               }
@@ -1418,6 +1425,7 @@ export const App = () => {
         return;
     }
 
+    // Check Usage Limit before connecting
     const currentPeriod = new Date().toISOString().slice(0, 7);
     if (subscriptionPlan === 'free' && usageData.period === currentPeriod && usageData.seconds >= FREE_LIMIT_SECONDS) {
         setIsSettingsOpen(true);
@@ -1426,6 +1434,7 @@ export const App = () => {
         return;
     }
     
+    // Acquire Wake Lock to keep screen alive
     try {
         if ('wakeLock' in navigator) {
             wakeLockRef.current = await navigator.wakeLock.request('screen');
@@ -1435,14 +1444,17 @@ export const App = () => {
     }
     
     setStatus('listening');
-    setActiveSessionConfig(currentConfig); 
+    setActiveSessionConfig(currentConfig); // Capture config at start of session
     
+    // Resolve session promise to handle initial audio stream race condition
     let resolveSession;
     const sessionPromise = new Promise(resolve => { resolveSession = resolve; });
 
+    // Initialize Audio Contexts
     try {
+        // Use default sample rate for better clarity and compatibility via browser resampling
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        await outputAudioContextRef.current.resume(); 
+        await outputAudioContextRef.current.resume(); // CRITICAL FIX: Ensure context is running (autoplay policy)
         inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
         nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
     } catch (e) {
@@ -1461,6 +1473,7 @@ export const App = () => {
                 audio.play().catch(e => console.warn("SFX failed", e));
             }
 
+            // Start Mic Streaming
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(stream);
@@ -1469,6 +1482,7 @@ export const App = () => {
                 scriptProcessorRef.current.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
                     const pcmBlob = createBlob(inputData); 
+                    // CRITICAL: Solely rely on sessionPromise resolves
                     sessionPromise.then((session: any) => {
                          session.sendRealtimeInput({ media: pcmBlob });
                     });
@@ -1477,6 +1491,7 @@ export const App = () => {
                 audioSourceRef.current.connect(scriptProcessorRef.current);
                 scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
 
+                // Start Video Streaming if Camera was already on
                 if (isCameraOn) {
                     startVideoTransmission();
                 }
@@ -1488,6 +1503,7 @@ export const App = () => {
             }
         },
         onmessage: async (msg) => {
+             // Handle Transcripts for History
              if (msg.serverContent?.outputTranscription) {
                  const text = msg.serverContent.outputTranscription.text;
                  if (text) saveToHistory(text, 'assistant');
@@ -1497,6 +1513,7 @@ export const App = () => {
                  if (text) saveToHistory(text, 'user');
              }
 
+             // Audio Playback with Jitter Buffer Fix
              const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (audioData) {
                  setStatus('speaking');
@@ -1505,16 +1522,23 @@ export const App = () => {
                      const bytes = new Uint8Array(binary.length);
                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
                      
+                     // Decode raw PCM (16-bit little endian, 24kHz)
                      const buffer = await decodeAudioData(bytes, outputAudioContextRef.current, 24000, 1);
                      
+                     // Safety check: if decoding failed or context closed, do not proceed
                      if (!buffer || !outputAudioContextRef.current) return;
 
                      const source = outputAudioContextRef.current.createBufferSource();
                      source.buffer = buffer;
                      source.connect(outputAudioContextRef.current.destination);
                      
+                     // Improved Scheduling Logic to prevent crackling (Jitter Buffer)
                      const now = outputAudioContextRef.current.currentTime;
+                     // Ensure next start time is at least 'now'. 
+                     // Add a tiny offset (0.05s) to the very first chunk in a sequence to prevent overlap if latency fluctuates.
                      let startTime = nextStartTimeRef.current;
+                     
+                     // Increased buffer from 0.05 to 0.08 for smoother playback (less "fatna")
                      if (startTime < now) {
                         startTime = now + 0.08; 
                      }
@@ -1532,6 +1556,7 @@ export const App = () => {
                  }
              }
 
+             // Handle Text Fallback if Audio is disabled
              const textData = msg.serverContent?.modelTurn?.parts?.[0]?.text;
              if (textData && useSystemVoice) {
                   setStatus('speaking');
@@ -1540,11 +1565,12 @@ export const App = () => {
              }
 
              if (msg.serverContent?.interrupted) {
+                 // Clear Queue
                  scheduledSourcesRef.current.forEach(s => s.stop());
                  scheduledSourcesRef.current = [];
                  nextStartTimeRef.current = outputAudioContextRef.current?.currentTime || 0;
                  if (useSystemVoice) window.speechSynthesis.cancel();
-                 setStatus('listening');
+                 setStatus('listening'); // Back to listening immediately
              }
              
              if (msg.toolCall?.functionCalls) {
@@ -1627,12 +1653,13 @@ export const App = () => {
                          const app = args.appName;
                          let url = '';
                          switch(app) {
-                             case 'instagram': url = 'instagram://'; break;
+                             case 'instagram': url = 'instagram://'; break; // Attempt deep link
                              case 'google': url = 'https://google.com'; break;
                              case 'file_manager': result = { result: "Cannot open native file manager from web, but opened browser upload." }; break; 
-                             default: url = 'https://google.com';
+                             default: url = 'https://google.com'; // Fallback
                          }
                          if (url) {
+                            // Try deep link, catch if failed (though mostly silent in browser)
                             try { window.location.href = url; } catch(e) { window.open(url, '_blank'); }
                             result = { result: `Attempted to open ${app}` };
                          }
@@ -1661,8 +1688,15 @@ export const App = () => {
                              result = { error: "Failed to control media." };
                          }
                      }
-                     responses.push({ id: call.id, name: call.name, response: result });
+                     
+                     responses.push({
+                         id: call.id,
+                         name: call.name,
+                         response: result
+                     });
                  }
+                 
+                 // Send tool response back to model
                  sessionPromise.then((sess: any) => {
                      sess.sendToolResponse({ functionResponses: responses });
                  });
@@ -1677,11 +1711,14 @@ export const App = () => {
         onerror: (err) => {
              console.error("Session Error", err);
              const errorStr = err.toString().toLowerCase();
+             
+             // More descriptive error handling
              if (errorStr.includes("networkerror") || errorStr.includes("fetch")) {
                  alert("Network Connection Failed. Please refresh and try again.");
              } else if (errorStr.includes("unavailable") || errorStr.includes("503")) {
                  alert("Service Temporarily Unavailable. Please try connecting again in a few seconds.");
              }
+             
              setStatus('error');
              cleanupMedia();
              setIsConnected(false);
@@ -1692,20 +1729,21 @@ export const App = () => {
         const voiceConfig = gender === 'female' ? femaleVoices : maleVoices;
         const voiceName = voiceConfig.main;
         
+        // Pass all config to connection logic
         const session = await connectLiveSession(callbacks, {
             customInstructions, 
             coreProtocol, 
-            personality, 
+            personality, // Pass the new personality state
             voiceName, 
-            apiKey: apiKeys.gemini,
+            // REMOVED: gemini key passing.
             assistantName,
             userName,
             userBio,
-            subscriptionPlan, 
-            greetingMessage, 
-            emotionTuning, 
-            gender, 
-            useSystemVoice
+            subscriptionPlan, // Pass subscription plan
+            greetingMessage, // Pass the custom greeting
+            emotionTuning, // Pass emotion tuning
+            gender, // Pass explicit gender
+            useSystemVoice // Pass system voice preference
         });
         
         sessionRef.current = session;
@@ -1724,6 +1762,7 @@ export const App = () => {
   };
 
   const handleUpdateSession = () => {
+      // Reconnect to apply new settings
       cleanupMedia();
       setIsConnected(false);
       setStatus('idle');
@@ -1731,46 +1770,49 @@ export const App = () => {
   };
 
   return h('div', { className: `w-screen h-screen overflow-hidden flex flex-col items-center justify-center relative bg-black ${theme === 'light' ? 'bg-white text-black' : 'text-white'}` },
+        // Background Effects
         h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
             h('div', { className: "absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-900/20 rounded-full blur-3xl animate-pulse" }),
             h('div', { className: "absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-900/20 rounded-full blur-3xl animate-pulse", style: { animationDelay: '1s' } }),
             h('div', { className: "absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150" })
         ),
 
-        // Settings Button - Adjusted for Safe Area
+        // Settings Button - Adjusted top position for Safe Area
         h('button', { 
             onClick: () => {
                 setIsSettingsOpen(true);
-                setIsFeedbackOpen(false); 
+                setIsFeedbackOpen(false); // Mutual exclusion
             },
-            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group active:scale-95" 
+            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" 
         },
             h(SettingsIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
         ),
 
-        // Feedback Button - Adjusted for Safe Area
+        // Feedback Button - Adjusted top position for Safe Area
         h('button', {
             onClick: () => {
                 setIsFeedbackOpen(true);
-                setIsSettingsOpen(false); 
+                setIsSettingsOpen(false); // Mutual exclusion
             },
-            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group active:scale-95"
+            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group"
         },
             h(FeedbackIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
         ),
 
+        // Update Prompt (Visible when settings change during live session)
         isUpdateAvailable && h('div', { 
             className: "absolute top-[calc(env(safe-area-inset-top)+6rem)] z-40 animate-fade-in" 
         },
             h('button', {
                 onClick: handleUpdateSession,
-                className: "flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:bg-yellow-500/30 transition-all font-bold text-sm backdrop-blur-md active:scale-95"
+                className: "flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:bg-yellow-500/30 transition-all font-bold text-sm backdrop-blur-md"
             },
                 h('svg', { className: "w-4 h-4 animate-spin", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })),
                 "System Update Available"
             )
         ),
         
+        // Video Preview (Fixed Position - Bottom Safe Area)
         h('div', { 
             className: `fixed bottom-[calc(env(safe-area-inset-bottom)+9rem)] right-6 z-50 transition-all duration-500 ${isCameraOn ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}` 
         },
@@ -1788,6 +1830,7 @@ export const App = () => {
 
         // Main Content Area with Safe Area Padding
         h('div', { className: "z-10 flex flex-col items-center justify-center w-full h-full p-4 pb-32 pt-safe" },
+            // Status Indicator
             h('div', { className: `mb-8 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md transition-all duration-500 ${
                 status === 'live' || status === 'speaking' || status === 'listening' 
                 ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' 
@@ -1803,16 +1846,25 @@ export const App = () => {
                 t(`main.status.${status}`)
             ),
 
-            h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl }),
+            // Avatar
+            h(Avatar, { 
+                state: status, 
+                mood: 'neutral', 
+                customUrl: avatarUrl
+            }),
 
-            h('h1', { className: "mt-8 text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 tracking-tight" }, assistantName)
+            // Assistant Name
+            h('h1', { className: "mt-8 text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 tracking-tight" }, 
+                assistantName
+            )
         ),
 
         // Footer Controls - Bottom Safe Area
         h('div', { className: "fixed bottom-[calc(env(safe-area-inset-bottom)+2.5rem)] z-30 flex items-center gap-4" },
+            // Camera Toggle
             h('button', {
                 onClick: toggleCamera,
-                className: `p-4 rounded-full transition-all duration-300 shadow-xl active:scale-95 ${
+                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
                     isCameraOn 
                     ? 'bg-white text-black hover:bg-gray-200' 
                     : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
@@ -1821,26 +1873,32 @@ export const App = () => {
                 isCameraOn ? h(CameraIcon, { className: "w-6 h-6" }) : h(CameraOffIcon, { className: "w-6 h-6" })
             ),
 
+            // Connect Button
             h('button', {
                 onClick: connect,
                 disabled: status === 'error',
-                className: `relative group px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 flex items-center gap-3 overflow-hidden shadow-2xl active:scale-[0.98] ${
+                className: `relative group px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 flex items-center gap-3 overflow-hidden shadow-2xl ${
                     isConnected 
                     ? 'bg-red-500/10 hover:bg-red-600/20 text-red-400 border border-red-500/50' 
                     : 'bg-white text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]'
                 }`
             },
-                isConnected ? h(DisconnectIcon, { className: "w-6 h-6" }) : h(ConnectIcon, { className: "w-6 h-6" }),
+                isConnected 
+                ? h(DisconnectIcon, { className: "w-6 h-6" }) 
+                : h(ConnectIcon, { className: "w-6 h-6" }),
                 h('span', null, isConnected ? t('footer.disconnect') : t('footer.connect')),
+                
+                // Button Glow Effect
                 !isConnected && h('div', { className: "absolute inset-0 rounded-full ring-2 ring-white/50 animate-ping opacity-20" })
             ),
 
+            // YouTube Toggle Button (Manual Open)
              h('button', {
                 onClick: () => {
                      setIsYouTubeOpen(!isYouTubeOpen);
                      if (!isYouTubeOpen) setIsPlayerMinimized(false);
                 },
-                className: `p-4 rounded-full transition-all duration-300 shadow-xl active:scale-95 ${
+                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
                     isYouTubeOpen 
                     ? 'bg-red-600 text-white hover:bg-red-700' 
                     : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
@@ -1850,6 +1908,7 @@ export const App = () => {
             )
         ),
 
+        // Components Overlay (YouTube is z-40, Modals are z-60+)
         isYouTubeOpen && h(YouTubePlayer, { 
             ref: youtubePlayerRef,
             video: currentVideo, 
