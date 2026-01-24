@@ -7,13 +7,17 @@ export default defineConfig({
   plugins: [react()],
   // CRITICAL: Define process.env for browser compatibility
   define: {
-    'process.env': process.env
+    'process.env': process.env,
+    // Explicitly inject API_KEY to prevent "process is not defined" error in Gemini SDK
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || "")
   },
-  // CRITICAL FOR CAPACITOR: 
-  // Makes paths relative (e.g., "./assets/index.js") instead of absolute ("/assets/index.js").
   base: './', 
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+  },
+  server: {
+    port: 3000,
+    host: true
   }
 });
