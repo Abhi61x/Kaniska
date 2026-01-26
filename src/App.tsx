@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect, useRef, useImperativeHandle, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
-// FIX: Updated import path to use the more complete sibling file in src/services/
 import { processUserCommand, fetchWeatherSummary, fetchNews, searchYouTube, generateSpeech, fetchLyrics, generateSong, recognizeSong, generateImage, ApiKeyError, MainApiKeyError, validateWeatherKey, validateNewsKey, validateYouTubeKey, validateAuddioKey, processCodeCommand, getSupportResponse, createCashfreeOrder, connectLiveSession, speakWithBrowser } from './services/api.ts';
 import { useTranslation, availableLanguages } from '../i18n/index.tsx';
 import { auth, db, googleProvider } from '../firebase.ts';
@@ -48,6 +46,9 @@ const YouTubeIcon = ({ className }: any) => h('svg', { className, xmlns: "http:/
 const LockIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('rect', { x: "3", y: "11", width: "18", height: "11", rx: "2", ry: "2" }), h('path', { d: "M7 11V7a5 5 0 0 1 10 0v4" }));
 const CrownIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" }));
 const ChevronRightIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('polyline', { points: "9 18 15 12 9 6" }));
+const MusicIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M9 18V5l12-2v13" }), h('circle', { cx: "6", cy: "18", r: "3" }), h('circle', { cx: "18", cy: "16", r: "3" }));
+const SunIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('circle', { cx: "12", cy: "12", r: "5" }), h('line', { x1: "12", y1: "1", x2: "12", y2: "3" }), h('line', { x1: "12", y1: "21", x2: "12", y2: "23" }), h('line', { x1: "4.22", y1: "4.22", x2: "5.64", y2: "5.64" }), h('line', { x1: "18.36", y1: "18.36", x2: "19.78", y2: "19.78" }), h('line', { x1: "1", y1: "12", x2: "3", y2: "12" }), h('line', { x1: "21", y1: "12", x2: "23", y2: "12" }), h('line', { x1: "4.22", y1: "19.78", x2: "5.64", y2: "18.36" }), h('line', { x1: "18.36", y1: "5.64", x2: "19.78", y2: "4.22" }));
+const MoonIcon = ({ className }: any) => h('svg', { className, xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, h('path', { d: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" }));
 
 const getInitialState = (key: string, defaultValue: any) => {
     try {
@@ -61,34 +62,28 @@ const getInitialState = (key: string, defaultValue: any) => {
     }
 };
 
-// Updated hook to sync state with Firebase Firestore
 const usePersistentState = (key: string, defaultValue: any, user: any) => {
-    const [state, setState] = React.useState(() => getInitialState(key, defaultValue));
-    const timeoutRef = React.useRef<any>(null);
-    const stateRef = React.useRef(state);
+    const [state, setState] = useState(() => getInitialState(key, defaultValue));
+    const timeoutRef = useRef<any>(null);
+    const stateRef = useRef(state);
 
-    // Keep ref updated for comparisons inside useEffect
-    React.useEffect(() => {
+    useEffect(() => {
         stateRef.current = state;
     }, [state]);
 
-    // Sync with Firestore
-    React.useEffect(() => {
+    useEffect(() => {
         if (!user) return;
         const docRef = doc(db, "users", user.uid, "settings", key);
-        
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
              if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data && data.value !== undefined) {
-                    // Only update if value changed remotely to avoid loop
                     if (JSON.stringify(data.value) !== JSON.stringify(stateRef.current)) {
                         setState(data.value);
                         localStorage.setItem(key, JSON.stringify(data.value));
                     }
                 }
              } else {
-                 // Push local state to remote if doc doesn't exist (First sync)
                  setDoc(docRef, { value: stateRef.current }, { merge: true }).catch(err => console.debug("Firestore write error", err));
              }
         }, (err) => {
@@ -97,27 +92,22 @@ const usePersistentState = (key: string, defaultValue: any, user: any) => {
         return () => unsubscribe();
     }, [user, key]);
 
-    const setPersistentState = React.useCallback((newValue: any) => {
+    const setPersistentState = (newValue: any) => {
         setState((current: any) => {
             const valueToStore = newValue instanceof Function ? newValue(current) : newValue;
-            
-            // Local persistence (Backup/Offline)
             try {
                 localStorage.setItem(key, JSON.stringify(valueToStore));
             } catch (error) { console.error(error); }
-            
-            // Backend persistence (Debounced)
             if (user) {
                 if (timeoutRef.current) clearTimeout(timeoutRef.current);
                 timeoutRef.current = setTimeout(() => {
                     const docRef = doc(db, "users", user.uid, "settings", key);
                     setDoc(docRef, { value: valueToStore }, { merge: true }).catch(console.error);
-                }, 1000); // 1s debounce to prevent excessive writes
+                }, 1000);
             }
-            
             return valueToStore;
         });
-    }, [user, key]);
+    };
 
     return [state, setPersistentState];
 };
@@ -146,7 +136,6 @@ Voice: Soft, emotional, and expressive. Use natural pauses.
 Language: Hinglish (Hindi + English). Use 'Aap' for respect.
 Never say you are an AI. You are a real person named Kaniska.`;
 
-// Helper to decode Base64 and create AudioBuffer
 const decode = (base64: string) => {
     const binaryString = atob(base64);
     const len = binaryString.length;
@@ -184,7 +173,6 @@ async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ) {
-  // Safety check: Context might be closed/null if disconnected rapidly
   if (!ctx) return null;
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
@@ -250,13 +238,12 @@ const Avatar = React.memo(({ state, mood = 'neutral', customUrl }: any) => {
     );
 });
 
-// ... YouTubePlayer, FeedbackModal, ConfirmationModal, CollapsibleSection, ApiKeysTab ...
 const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch }: any, ref) => {
     const playerRef = React.useRef(null);
     const containerRef = React.useRef(null);
     const [query, setQuery] = React.useState('');
+    const [recentSearches, setRecentSearches] = React.useState<string[]>([]);
 
-    // Expose methods to parent
     useImperativeHandle(ref, () => ({
         play: () => playerRef.current?.playVideo(),
         pause: () => playerRef.current?.pauseVideo(),
@@ -268,6 +255,13 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch 
         getCurrentTime: () => playerRef.current?.getCurrentTime() || 0,
         getDuration: () => playerRef.current?.getDuration() || 0,
     }));
+
+    React.useEffect(() => {
+        try {
+            const saved = localStorage.getItem('kaniska-recent-searches');
+            if (saved) setRecentSearches(JSON.parse(saved));
+        } catch (e) { console.error(e); }
+    }, []);
 
     React.useEffect(() => {
         if (!video) {
@@ -287,24 +281,14 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch 
         }
         
         const initPlayer = () => {
-             if (playerRef.current) {
-                 playerRef.current.destroy();
-             }
-             
+             if (playerRef.current) playerRef.current.destroy();
              if (containerRef.current) {
                  playerRef.current = new (window as any)['YT'].Player(containerRef.current, {
                     height: '100%',
                     width: '100%',
                     videoId: video.videoId,
-                    playerVars: { 
-                        'autoplay': 1, 
-                        'controls': 1,
-                        'modestbranding': 1,
-                        'rel': 0
-                    },
-                    events: {
-                        // 'onReady': () => setIsReady(true),
-                    }
+                    playerVars: { 'autoplay': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
+                    events: {}
                 });
              }
         };
@@ -314,16 +298,15 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch 
         } else {
             (window as any)['onYouTubeIframeAPIReady'] = initPlayer;
         }
-
-        return () => {
-             // Cleanup handled by ref destruction logic on effect re-run or unmount
-        };
     }, [video?.videoId]);
 
     const handleSearchSubmit = (e) => {
         e.preventDefault();
         if (query.trim()) {
             onSearch(query);
+            const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 5);
+            setRecentSearches(updated);
+            localStorage.setItem('kaniska-recent-searches', JSON.stringify(updated));
             setQuery('');
         }
     };
@@ -337,34 +320,23 @@ const YouTubePlayer = React.forwardRef(({ video, onClose, isMinimized, onSearch 
              video 
                 ? h('div', { ref: containerRef, className: "w-full h-full" }) 
                 : h('div', { className: "w-full h-full flex items-center justify-center text-gray-500 text-xs uppercase tracking-widest bg-gray-950" }, 
-                    h('div', { className: "text-center" }, 
-                        h(YouTubeIcon, { className: "w-8 h-8 mx-auto mb-2 opacity-50" }),
-                        "No Video Selected"
-                    )
+                    h('div', { className: "text-center" }, h(YouTubeIcon, { className: "w-8 h-8 mx-auto mb-2 opacity-50" }), "No Video Selected")
                   ),
              h('div', { className: "absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2" },
-                 h('button', { 
-                     onClick: onClose,
-                     className: "bg-black/50 hover:bg-red-600 text-white p-1 rounded-full backdrop-blur-sm transition-colors"
-                 }, h(XIcon, { className: "w-4 h-4" }))
+                 h('button', { onClick: onClose, className: "bg-black/50 hover:bg-red-600 text-white p-1 rounded-full backdrop-blur-sm transition-colors" }, h(XIcon, { className: "w-4 h-4" }))
              )
         ),
         !isMinimized && h('div', { className: "p-4 bg-gray-900 space-y-3" },
-             video && h('div', null,
-                 h('h3', { className: "text-sm font-bold text-white truncate" }, video.title),
-                 h('p', { className: "text-xs text-gray-400" }, video.channelTitle)
-             ),
-             // Manual Search Bar
+             video && h('div', null, h('h3', { className: "text-sm font-bold text-white truncate" }, video.title), h('p', { className: "text-xs text-gray-400" }, video.channelTitle)),
              h('form', { onSubmit: handleSearchSubmit, className: "flex gap-2" },
-                 h('input', { 
-                     className: "flex-1 bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-500 outline-none",
-                     placeholder: "Search YouTube...",
-                     value: query,
-                     onChange: (e) => setQuery(e.target.value)
-                 }),
-                 h('button', { type: "submit", className: "p-2 bg-cyan-900/50 hover:bg-cyan-900 text-cyan-400 rounded-lg border border-cyan-500/30 transition-colors" },
-                     h(SearchIcon, { className: "w-4 h-4" })
-                 )
+                 h('input', { className: "flex-1 bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-500 outline-none", placeholder: "Search YouTube...", value: query, onChange: (e) => setQuery(e.target.value) }),
+                 h('button', { type: "submit", className: "p-2 bg-cyan-900/50 hover:bg-cyan-900 text-cyan-400 rounded-lg border border-cyan-500/30 transition-colors" }, h(SearchIcon, { className: "w-4 h-4" }))
+             ),
+             recentSearches.length > 0 && h('div', { className: "mt-2" },
+                h('p', { className: "text-[10px] text-gray-500 uppercase tracking-widest mb-1" }, "Recent"),
+                h('div', { className: "flex flex-wrap gap-2" },
+                    recentSearches.map((s, i) => h('button', { key: i, onClick: () => onSearch(s), className: "px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-[10px] text-gray-300 transition-colors truncate max-w-[150px]" }, s))
+                )
              )
         )
     );
@@ -376,51 +348,23 @@ const FeedbackModal = ({ isOpen, onClose }: any) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
-
     const handleSubmit = async () => {
         setIsSubmitting(true);
-        // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 800));
         console.log("Feedback submitted:", { rating, feedback });
         alert("Thank you for your feedback! We will improve.");
-        setIsSubmitting(false);
-        setRating(null);
-        setFeedback('');
-        onClose();
+        setIsSubmitting(false); setRating(null); setFeedback(''); onClose();
     };
 
     return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm", onClick: onClose },
         h('div', { className: "bg-gray-900 w-[90vw] max-w-md p-6 rounded-2xl border border-white/10 shadow-2xl animate-fade-in", onClick: e => e.stopPropagation() },
-            h('div', { className: "flex justify-between items-center mb-6" },
-                h('h3', { className: "text-xl font-bold text-white flex items-center gap-2" }, 
-                    h(FeedbackIcon, { className: "w-5 h-5 text-cyan-400" }),
-                    "Rate Interaction"
-                ),
-                h('button', { onClick: onClose, className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))
-            ),
+            h('div', { className: "flex justify-between items-center mb-6" }, h('h3', { className: "text-xl font-bold text-white flex items-center gap-2" }, h(FeedbackIcon, { className: "w-5 h-5 text-cyan-400" }), "Rate Interaction"), h('button', { onClick: onClose, className: "text-gray-400 hover:text-white" }, h(XIcon, { className: "w-5 h-5" }))),
             h('div', { className: "flex justify-center gap-6 mb-6" },
-                h('button', { 
-                    onClick: () => setRating('up'),
-                    className: `p-4 rounded-full border-2 transition-all ${rating === 'up' ? 'bg-green-500/20 border-green-500 text-green-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
-                }, h(ThumbsUpIcon, { className: "w-8 h-8" })),
-                h('button', { 
-                    onClick: () => setRating('down'),
-                    className: `p-4 rounded-full border-2 transition-all ${rating === 'down' ? 'bg-red-500/20 border-red-500 text-red-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`
-                }, h(ThumbsDownIcon, { className: "w-8 h-8" }))
+                h('button', { onClick: () => setRating('up'), className: `p-4 rounded-full border-2 transition-all ${rating === 'up' ? 'bg-green-500/20 border-green-500 text-green-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}` }, h(ThumbsUpIcon, { className: "w-8 h-8" })),
+                h('button', { onClick: () => setRating('down'), className: `p-4 rounded-full border-2 transition-all ${rating === 'down' ? 'bg-red-500/20 border-red-500 text-red-400 scale-110' : 'border-gray-700 text-gray-500 hover:border-gray-500'}` }, h(ThumbsDownIcon, { className: "w-8 h-8" }))
             ),
-            h('textarea', {
-                placeholder: "Describe your experience or report an issue...",
-                className: "w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 outline-none resize-none h-32 mb-6",
-                value: feedback,
-                onChange: (e) => setFeedback(e.target.value)
-            }),
-            h('button', {
-                onClick: handleSubmit,
-                disabled: !rating || isSubmitting,
-                className: "w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-white disabled:opacity-50 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all flex items-center justify-center gap-2"
-            },
-                isSubmitting ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : "Submit Feedback"
-            )
+            h('textarea', { placeholder: "Describe your experience or report an issue...", className: "w-full bg-black/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 outline-none resize-none h-32 mb-6", value: feedback, onChange: (e) => setFeedback(e.target.value) }),
+            h('button', { onClick: handleSubmit, disabled: !rating || isSubmitting, className: "w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-white disabled:opacity-50 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all flex items-center justify-center gap-2" }, isSubmitting ? h(SpinnerIcon, { className: "w-5 h-5 animate-spin" }) : "Submit Feedback")
         )
     );
 };
@@ -429,91 +373,64 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirm
     if (!isOpen) return null;
     return h('div', { className: "fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in", onClick: onClose },
         h('div', { className: "bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all scale-100", onClick: e => e.stopPropagation() },
-            h('div', { className: "flex items-center gap-4 mb-4" },
-                h('div', { className: `p-3 rounded-full shrink-0 ${isDanger ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'}` },
-                    h(WarningIcon, { className: "w-6 h-6" })
-                ),
-                h('h3', { className: "text-lg font-bold text-white" }, title)
-            ),
+            h('div', { className: "flex items-center gap-4 mb-4" }, h('div', { className: `p-3 rounded-full shrink-0 ${isDanger ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'}` }, h(WarningIcon, { className: "w-6 h-6" })), h('h3', { className: "text-lg font-bold text-white" }, title)),
             h('p', { className: "text-gray-400 text-sm mb-6 leading-relaxed" }, message),
-            h('div', { className: "flex justify-end gap-3" },
-                h('button', { 
-                    onClick: onClose, 
-                    className: "px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors" 
-                }, cancelLabel),
-                h('button', { 
-                    onClick: () => { onConfirm(); onClose(); }, 
-                    className: `px-4 py-2 rounded-lg text-sm font-bold text-white transition-all shadow-lg ${isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-900/20' : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20'}` 
-                }, confirmLabel)
-            )
+            h('div', { className: "flex justify-end gap-3" }, h('button', { onClick: onClose, className: "px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors" }, cancelLabel), h('button', { onClick: () => { onConfirm(); onClose(); }, className: `px-4 py-2 rounded-lg text-sm font-bold text-white transition-all shadow-lg ${isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-900/20' : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20'}` }, confirmLabel))
         )
     );
 };
 
-// Reusable Collapsible Section for Settings
 const CollapsibleSection = ({ title, description, icon, children, defaultOpen = false }: any) => {
     const [isOpen, setIsOpen] = React.useState(defaultOpen);
     return h('div', { className: "border border-white/10 rounded-xl bg-gray-900/40 overflow-hidden mb-4 transition-all duration-300" },
-        h('button', { 
-            onClick: () => setIsOpen(!isOpen),
-            className: `w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors ${isOpen ? 'bg-white/5' : ''}`
-        }, 
-            h('div', { className: "flex items-center gap-3 text-left" },
-                icon && h('div', { className: "text-cyan-400" }, icon),
-                h('div', null,
-                    h('h3', { className: "font-semibold text-gray-200 text-sm" }, title),
-                    description && h('p', { className: "text-xs text-gray-500 mt-0.5" }, description)
-                )
-            ),
-            h('div', { className: `text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}` }, 
-                h('svg', { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M6 9l6 6 6-6" }))
-            )
+        h('button', { onClick: () => setIsOpen(!isOpen), className: `w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors ${isOpen ? 'bg-white/5' : ''}` }, 
+            h('div', { className: "flex items-center gap-3 text-left" }, icon && h('div', { className: "text-cyan-400" }, icon), h('div', null, h('h3', { className: "font-semibold text-gray-200 text-sm" }, title), description && h('p', { className: "text-xs text-gray-500 mt-0.5" }, description))),
+            h('div', { className: `text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}` }, h('svg', { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M6 9l6 6 6-6" })))
         ),
-        h('div', { className: `transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}` },
-            h('div', { className: "p-4 border-t border-white/10" }, children)
-        )
+        h('div', { className: `transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}` }, h('div', { className: "p-4 border-t border-white/10" }, children))
     );
 };
 
 const ApiKeysTab = ({ apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab }: any) => {
-    // API KEY LOCK LOGIC
-    if (subscriptionPlan === 'free') {
+    const [unlockCode, setUnlockCode] = React.useState('');
+    const [isUnlocked, setIsUnlocked] = React.useState(false);
+
+    if (subscriptionPlan === 'free' && !isUnlocked) {
         return h('div', { className: "flex flex-col items-center justify-center h-96 text-center animate-fade-in space-y-6" },
-            h('div', { className: "w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-2 shadow-2xl relative" },
-                h(LockIcon, { className: "w-12 h-12 text-gray-400" }),
-                h('div', { className: "absolute top-0 right-0 p-2 bg-yellow-500 rounded-full animate-pulse" },
-                    h(CrownIcon, { className: "w-4 h-4 text-black" })
-                )
-            ),
+            h('div', { className: "w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-2 shadow-2xl relative" }, h(LockIcon, { className: "w-12 h-12 text-gray-400" }), h('div', { className: "absolute top-0 right-0 p-2 bg-yellow-500 rounded-full animate-pulse" }, h(CrownIcon, { className: "w-4 h-4 text-black" }))),
             h('h3', { className: "text-2xl font-bold text-white" }, "Premium Feature Locked"),
             h('p', { className: "text-gray-400 max-w-sm" }, "Entering custom API keys requires a subscription. Upgrade your plan to unlock this feature and power up your assistant."),
-            h('button', {
-                onClick: () => setActiveTab('subscription'),
-                className: "px-8 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black font-bold rounded-xl hover:scale-105 transition-transform flex items-center gap-2"
-            }, 
-                h(CrownIcon, { className: "w-5 h-5" }),
-                "Upgrade to Unlock"
-            )
+            h('div', { className: "flex gap-2 mt-4 items-center" },
+                h('input', { 
+                    type: "password", 
+                    placeholder: "Enter Access Code",
+                    className: "bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm w-40 outline-none focus:border-cyan-500 transition-colors",
+                    value: unlockCode,
+                    onChange: (e) => setUnlockCode(e.target.value)
+                }),
+                h('button', {
+                    onClick: () => {
+                        if (unlockCode === '0101') setIsUnlocked(true);
+                        else alert('Incorrect code');
+                    },
+                    className: "bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded font-bold text-sm transition-colors"
+                }, "Unlock")
+            ),
+            h('div', { className: "text-xs text-gray-500 font-mono" }, "OR"),
+            h('button', { onClick: () => setActiveTab('subscription'), className: "px-8 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black font-bold rounded-xl hover:scale-105 transition-transform flex items-center gap-2" }, h(CrownIcon, { className: "w-5 h-5" }), "Upgrade to Unlock")
         );
     }
 
     const [localKeys, setLocalKeys] = React.useState(apiKeys);
-    // FIX: Typed validationStatus to allow string keys
     const [validationStatus, setValidationStatus] = React.useState<Record<string, any>>({});
     const [isValidating, setIsValidating] = React.useState(false);
 
     const handleSaveKeys = async () => {
         setIsValidating(true);
         setValidationStatus({});
-        // FIX: Typed status object to allow dynamic assignment
         const status: Record<string, any> = {};
-        
-        const yRes = await validateYouTubeKey(localKeys.youtube);
-        status.youtube = yRes;
-        
-        const aRes = await validateAuddioKey(localKeys.auddio);
-        status.auddio = aRes;
-
+        const yRes = await validateYouTubeKey(localKeys.youtube); status.youtube = yRes;
+        const aRes = await validateAuddioKey(localKeys.auddio); status.auddio = aRes;
         setValidationStatus(status);
         setApiKeys(localKeys);
         setIsValidating(false);
@@ -521,53 +438,17 @@ const ApiKeysTab = ({ apiKeys, setApiKeys, t, subscriptionPlan, setActiveTab }: 
 
     return h('div', { className: "space-y-6 animate-fade-in" },
         h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
-            h('div', { className: "flex items-center gap-3 mb-4" },
-                h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" },
-                    h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })
-                ),
-                h('div', null,
-                    h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.apiKeysTab.optional.title')),
-                    h('p', { className: "text-xs text-gray-300" }, t('settings.apiKeysTab.optional.description'))
-                )
-            ),
-            
+            h('div', { className: "flex items-center gap-3 mb-4" }, h('div', { className: "p-2 bg-cyan-900/30 rounded-lg" }, h(ApiKeysIcon, { className: "w-6 h-6 text-cyan-400" })), h('div', null, h('h3', { className: "font-semibold text-lg text-cyan-400" }, t('settings.apiKeysTab.optional.title')), h('p', { className: "text-xs text-gray-300" }, t('settings.apiKeysTab.optional.description')))),
             h('div', { className: "space-y-6 mt-6" },
-                // Only YouTube and Auddio keys are user-configurable. Weather and News are system managed.
                 ['youtube', 'auddio'].map(keyType => 
                     h('div', { key: keyType, className: "bg-black/40 p-4 rounded-lg border border-white/5" },
-                        h('div', { className: "flex justify-between items-center mb-2" },
-                            h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, 
-                                t(`settings.apiKeysTab.${keyType}Key`)
-                            ),
-                            validationStatus[keyType] && (
-                                h('span', { className: `text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}` },
-                                    validationStatus[keyType].success ? h(CheckCircleIcon, { className: "w-3 h-3" }) : h(WarningIcon, { className: "w-3 h-3" }),
-                                    validationStatus[keyType].success ? 'Valid' : 'Invalid'
-                                )
-                            )
-                        ),
-                        h('input', {
-                            type: "password",
-                            className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-500",
-                            value: localKeys[keyType] || '',
-                            onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}),
-                            placeholder: "Enter your API key here..."
-                        }),
-                        validationStatus[keyType] && !validationStatus[keyType].success && (
-                            h('p', { className: "text-xs text-red-400 mt-2 pl-1" }, validationStatus[keyType].message)
-                        )
+                        h('div', { className: "flex justify-between items-center mb-2" }, h('label', { className: "text-xs uppercase tracking-wider font-semibold text-gray-400" }, t(`settings.apiKeysTab.${keyType}Key`)), validationStatus[keyType] && (h('span', { className: `text-xs flex items-center gap-1 ${validationStatus[keyType].success ? 'text-green-400' : 'text-red-400'}` }, validationStatus[keyType].success ? h(CheckCircleIcon, { className: "w-3 h-3" }) : h(WarningIcon, { className: "w-3 h-3" }), validationStatus[keyType].success ? 'Valid' : 'Invalid'))),
+                        h('input', { type: "password", className: "w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder-gray-500", value: localKeys[keyType] || '', onChange: (e) => setLocalKeys({...localKeys, [keyType]: e.target.value}), placeholder: "Enter your API key here..." }),
+                        validationStatus[keyType] && !validationStatus[keyType].success && (h('p', { className: "text-xs text-red-400 mt-2 pl-1" }, validationStatus[keyType].message))
                     )
                 )
             ),
-            
-            h('button', {
-                onClick: handleSaveKeys,
-                disabled: isValidating,
-                className: "mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2"
-            },
-                isValidating ? h(SpinnerIcon, { className: "w-5 h-5" }) : h(CheckCircleIcon, { className: "w-5 h-5" }),
-                t('settings.apiKeysTab.save')
-            )
+            h('button', { onClick: handleSaveKeys, disabled: isValidating, className: "mt-8 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-800 disabled:to-gray-800 text-white py-3 rounded-lg font-bold transition-all shadow-lg shadow-cyan-900/20 flex items-center justify-center gap-2" }, isValidating ? h(SpinnerIcon, { className: "w-5 h-5" }) : h(CheckCircleIcon, { className: "w-5 h-5" }), t('settings.apiKeysTab.save'))
         )
     );
 };
@@ -595,7 +476,6 @@ const SettingsModal = ({
     useSystemVoice, setUseSystemVoice,
     user, handleLogin, handleLogout
 }: any) => {
-    // ... (Keep existing implementation of SettingsModal)
     const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(true);
     const [previewingVoice, setPreviewingVoice] = React.useState(null);
@@ -622,9 +502,6 @@ const SettingsModal = ({
     };
 
     const handlePlanSelection = async (planId) => {
-        // In a real app, this would trigger payment flow.
-        // For now, we simulate upgrading by setting the plan immediately.
-        // This effectively "releases the lock".
         setSubscriptionPlan(planId);
         alert(`Successfully upgraded to ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan! API Key lock is released.`);
     };
@@ -639,9 +516,7 @@ const SettingsModal = ({
                 setPreviewingVoice(null);
                 return;
             }
-            // REMOVED: Passing gemini API key as generateSpeech will use process.env.API_KEY directly.
             const stream = await generateSpeech(text, voiceName);
-            // ... stream logic ...
              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             let nextTime = audioCtx.currentTime;
             
@@ -705,11 +580,8 @@ const SettingsModal = ({
                 );
             case 'persona':
                 return h('div', { className: "space-y-4 animate-fade-in pb-10" },
-                    
-                    // COLLAPSIBLE 1: IDENTITY
                     h(CollapsibleSection, { title: "Assistant Identity", description: "Customize name, avatar, and user profile.", icon: h(PersonaIcon, { className: "w-5 h-5" }), defaultOpen: true },
                         h('div', { className: "space-y-6" },
-                            // Assistant Identity
                             h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
                                 h('h4', { className: "text-xs font-bold text-cyan-400 uppercase tracking-wider mb-4" }, "Assistant Profile"),
                                 h('div', { className: "flex flex-col md:flex-row gap-4" },
@@ -761,8 +633,6 @@ const SettingsModal = ({
                                     )
                                 )
                             ),
-
-                            // User Profile
                              h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
                                 h('h4', { className: "text-xs font-bold text-purple-400 uppercase tracking-wider mb-4" }, "User Profile"),
                                 h('div', { className: "space-y-3" },
@@ -788,7 +658,6 @@ const SettingsModal = ({
                             )
                         )
                     ),
-                    // ... other collapsibles (Behavioral, System, Identity)
                     h(CollapsibleSection, { title: "Behavioral Matrix", description: "Fine-tune personality, greeting, and emotions.", icon: h('svg', { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" })) },
                         h('div', { className: "space-y-6" },
                             h('div', null,
@@ -821,10 +690,8 @@ const SettingsModal = ({
                             )
                         )
                     ),
-                    // ...
                      h(CollapsibleSection, { title: "System & Audio", description: "Audio effects, ambient sounds, and visual theme.", icon: h(SettingsIcon, { className: "w-5 h-5" }) },
                          h('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
-                            // Audio Config
                             h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
                                 h('h4', { className: "text-xs font-bold text-yellow-500 uppercase tracking-wider mb-4" }, "Audio Config"),
                                 h('div', { className: "space-y-4" },
@@ -845,8 +712,6 @@ const SettingsModal = ({
                                     )
                                 )
                             ),
-                            
-                            // Theme Config
                             h('div', { className: "p-4 bg-black/40 rounded-lg border border-white/5" },
                                 h('h4', { className: "text-xs font-bold text-blue-500 uppercase tracking-wider mb-4" }, "Appearance"),
                                 h('div', { className: "flex bg-black/50 rounded-lg p-1 border border-gray-700" },
@@ -885,7 +750,6 @@ const SettingsModal = ({
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h(CollapsibleSection, { title: "Voice Selection", description: "Choose the active voice model for your assistant.", icon: h(VoiceIcon, { className: "w-5 h-5" }), defaultOpen: true },
                         h('div', { className: "space-y-8" },
-                            // System Voice Toggle
                             h('div', { className: "p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl mb-6" },
                                 h('div', { className: "flex items-center justify-between" },
                                     h('div', null,
@@ -901,7 +765,6 @@ const SettingsModal = ({
                                 )
                             ),
                             
-                            // Model Voices
                             h('div', { className: `${useSystemVoice ? 'opacity-50 pointer-events-none' : 'opacity-100'} transition-opacity` },
                                 h('h4', { className: "text-xs font-bold text-cyan-400 uppercase tracking-wider mb-4 border-b border-white/10 pb-2" }, t('settings.voiceTab.mainVoiceLabel')),
                                 Object.entries(categories).map(([category, voices]) => 
@@ -964,12 +827,10 @@ const SettingsModal = ({
                     )
                 );
              case 'help':
-                // ... same help content
                 return h('div', { className: "space-y-6 animate-fade-in" },
                     h('div', { className: "bg-gray-900/60 backdrop-blur-md p-6 rounded-xl border border-white/10" },
                         h('h3', { className: "font-semibold text-lg mb-6 text-cyan-400" }, t('settings.helpTab.faqTitle')),
                          h('div', { className: "space-y-4" },
-                            // ... details/summary
                              h('div', { className: "border border-gray-700/50 rounded-lg overflow-hidden" },
                                 h('details', { className: "group bg-black/40", open: true },
                                     h('summary', { className: "cursor-pointer p-4 text-sm font-medium text-white flex items-center justify-between hover:bg-white/5 transition-colors" },
@@ -982,7 +843,6 @@ const SettingsModal = ({
                                 )
                             )
                         ),
-                        // Contact Section
                         h('div', { className: "mt-6 pt-6 border-t border-white/10" },
                             h('h3', { className: "text-sm font-bold text-white mb-4" }, "Contact Developer"),
                             h('div', { className: "flex flex-col md:flex-row gap-4 justify-center" },
@@ -1008,7 +868,6 @@ const SettingsModal = ({
                     )
                 );
              case 'subscription':
-                // NEW SUBSCRIPTION UI - GRID LAYOUT WITH ONLY 3 PLANS
                 return h('div', { className: "space-y-8 animate-fade-in" },
                      h('div', { className: "text-center mb-8" }, 
                         h('h3', { className: "text-3xl font-bold text-white mb-2" }, t('settings.subscriptionTab.title')), 
@@ -1057,7 +916,6 @@ const SettingsModal = ({
                             );
                         })
                      ),
-                     // UPGRADE MORE OPTION
                      h('div', { className: "mt-12 pt-8 border-t border-white/10 text-center" },
                         h('h4', { className: "text-white font-medium mb-4" }, "Need something else?"),
                         h('button', {
@@ -1073,7 +931,6 @@ const SettingsModal = ({
         }
     };
     
-    // ... rest of modal (unchanged)
      return h('div', { className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity", onClick: onClose },
         h('div', { className: "bg-black md:bg-gray-900 w-full h-full md:w-[90vw] md:h-[85vh] md:max-w-5xl md:rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col md:flex-row relative animate-panel-enter", onClick: e => e.stopPropagation() },
             h('div', { className: `${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-72 bg-black md:bg-black/20 md:border-r border-white/10 h-full absolute md:relative z-20` },
@@ -1109,10 +966,8 @@ const SettingsModal = ({
 export const App = () => {
   const { t, lang, setLang } = useTranslation();
   
-  // -- State Definitions --
   const [user, setUser] = React.useState(null);
   
-  // All persistent states now accept 'user' to enable Firestore sync
   const [theme, setTheme] = usePersistentState('kaniska-theme', 'dark', user);
   const [gender, setGender] = usePersistentState('kaniska-gender', 'female', user);
   const [assistantName, setAssistantName] = usePersistentState('kaniska-name', DEFAULT_ASSISTANT_NAME_FEMALE, user);
@@ -1123,7 +978,6 @@ export const App = () => {
   const [coreProtocol, setCoreProtocol] = usePersistentState('kaniska-core-protocol', DEFAULT_CORE_PROTOCOL, user);
   const [userBio, setUserBio] = usePersistentState('kaniska-user-bio', '', user);
   const [emotionTuning, setEmotionTuning] = usePersistentState('kaniska-emotions', { happiness: 60, empathy: 60, formality: 40, excitement: 50, sadness: 10, curiosity: 60 }, user);
-  // REMOVED: Gemini API Key from persistent state.
   const [apiKeys, setApiKeys] = usePersistentState('kaniska-keys', { weather: '', news: '', youtube: '', auddio: '' }, user);
   const [femaleVoices, setFemaleVoices] = usePersistentState('kaniska-voices-female', { main: 'Kore', greeting: 'Kore' }, user);
   const [maleVoices, setMaleVoices] = usePersistentState('kaniska-voices-male', { main: 'Fenrir', greeting: 'Fenrir' }, user);
@@ -1133,27 +987,24 @@ export const App = () => {
   const [subscriptionPlan, setSubscriptionPlan] = usePersistentState('kaniska-plan', 'free', user);
   const [useSystemVoice, setUseSystemVoice] = usePersistentState('kaniska-sys-voice', false, user);
   
-  // Usage tracking is persisted, but updating is throttled in useEffect below
   const [usageData, setUsageData] = usePersistentState('kaniska-usage-data', { seconds: 0, period: new Date().toISOString().slice(0, 7) }, user);
   
   const [isConnected, setIsConnected] = React.useState(false);
   const [isCameraOn, setIsCameraOn] = React.useState(false);
   const [status, setStatus] = React.useState('idle');
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState( 'account');
+  const [activeTab, setActiveTab] = React.useState('account');
   const [currentVideo, setCurrentVideo] = React.useState(null);
   const [isPlayerMinimized, setIsPlayerMinimized] = React.useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const [isYouTubeOpen, setIsYouTubeOpen] = React.useState(false);
   
-  // Track active session configuration to detect updates
   const [activeSessionConfig, setActiveSessionConfig] = React.useState(null);
   
   const sessionRef = React.useRef(null);
   const youtubePlayerRef = React.useRef(null);
   const wakeLockRef = React.useRef(null);
   
-  // Audio Refs
   const inputAudioContextRef = useRef(null);
   const outputAudioContextRef = useRef(null);
   const scriptProcessorRef = useRef(null);
@@ -1161,117 +1012,58 @@ export const App = () => {
   const nextStartTimeRef = useRef(0);
   const scheduledSourcesRef = useRef([]);
 
-  // Video Refs
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const videoStreamRef = useRef(null);
   const videoIntervalRef = useRef(null);
+  
+  const connectionStartTimeRef = useRef(0);
 
   React.useEffect(() => {
-     // Request Notification Permission on startup
-     if ("Notification" in window) {
-         Notification.requestPermission();
-     }
+     if ("Notification" in window) Notification.requestPermission();
      return onAuthStateChanged(auth, u => setUser(u));
   }, []);
 
-  // CAPACITOR NATIVE HANDLERS (BACK BUTTON & STATUS BAR)
   useEffect(() => {
-    // Make status bar transparent/dark
     const configureNativeUI = async () => {
-        try {
-            await StatusBar.setStyle({ style: Style.Dark });
-            await StatusBar.setOverlaysWebView({ overlay: true });
-        } catch (e) {
-            // Not running in capacitor
-        }
+        try { await StatusBar.setStyle({ style: Style.Dark }); await StatusBar.setOverlaysWebView({ overlay: true }); } catch (e) {}
     };
     configureNativeUI();
-
-    // Handle Hardware Back Button
-    const backListener = CapApp.addListener('backButton', (data) => {
-        if (isSettingsOpen) {
-            setIsSettingsOpen(false);
-        } else if (isFeedbackOpen) {
-            setIsFeedbackOpen(false);
-        } else if (isYouTubeOpen && !isPlayerMinimized) {
-            // Minimize player instead of closing app
-            setIsPlayerMinimized(true);
-        } else if (isConnected) {
-            // Optional: Confirm exit or background app?
-            // For now, let's just background it to keep the session alive
-            CapApp.minimizeApp(); 
-        } else {
-            // Exit app
-            CapApp.exitApp();
-        }
+    const backListener = CapApp.addListener('backButton', () => {
+        if (isSettingsOpen) setIsSettingsOpen(false);
+        else if (isFeedbackOpen) setIsFeedbackOpen(false);
+        else if (isYouTubeOpen && !isPlayerMinimized) setIsPlayerMinimized(true);
+        else if (isConnected) CapApp.minimizeApp(); 
+        else CapApp.exitApp();
     });
-
-    return () => {
-        backListener.then(h => h.remove());
-    };
+    return () => { backListener.then(h => h.remove()); };
   }, [isSettingsOpen, isFeedbackOpen, isYouTubeOpen, isPlayerMinimized, isConnected]);
 
-
-  // Compute current configuration object to compare with active session
-  const currentConfig = useMemo(() => ({
-      assistantName,
-      userName,
-      userBio,
-      gender,
-      customInstructions,
-      personality,
-      coreProtocol,
-      emotionTuning,
-      voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main,
-      greetingMessage,
-      useSystemVoice
-  }), [assistantName, userName, userBio, gender, customInstructions, personality, coreProtocol, emotionTuning, femaleVoices, maleVoices, greetingMessage, useSystemVoice]);
-
-  // Check if updates are available
+  const currentConfig = useMemo(() => ({ assistantName, userName, userBio, gender, customInstructions, personality, coreProtocol, emotionTuning, voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main, greetingMessage, useSystemVoice }), [assistantName, userName, userBio, gender, customInstructions, personality, coreProtocol, emotionTuning, femaleVoices, maleVoices, greetingMessage, useSystemVoice]);
   const isUpdateAvailable = isConnected && activeSessionConfig && JSON.stringify(activeSessionConfig) !== JSON.stringify(currentConfig);
 
-  // Preload Image to avoid flashing
   useEffect(() => {
-      if (avatarUrl) {
-          const img = new Image();
-          img.src = avatarUrl;
-      } else {
-          const img = new Image();
-          img.src = "https://i.gifer.com/NTHO.gif";
-      }
+      const img = new Image();
+      img.src = avatarUrl || "https://i.gifer.com/NTHO.gif";
   }, [avatarUrl]);
 
-  // Usage Tracking & Limit Enforcement
   React.useEffect(() => {
       let interval;
       if (status === 'live') {
           interval = setInterval(() => {
               setUsageData(prev => {
-                  const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
-                  
-                  // Reset if a new month
-                  if (prev.period !== currentPeriod) {
-                      return { period: currentPeriod, seconds: 0 };
-                  }
-                  
-                  // Increment usage (5 seconds)
+                  const currentPeriod = new Date().toISOString().slice(0, 7);
+                  if (prev.period !== currentPeriod) return { period: currentPeriod, seconds: 0 };
                   return { ...prev, seconds: (prev.seconds || 0) + 5 };
               });
-          }, 5000); // Reduced write frequency to 5s to save DB quota
+          }, 5000);
       }
       return () => clearInterval(interval);
   }, [status]);
 
-  // Separate effect to enforce limit based on updated usageData
   React.useEffect(() => {
       if (subscriptionPlan === 'free' && usageData.seconds >= FREE_LIMIT_SECONDS && status === 'live') {
-          cleanupMedia();
-          setIsConnected(false);
-          setStatus('idle');
-          setIsSettingsOpen(true);
-          setActiveTab('subscription');
-          alert("You have reached your monthly free trial limit (1 hour). Please upgrade to continue using Kaniska.");
+          cleanupMedia(); setIsConnected(false); setStatus('idle'); setIsSettingsOpen(true); setActiveTab('subscription'); alert("You have reached your monthly free trial limit (1 hour). Please upgrade to continue using Kaniska.");
       }
   }, [usageData.seconds, subscriptionPlan, status]);
 
@@ -1280,240 +1072,140 @@ export const App = () => {
 
   const saveToHistory = async (text, sender) => {
       if (!user) return;
-      try {
-          await addDoc(collection(db, "users", user.uid, "chat_history"), {
-              text,
-              sender, // 'user' or 'assistant'
-              timestamp: serverTimestamp()
-          });
-      } catch (e) { console.error("History Save Error", e); }
+      try { await addDoc(collection(db, "users", user.uid, "chat_history"), { text, sender, timestamp: serverTimestamp() }); } catch (e) { console.error("History Save Error", e); }
   };
 
   const cleanupMedia = () => {
-      // Close contexts
-      if (inputAudioContextRef.current) {
-          inputAudioContextRef.current.close();
-          inputAudioContextRef.current = null;
-      }
-      if (outputAudioContextRef.current) {
-          outputAudioContextRef.current.close();
-          outputAudioContextRef.current = null;
-      }
-      // Stop sources
-      if (scheduledSourcesRef.current) {
-          scheduledSourcesRef.current.forEach(source => {
-              try { source.stop(); } catch(e) {}
-          });
-          scheduledSourcesRef.current = [];
-      }
-      // Disconnect processor
-      if (scriptProcessorRef.current) {
-          scriptProcessorRef.current.disconnect();
-          scriptProcessorRef.current = null;
-      }
-      if (audioSourceRef.current) {
-          audioSourceRef.current.disconnect();
-          audioSourceRef.current = null;
-      }
-      
-      // Stop Video
-      if (videoIntervalRef.current) {
-          clearInterval(videoIntervalRef.current);
-          videoIntervalRef.current = null;
-      }
-      if (videoStreamRef.current) {
-          videoStreamRef.current.getTracks().forEach(t => t.stop());
-          videoStreamRef.current = null;
-      }
-      
-      // Release Wake Lock
-      if (wakeLockRef.current) {
-          wakeLockRef.current.release()
-              .then(() => { wakeLockRef.current = null; })
-              .catch((e) => console.log('Wake Lock release error', e));
-      }
-      
+      if (inputAudioContextRef.current) { inputAudioContextRef.current.close(); inputAudioContextRef.current = null; }
+      if (outputAudioContextRef.current) { outputAudioContextRef.current.close(); outputAudioContextRef.current = null; }
+      if (scheduledSourcesRef.current) { scheduledSourcesRef.current.forEach(source => { try { source.stop(); } catch(e) {} }); scheduledSourcesRef.current = []; }
+      if (scriptProcessorRef.current) { scriptProcessorRef.current.disconnect(); scriptProcessorRef.current = null; }
+      if (audioSourceRef.current) { audioSourceRef.current.disconnect(); audioSourceRef.current = null; }
+      if (videoIntervalRef.current) { clearInterval(videoIntervalRef.current); videoIntervalRef.current = null; }
+      if (videoStreamRef.current) { videoStreamRef.current.getTracks().forEach(t => t.stop()); videoStreamRef.current = null; }
+      if (wakeLockRef.current) { wakeLockRef.current.release().then(() => { wakeLockRef.current = null; }).catch((e) => console.log('Wake Lock release error', e)); }
       setIsCameraOn(false);
   };
 
   const startVideoTransmission = () => {
       if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
-
       videoIntervalRef.current = setInterval(() => {
           if (!sessionRef.current || !videoRef.current || !canvasRef.current) return;
-          
           const video = videoRef.current;
-          if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+          if (video.readyState >= 2) { 
               const canvas = canvasRef.current;
               const ctx = canvas.getContext('2d');
-              
-              // Increased scale from 0.25 to 0.4 for better detail (supports "exact motion" analysis)
               const scale = 0.4; 
               canvas.width = video.videoWidth * scale;
               canvas.height = video.videoHeight * scale;
-              
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              
-              // Get base64 string without prefix
               const base64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-              
-              sessionRef.current.sendRealtimeInput({
-                  media: { mimeType: 'image/jpeg', data: base64 }
-              });
+              sessionRef.current.sendRealtimeInput({ media: { mimeType: 'image/jpeg', data: base64 } });
           }
-      }, 100); // 10 FPS (100ms interval) for smoother, exact motion tracking
+      }, 100); 
   };
 
   const toggleCamera = async () => {
       if (isCameraOn) {
-          // Stop Camera
-          if (videoStreamRef.current) {
-              videoStreamRef.current.getTracks().forEach(track => track.stop());
-              videoStreamRef.current = null;
-          }
-          if (videoIntervalRef.current) {
-              clearInterval(videoIntervalRef.current);
-              videoIntervalRef.current = null;
-          }
-          if (videoRef.current) {
-              videoRef.current.srcObject = null;
-          }
+          if (videoStreamRef.current) { videoStreamRef.current.getTracks().forEach(track => track.stop()); videoStreamRef.current = null; }
+          if (videoIntervalRef.current) { clearInterval(videoIntervalRef.current); videoIntervalRef.current = null; }
+          if (videoRef.current) { videoRef.current.srcObject = null; }
           setIsCameraOn(false);
       } else {
-          // Start Camera
           try {
               const stream = await navigator.mediaDevices.getUserMedia({ video: true });
               videoStreamRef.current = stream;
-              if (videoRef.current) {
-                  videoRef.current.srcObject = stream;
-                  await videoRef.current.play();
-              }
+              if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
               setIsCameraOn(true);
-              
-              // If connected, start streaming immediately
-              if (isConnected && sessionRef.current) {
-                  startVideoTransmission();
-              }
-          } catch (err) {
-              console.error("Camera Error:", err);
-              alert("Unable to access camera. Please allow permission in your browser settings.");
-          }
+              if (isConnected && sessionRef.current) { startVideoTransmission(); }
+          } catch (err) { console.error("Camera Error:", err); alert("Unable to access camera. Please allow permission in your browser settings."); }
       }
   };
 
   const handleManualSearch = async (query) => {
         try {
             const video = await searchYouTube(apiKeys.youtube, query);
-            if (video) {
-                setCurrentVideo(video);
-                setIsYouTubeOpen(true);
-                setIsPlayerMinimized(false);
-            } else {
-                alert("No video found for that query.");
-            }
-        } catch (e) {
-            alert(e.message);
-        }
+            if (video) { setCurrentVideo(video); setIsYouTubeOpen(true); setIsPlayerMinimized(false); } else { alert("No video found for that query."); }
+        } catch (e) { alert(e.message); }
+  };
+
+  const handleRecognizeSong = async () => {
+      if (!apiKeys.auddio) {
+          alert(t('main.errors.auddioKeyMissing'));
+          setIsSettingsOpen(true);
+          setActiveTab('apiKeys');
+          return;
+      }
+      const prevStatus = status;
+      setStatus('recognizing');
+
+      try {
+          const result: any = await recognizeSong(apiKeys.auddio);
+          if (result && result.title) {
+              const message = t('chat.songRecognized', { title: result.title, artist: result.artist });
+              alert(message);
+              saveToHistory(`Recognized Song: ${result.title} by ${result.artist}`, 'assistant');
+          } else {
+              alert(t('chat.songNotFound'));
+          }
+      } catch (e) {
+          console.error(e);
+          alert(t('main.errors.auddioRecording'));
+      } finally {
+          setStatus(prevStatus === 'live' ? 'live' : 'idle');
+      }
   };
 
   const connect = async () => {
-    if (isConnected) {
-        cleanupMedia();
-        setIsConnected(false);
-        setStatus('idle');
-        setActiveSessionConfig(null);
-        return;
-    }
-
-    // Check Usage Limit before connecting
-    const currentPeriod = new Date().toISOString().slice(0, 7);
-    if (subscriptionPlan === 'free' && usageData.period === currentPeriod && usageData.seconds >= FREE_LIMIT_SECONDS) {
-        setIsSettingsOpen(true);
-        setActiveTab('subscription');
-        alert("Monthly usage limit reached. Please upgrade to continue.");
-        return;
-    }
+    if (isConnected) { cleanupMedia(); setIsConnected(false); setStatus('idle'); setActiveSessionConfig(null); return; }
     
-    // Acquire Wake Lock to keep screen alive
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLockRef.current = await navigator.wakeLock.request('screen');
-        }
-    } catch (err) {
-        console.warn("Wake Lock not supported or failed", err);
-    }
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    if (subscriptionPlan === 'free' && usageData.period === currentPeriod && usageData.seconds >= FREE_LIMIT_SECONDS) { setIsSettingsOpen(true); setActiveTab('subscription'); alert("Monthly usage limit reached. Please upgrade to continue."); return; }
+    
+    try { 
+        if ('wakeLock' in navigator) { 
+            wakeLockRef.current = await (navigator.wakeLock as any).request('screen'); 
+        } 
+    } catch (err) { console.warn("Wake Lock not supported or failed", err); }
     
     setStatus('listening');
-    setActiveSessionConfig(currentConfig); // Capture config at start of session
+    setActiveSessionConfig(currentConfig); 
     
-    // Resolve session promise to handle initial audio stream race condition
+    // Track connection start time
+    connectionStartTimeRef.current = Date.now();
+    
     let resolveSession;
     const sessionPromise = new Promise(resolve => { resolveSession = resolve; });
 
-    // Initialize Audio Contexts
     try {
-        // Use default sample rate for better clarity and compatibility via browser resampling
         outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        await outputAudioContextRef.current.resume(); // CRITICAL FIX: Ensure context is running (autoplay policy)
+        await outputAudioContextRef.current.resume();
         inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
         nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
-    } catch (e) {
-        console.error("Audio Context Error", e);
-        setStatus('error');
-        return;
-    }
+    } catch (e) { console.error("Audio Context Error", e); setStatus('error'); return; }
 
     const callbacks = {
         onopen: async () => {
             setIsConnected(true);
             setStatus('live');
-            if (connectionSound) {
-                const audio = new Audio(connectionSound);
-                audio.volume = ambientVolume;
-                audio.play().catch(e => console.warn("SFX failed", e));
-            }
-
-            // Start Mic Streaming
+            if (connectionSound) { const audio = new Audio(connectionSound); audio.volume = ambientVolume; audio.play().catch(e => console.warn("SFX failed", e)); }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(stream);
                 scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
-                
                 scriptProcessorRef.current.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
                     const pcmBlob = createBlob(inputData); 
-                    // CRITICAL: Solely rely on sessionPromise resolves
-                    sessionPromise.then((session: any) => {
-                         session.sendRealtimeInput({ media: pcmBlob });
-                    });
+                    sessionPromise.then((session: any) => { session.sendRealtimeInput({ media: pcmBlob }); });
                 };
-                
                 audioSourceRef.current.connect(scriptProcessorRef.current);
                 scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
-
-                // Start Video Streaming if Camera was already on
-                if (isCameraOn) {
-                    startVideoTransmission();
-                }
-
-            } catch (err) {
-                console.error("Mic Error", err);
-                alert("Could not access microphone.");
-                setStatus('error');
-            }
+                if (isCameraOn) { startVideoTransmission(); }
+            } catch (err) { console.error("Mic Error", err); alert("Could not access microphone."); setStatus('error'); }
         },
         onmessage: async (msg) => {
-             // Handle Transcripts for History
-             if (msg.serverContent?.outputTranscription) {
-                 const text = msg.serverContent.outputTranscription.text;
-                 if (text) saveToHistory(text, 'assistant');
-             }
-             if (msg.serverContent?.inputTranscription) {
-                 const text = msg.serverContent.inputTranscription.text;
-                 if (text) saveToHistory(text, 'user');
-             }
-
-             // Audio Playback with Jitter Buffer Fix
+             if (msg.serverContent?.outputTranscription) { const text = msg.serverContent.outputTranscription.text; if (text) saveToHistory(text, 'assistant'); }
+             if (msg.serverContent?.inputTranscription) { const text = msg.serverContent.inputTranscription.text; if (text) saveToHistory(text, 'user'); }
              const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (audioData) {
                  setStatus('speaking');
@@ -1521,432 +1213,108 @@ export const App = () => {
                      const binary = atob(audioData);
                      const bytes = new Uint8Array(binary.length);
                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                     
-                     // Decode raw PCM (16-bit little endian, 24kHz)
                      const buffer = await decodeAudioData(bytes, outputAudioContextRef.current, 24000, 1);
-                     
-                     // Safety check: if decoding failed or context closed, do not proceed
                      if (!buffer || !outputAudioContextRef.current) return;
-
                      const source = outputAudioContextRef.current.createBufferSource();
                      source.buffer = buffer;
                      source.connect(outputAudioContextRef.current.destination);
-                     
-                     // Improved Scheduling Logic to prevent crackling (Jitter Buffer)
-                     const now = outputAudioContextRef.current.currentTime;
-                     // Ensure next start time is at least 'now'. 
-                     // Add a tiny offset (0.05s) to the very first chunk in a sequence to prevent overlap if latency fluctuates.
                      let startTime = nextStartTimeRef.current;
-                     
-                     // Increased buffer from 0.05 to 0.08 for smoother playback (less "fatna")
-                     if (startTime < now) {
-                        startTime = now + 0.08; 
-                     }
-                     
+                     const now = outputAudioContextRef.current.currentTime;
+                     if (startTime < now) { startTime = now + 0.08; }
                      source.start(startTime);
                      nextStartTimeRef.current = startTime + buffer.duration;
-                     
                      scheduledSourcesRef.current.push(source);
-                     source.onended = () => {
-                         scheduledSourcesRef.current = scheduledSourcesRef.current.filter(s => s !== source);
-                         if (scheduledSourcesRef.current.length === 0) setStatus('live');
-                     };
-                 } catch (e) {
-                     console.error("Audio Decode Error", e);
-                 }
+                     source.onended = () => { scheduledSourcesRef.current = scheduledSourcesRef.current.filter(s => s !== source); if (scheduledSourcesRef.current.length === 0) setStatus('live'); };
+                 } catch (e) { console.error("Audio Decode Error", e); }
              }
-
-             // Handle Text Fallback if Audio is disabled
              const textData = msg.serverContent?.modelTurn?.parts?.[0]?.text;
-             if (textData && useSystemVoice) {
-                  setStatus('speaking');
-                  await speakWithBrowser(textData, 'hi-IN');
-                  setStatus('live');
-             }
-
-             if (msg.serverContent?.interrupted) {
-                 // Clear Queue
-                 scheduledSourcesRef.current.forEach(s => s.stop());
-                 scheduledSourcesRef.current = [];
-                 nextStartTimeRef.current = outputAudioContextRef.current?.currentTime || 0;
-                 if (useSystemVoice) window.speechSynthesis.cancel();
-                 setStatus('listening'); // Back to listening immediately
-             }
-             
+             if (textData && useSystemVoice) { setStatus('speaking'); await speakWithBrowser(textData, 'hi-IN'); setStatus('live'); }
+             if (msg.serverContent?.interrupted) { scheduledSourcesRef.current.forEach(s => s.stop()); scheduledSourcesRef.current = []; nextStartTimeRef.current = outputAudioContextRef.current?.currentTime || 0; if (useSystemVoice) window.speechSynthesis.cancel(); setStatus('listening'); }
              if (msg.toolCall?.functionCalls) {
                  const responses = [];
                  for (const call of msg.toolCall.functionCalls) {
                      let result: Record<string, any> = { result: "ok" };
                      const args = (call.args as any) || {};
-
-                     if (call.name === 'getWeather') {
-                         try {
-                             if (args.location) {
-                                 const summary = await fetchWeatherSummary(args.location);
-                                 result = { result: summary };
-                             } else {
-                                 result = { error: "Location is required for weather. Please ask the user for the city name." };
-                             }
-                         } catch (e) { result = { error: e.message }; }
-                     } 
-                     else if (call.name === 'getNews') {
-                         try {
-                             const news = await fetchNews(null, args.query || 'general');
-                             result = { result: news };
-                         } catch (e) { result = { error: e.message }; }
-                     } 
-                     else if (call.name === 'searchYouTube') {
-                         try {
-                             const video = await searchYouTube(apiKeys.youtube, args.query || '');
-                             if (video) {
-                                 setCurrentVideo(video);
-                                 setIsYouTubeOpen(true);
-                                 setIsPlayerMinimized(false);
-                                 result = { result: `Playing ${video.title}` };
-                             } else result = { result: "Not found" };
-                         } catch(e) { result = { error: e.message }; }
-                     } 
-                     else if (call.name === 'openSettings') {
-                         setIsSettingsOpen(true);
-                     } 
-                     else if (call.name === 'setTimer') {
-                         if (args.duration > 0) {
-                             setTimeout(() => {
-                                 new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
-                                 if (Notification.permission === 'granted') {
-                                    new Notification("Timer Done!");
-                                 } else {
-                                    alert("Timer Done!");
-                                 }
-                             }, args.duration * 1000);
-                             result = { result: `Timer set for ${args.duration} seconds.` };
-                         } else {
-                             result = { error: "Invalid duration" };
-                         }
-                     } 
-                     else if (call.name === 'open_whatsapp') {
-                         window.open('https://wa.me', '_blank');
-                         result = { result: "WhatsApp opened." };
-                     } 
-                     else if (call.name === 'send_whatsapp') {
-                         const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(args.message || '')}`;
-                         window.open(url, '_blank');
-                         result = { result: `WhatsApp draft opened for message: ${args.message}` };
-                     } 
-                     else if (call.name === 'make_phone_call') {
-                         const num = args.phoneNumber;
-                         if (num) {
-                             window.open(`tel:${num}`, '_self');
-                             result = { result: `Calling ${num}` };
-                         } else {
-                             result = { error: "Phone number required" };
-                         }
-                     }
-                     else if (call.name === 'send_email') {
-                        const subject = encodeURIComponent(args.subject || 'Subject');
-                        const body = encodeURIComponent(args.body || 'Body');
-                        const recipient = args.recipient ? `mailto:${args.recipient}` : 'mailto:';
-                        window.open(`${recipient}?subject=${subject}&body=${body}`, '_blank');
-                        result = { result: "Email composer opened" };
-                     }
-                     else if (call.name === 'open_external_app') {
-                         const app = args.appName;
-                         let url = '';
-                         switch(app) {
-                             case 'instagram': url = 'instagram://'; break; // Attempt deep link
-                             case 'google': url = 'https://google.com'; break;
-                             case 'file_manager': result = { result: "Cannot open native file manager from web, but opened browser upload." }; break; 
-                             default: url = 'https://google.com'; // Fallback
-                         }
-                         if (url) {
-                            // Try deep link, catch if failed (though mostly silent in browser)
-                            try { window.location.href = url; } catch(e) { window.open(url, '_blank'); }
-                            result = { result: `Attempted to open ${app}` };
-                         }
-                     }
-                     else if (call.name === 'controlMedia') {
-                         try {
-                             const cmd = args.command;
-                             if (!youtubePlayerRef.current && cmd !== 'stop') {
-                                 result = { error: "No video is currently playing." };
-                             } else {
-                                switch (cmd) {
-                                    case 'pause': youtubePlayerRef.current?.pause(); break;
-                                    case 'play': youtubePlayerRef.current?.play(); break;
-                                    case 'stop': setCurrentVideo(null); setIsYouTubeOpen(false); break;
-                                    case 'forward_10': youtubePlayerRef.current?.seekBy(10); break;
-                                    case 'forward_60': youtubePlayerRef.current?.seekBy(60); break;
-                                    case 'rewind_10': youtubePlayerRef.current?.seekBy(-10); break;
-                                    case 'rewind_600': youtubePlayerRef.current?.seekBy(-600); break;
-                                    case 'minimize': setIsPlayerMinimized(true); break;
-                                    case 'maximize': setIsPlayerMinimized(false); break;
-                                    default: result = { error: "Unknown command." };
-                                }
-                                result = { result: `Executed command: ${cmd}` };
-                             }
-                         } catch (e) {
-                             result = { error: "Failed to control media." };
-                         }
-                     }
-                     
-                     responses.push({
-                         id: call.id,
-                         name: call.name,
-                         response: result
-                     });
+                     if (call.name === 'getWeather') { try { if (args.location) { const summary = await fetchWeatherSummary(args.location); result = { result: summary }; } else { result = { error: "Location is required." }; } } catch (e) { result = { error: e.message }; } } 
+                     else if (call.name === 'getNews') { try { const news = await fetchNews(null, args.query || 'general'); result = { result: news }; } catch (e) { result = { error: e.message }; } } 
+                     else if (call.name === 'searchYouTube') { try { const video = await searchYouTube(apiKeys.youtube, args.query || ''); if (video) { setCurrentVideo(video); setIsYouTubeOpen(true); setIsPlayerMinimized(false); result = { result: `Playing ${video.title}` }; } else result = { result: "Not found" }; } catch(e) { result = { error: e.message }; } } 
+                     else if (call.name === 'openSettings') { setIsSettingsOpen(true); } 
+                     else if (call.name === 'setTimer') { if (args.duration > 0) { setTimeout(() => { new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play(); if (Notification.permission === 'granted') { new Notification("Timer Done!"); } else { alert("Timer Done!"); } }, args.duration * 1000); result = { result: `Timer set for ${args.duration} seconds.` }; } else { result = { error: "Invalid duration" }; } } 
+                     else if (call.name === 'open_whatsapp') { window.open('https://wa.me', '_blank'); result = { result: "WhatsApp opened." }; } 
+                     else if (call.name === 'send_whatsapp') { const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(args.message || '')}`; window.open(url, '_blank'); result = { result: `WhatsApp draft opened.` }; } 
+                     else if (call.name === 'make_phone_call') { const num = args.phoneNumber; if (num) { window.open(`tel:${num}`, '_self'); result = { result: `Calling ${num}` }; } else { result = { error: "Phone number required" }; } }
+                     else if (call.name === 'send_email') { const subject = encodeURIComponent(args.subject || 'Subject'); const body = encodeURIComponent(args.body || 'Body'); const recipient = args.recipient ? `mailto:${args.recipient}` : 'mailto:'; window.open(`${recipient}?subject=${subject}&body=${body}`, '_blank'); result = { result: "Email composer opened" }; }
+                     else if (call.name === 'open_external_app') { const app = args.appName; let url = ''; switch(app) { case 'instagram': url = 'instagram://'; break; case 'google': url = 'https://google.com'; break; default: url = 'https://google.com'; } if (url) { try { window.location.href = url; } catch(e) { window.open(url, '_blank'); } result = { result: `Attempted to open ${app}` }; } }
+                     else if (call.name === 'controlMedia') { try { const cmd = args.command; if (!youtubePlayerRef.current && cmd !== 'stop') { result = { error: "No video." }; } else { switch (cmd) { case 'pause': youtubePlayerRef.current?.pause(); break; case 'play': youtubePlayerRef.current?.play(); break; case 'stop': setCurrentVideo(null); setIsYouTubeOpen(false); break; case 'forward_10': youtubePlayerRef.current?.seekBy(10); break; case 'forward_60': youtubePlayerRef.current?.seekBy(60); break; case 'rewind_10': youtubePlayerRef.current?.seekBy(-10); break; case 'rewind_600': youtubePlayerRef.current?.seekBy(-600); break; case 'minimize': setIsPlayerMinimized(true); break; case 'maximize': setIsPlayerMinimized(false); break; } result = { result: `Executed ${cmd}` }; } } catch (e) { result = { error: "Failed to control media." }; } }
+                     responses.push({ id: call.id, name: call.name, response: result });
                  }
-                 
-                 // Send tool response back to model
-                 sessionPromise.then((sess: any) => {
-                     sess.sendToolResponse({ functionResponses: responses });
-                 });
+                 sessionPromise.then((sess: any) => { sess.sendToolResponse({ functionResponses: responses }); });
              }
         },
         onclose: () => {
-             console.log("Session Closed");
-             setIsConnected(false);
-             setStatus('idle');
+             const duration = Date.now() - connectionStartTimeRef.current;
+             if (duration < 5000) {
+                 alert("Connection Closed Immediately! \n\nThis usually means your Vercel Environment Variable (VITE_GEMINI_API_KEY) is missing or invalid.\n\nPlease check Vercel Settings > Environment Variables.");
+             }
+             setIsConnected(false); 
+             setStatus('idle'); 
              cleanupMedia();
         },
-        onerror: (err) => {
-             console.error("Session Error", err);
-             const errorStr = err.toString().toLowerCase();
-             
-             // More descriptive error handling
-             if (errorStr.includes("networkerror") || errorStr.includes("fetch")) {
-                 alert("Network Connection Failed. Please refresh and try again.");
-             } else if (errorStr.includes("unavailable") || errorStr.includes("503")) {
-                 alert("Service Temporarily Unavailable. Please try connecting again in a few seconds.");
-             }
-             
-             setStatus('error');
-             cleanupMedia();
-             setIsConnected(false);
+        onerror: (err) => { 
+            console.error("Session Error", err);
+            const errStr = err.toString().toLowerCase();
+            if (errStr.includes("network")) {
+                alert("Network Error: Please check your internet connection.");
+            }
+            setStatus('error'); 
+            cleanupMedia(); 
+            setIsConnected(false); 
         }
     };
     
     try {
-        const voiceConfig = gender === 'female' ? femaleVoices : maleVoices;
-        const voiceName = voiceConfig.main;
-        
-        // Pass all config to connection logic
-        const session = await connectLiveSession(callbacks, {
-            customInstructions, 
-            coreProtocol, 
-            personality, // Pass the new personality state
-            voiceName, 
-            // REMOVED: gemini key passing.
-            assistantName,
-            userName,
-            userBio,
-            subscriptionPlan, // Pass subscription plan
-            greetingMessage, // Pass the custom greeting
-            emotionTuning, // Pass emotion tuning
-            gender, // Pass explicit gender
-            useSystemVoice // Pass system voice preference
-        });
-        
+        const session = await connectLiveSession(callbacks, { customInstructions, coreProtocol, personality, voiceName: gender === 'female' ? femaleVoices.main : maleVoices.main, assistantName, userName, userBio, subscriptionPlan, greetingMessage, emotionTuning, gender, useSystemVoice });
         sessionRef.current = session;
         resolveSession(session);
-    } catch (e) {
-        console.error("Connection Failed", e);
+    } catch (e) { 
+        console.error("Connection Failed", e); 
         if (e instanceof MainApiKeyError) {
-            alert(e.message);
+            alert(e.message); 
         } else {
-            alert("Connection Failed: " + (e.message || "Unknown error"));
+            alert("Connection Failed: " + (e.message || "Unknown error")); 
         }
-        setStatus('error');
-        cleanupMedia();
-        setIsConnected(false);
+        setStatus('error'); 
+        cleanupMedia(); 
+        setIsConnected(false); 
     }
   };
 
-  const handleUpdateSession = () => {
-      // Reconnect to apply new settings
-      cleanupMedia();
-      setIsConnected(false);
-      setStatus('idle');
-      setTimeout(() => connect(), 500);
-  };
+  const handleUpdateSession = () => { cleanupMedia(); setIsConnected(false); setStatus('idle'); setTimeout(() => connect(), 500); };
 
   return h('div', { className: `w-screen h-screen overflow-hidden flex flex-col items-center justify-center relative bg-black ${theme === 'light' ? 'bg-white text-black' : 'text-white'}` },
-        // Background Effects
         h('div', { className: "absolute inset-0 z-0 pointer-events-none" },
             h('div', { className: "absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-900/20 rounded-full blur-3xl animate-pulse" }),
             h('div', { className: "absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-900/20 rounded-full blur-3xl animate-pulse", style: { animationDelay: '1s' } }),
             h('div', { className: "absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150" })
         ),
-
-        // Settings Button - Adjusted top position for Safe Area
-        h('button', { 
-            onClick: () => {
-                setIsSettingsOpen(true);
-                setIsFeedbackOpen(false); // Mutual exclusion
-            },
-            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" 
-        },
-            h(SettingsIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
-        ),
-
-        // Feedback Button - Adjusted top position for Safe Area
-        h('button', {
-            onClick: () => {
-                setIsFeedbackOpen(true);
-                setIsSettingsOpen(false); // Mutual exclusion
-            },
-            className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group"
-        },
-            h(FeedbackIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })
-        ),
-
-        // Update Prompt (Visible when settings change during live session)
-        isUpdateAvailable && h('div', { 
-            className: "absolute top-[calc(env(safe-area-inset-top)+6rem)] z-40 animate-fade-in" 
-        },
-            h('button', {
-                onClick: handleUpdateSession,
-                className: "flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:bg-yellow-500/30 transition-all font-bold text-sm backdrop-blur-md"
-            },
-                h('svg', { className: "w-4 h-4 animate-spin", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })),
-                "System Update Available"
-            )
-        ),
-        
-        // Video Preview (Fixed Position - Bottom Safe Area)
-        h('div', { 
-            className: `fixed bottom-[calc(env(safe-area-inset-bottom)+9rem)] right-6 z-50 transition-all duration-500 ${isCameraOn ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}` 
-        },
-            h('div', { className: "relative w-32 h-48 bg-black rounded-lg border border-cyan-500/30 overflow-hidden shadow-xl" },
-                h('video', { 
-                    ref: videoRef, 
-                    className: "w-full h-full object-cover transform -scale-x-100", 
-                    muted: true, 
-                    playsInline: true 
-                }),
-                h('div', { className: "absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" })
-            )
-        ),
+        h('button', { onClick: () => { setIsSettingsOpen(true); setIsFeedbackOpen(false); }, className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] right-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" }, h(SettingsIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })),
+        h('button', { onClick: () => { setIsFeedbackOpen(true); setIsSettingsOpen(false); }, className: "absolute top-[calc(env(safe-area-inset-top)+1.5rem)] left-6 z-40 p-3 bg-white/5 hover:bg-white/10 rounded-full backdrop-blur-md transition-all border border-white/10 hover:border-cyan-500/50 group" }, h(FeedbackIcon, { className: "w-6 h-6 text-gray-400 group-hover:text-cyan-400 transition-colors" })),
+        isUpdateAvailable && h('div', { className: "absolute top-[calc(env(safe-area-inset-top)+6rem)] z-40 animate-fade-in" }, h('button', { onClick: handleUpdateSession, className: "flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.3)] hover:bg-yellow-500/30 transition-all font-bold text-sm backdrop-blur-md" }, h('svg', { className: "w-4 h-4 animate-spin", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, h('path', { d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" })), "System Update Available")),
+        h('div', { className: `fixed bottom-[calc(env(safe-area-inset-bottom)+9rem)] right-6 z-50 transition-all duration-500 ${isCameraOn ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'}` }, h('div', { className: "relative w-32 h-48 bg-black rounded-lg border border-cyan-500/30 overflow-hidden shadow-xl" }, h('video', { ref: videoRef, className: "w-full h-full object-cover transform -scale-x-100", muted: true, playsInline: true }), h('div', { className: "absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" }))),
         h('canvas', { ref: canvasRef, className: "hidden" }),
-
-        // Main Content Area with Safe Area Padding
         h('div', { className: "z-10 flex flex-col items-center justify-center w-full h-full p-4 pb-32 pt-safe" },
-            // Status Indicator
-            h('div', { className: `mb-8 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md transition-all duration-500 ${
-                status === 'live' || status === 'speaking' || status === 'listening' 
-                ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' 
-                : status === 'error'
-                ? 'bg-red-500/10 border-red-500/50 text-red-400'
-                : 'bg-white/5 border-white/10 text-gray-500'
-            }`},
-                h('div', { className: `w-2 h-2 rounded-full ${
-                    status === 'live' || status === 'speaking' ? 'bg-cyan-400 animate-pulse' : 
-                    status === 'listening' ? 'bg-green-400 animate-pulse' :
-                    status === 'error' ? 'bg-red-400' : 'bg-gray-500'
-                }`}),
-                t(`main.status.${status}`)
-            ),
-
-            // Avatar
-            h(Avatar, { 
-                state: status, 
-                mood: 'neutral', 
-                customUrl: avatarUrl
-            }),
-
-            // Assistant Name
-            h('h1', { className: "mt-8 text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 tracking-tight" }, 
-                assistantName
-            )
+            h('div', { className: `mb-8 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md transition-all duration-500 ${status === 'live' || status === 'speaking' || status === 'listening' ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : status === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-400' : 'bg-white/5 border-white/10 text-gray-500'}`}, h('div', { className: `w-2 h-2 rounded-full ${status === 'live' || status === 'speaking' ? 'bg-cyan-400 animate-pulse' : status === 'listening' ? 'bg-green-400 animate-pulse' : status === 'error' ? 'bg-red-400' : 'bg-gray-500'}`}), t(`main.status.${status}`)),
+            h(Avatar, { state: status, mood: 'neutral', customUrl: avatarUrl }),
+            h('h1', { className: "mt-8 text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 tracking-tight" }, assistantName)
         ),
-
-        // Footer Controls - Bottom Safe Area
         h('div', { className: "fixed bottom-[calc(env(safe-area-inset-bottom)+2.5rem)] z-30 flex items-center gap-4" },
-            // Camera Toggle
-            h('button', {
-                onClick: toggleCamera,
-                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
-                    isCameraOn 
-                    ? 'bg-white text-black hover:bg-gray-200' 
-                    : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
-                }`
-            },
-                isCameraOn ? h(CameraIcon, { className: "w-6 h-6" }) : h(CameraOffIcon, { className: "w-6 h-6" })
-            ),
-
-            // Connect Button
-            h('button', {
-                onClick: connect,
-                disabled: status === 'error',
-                className: `relative group px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 flex items-center gap-3 overflow-hidden shadow-2xl ${
-                    isConnected 
-                    ? 'bg-red-500/10 hover:bg-red-600/20 text-red-400 border border-red-500/50' 
-                    : 'bg-white text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]'
-                }`
-            },
-                isConnected 
-                ? h(DisconnectIcon, { className: "w-6 h-6" }) 
-                : h(ConnectIcon, { className: "w-6 h-6" }),
-                h('span', null, isConnected ? t('footer.disconnect') : t('footer.connect')),
-                
-                // Button Glow Effect
-                !isConnected && h('div', { className: "absolute inset-0 rounded-full ring-2 ring-white/50 animate-ping opacity-20" })
-            ),
-
-            // YouTube Toggle Button (Manual Open)
-             h('button', {
-                onClick: () => {
-                     setIsYouTubeOpen(!isYouTubeOpen);
-                     if (!isYouTubeOpen) setIsPlayerMinimized(false);
-                },
-                className: `p-4 rounded-full transition-all duration-300 shadow-xl ${
-                    isYouTubeOpen 
-                    ? 'bg-red-600 text-white hover:bg-red-700' 
-                    : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'
-                }`
-            },
-                h(YouTubeIcon, { className: "w-6 h-6" })
-            )
+            h('button', { onClick: toggleCamera, className: `p-4 rounded-full transition-all duration-300 shadow-xl ${isCameraOn ? 'bg-white text-black hover:bg-gray-200' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'}` }, isCameraOn ? h(CameraIcon, { className: "w-6 h-6" }) : h(CameraOffIcon, { className: "w-6 h-6" })),
+            h('button', { onClick: () => connect(), disabled: status === 'error', className: `relative group px-8 py-4 rounded-full font-bold text-lg transition-all duration-300 flex items-center gap-3 overflow-hidden shadow-2xl ${isConnected ? 'bg-red-500/10 hover:bg-red-600/20 text-red-400 border border-red-500/50' : 'bg-white text-black hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]'}` }, isConnected ? h(DisconnectIcon, { className: "w-6 h-6" }) : h(ConnectIcon, { className: "w-6 h-6" }), h('span', null, isConnected ? t('footer.disconnect') : t('footer.connect')), !isConnected && h('div', { className: "absolute inset-0 rounded-full ring-2 ring-white/50 animate-ping opacity-20" })),
+            h('button', { onClick: handleRecognizeSong, disabled: status === 'recognizing', className: `p-4 rounded-full transition-all duration-300 shadow-xl ${status === 'recognizing' ? 'bg-purple-600 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'}` }, status === 'recognizing' ? h(SpinnerIcon, { className: "w-6 h-6 animate-spin" }) : h(MusicIcon, { className: "w-6 h-6" })),
+            h('button', { onClick: () => { setIsYouTubeOpen(!isYouTubeOpen); if (!isYouTubeOpen) setIsPlayerMinimized(false); }, className: `p-4 rounded-full transition-all duration-300 shadow-xl ${isYouTubeOpen ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/10'}` }, h(YouTubeIcon, { className: "w-6 h-6" }))
         ),
-
-        // Components Overlay (YouTube is z-40, Modals are z-60+)
-        isYouTubeOpen && h(YouTubePlayer, { 
-            ref: youtubePlayerRef,
-            video: currentVideo, 
-            onClose: () => { setIsYouTubeOpen(false); },
-            isMinimized: isPlayerMinimized,
-            onSearch: handleManualSearch
-        }),
-        
-        h(FeedbackModal, {
-            isOpen: isFeedbackOpen,
-            onClose: () => setIsFeedbackOpen(false)
-        }),
-        
-        h(SettingsModal, {
-            isOpen: isSettingsOpen,
-            onClose: () => setIsSettingsOpen(false),
-            activeTab, setActiveTab,
-            theme, setTheme,
-            gender, setGender,
-            assistantName, setAssistantName,
-            userName, setUserName,
-            greetingMessage, setGreetingMessage,
-            customInstructions, setCustomInstructions,
-            coreProtocol, setCoreProtocol,
-            userBio, setUserBio,
-            personality, setPersonality,
-            emotionTuning, setEmotionTuning,
-            apiKeys, setApiKeys,
-            lang, setLang,
-            femaleVoices, setFemaleVoices,
-            maleVoices, setMaleVoices,
-            ambientVolume, setAmbientVolume,
-            connectionSound, setConnectionSound,
-            avatarUrl, setAvatarUrl,
-            subscriptionPlan, setSubscriptionPlan,
-            usageData,
-            useSystemVoice, setUseSystemVoice,
-            user, handleLogin, handleLogout
-        })
+        isYouTubeOpen && h(YouTubePlayer, { ref: youtubePlayerRef, video: currentVideo, onClose: () => { setIsYouTubeOpen(false); }, isMinimized: isPlayerMinimized, onSearch: handleManualSearch }),
+        h(FeedbackModal, { isOpen: isFeedbackOpen, onClose: () => setIsFeedbackOpen(false) }),
+        h(SettingsModal, { isOpen: isSettingsOpen, onClose: () => setIsSettingsOpen(false), activeTab, setActiveTab, theme, setTheme, gender, setGender, assistantName, setAssistantName, userName, setUserName, greetingMessage, setGreetingMessage, customInstructions, setCustomInstructions, coreProtocol, setCoreProtocol, userBio, setUserBio, personality, setPersonality, emotionTuning, setEmotionTuning, apiKeys, setApiKeys, lang, setLang, femaleVoices, setFemaleVoices, maleVoices, setMaleVoices, ambientVolume, setAmbientVolume, connectionSound, setConnectionSound, avatarUrl, setAvatarUrl, subscriptionPlan, setSubscriptionPlan, usageData, useSystemVoice, setUseSystemVoice, user, handleLogin, handleLogout })
   );
 };

@@ -476,9 +476,9 @@ export async function validateAuddioKey(k: string) { return { success: !!k }; }
 export async function createCashfreeOrder(planId: string, amount: number, customerId: string, customerPhone: string, customerEmail: string) { return "mock_session"; } // Mocked
 export async function processCodeCommand() { return {}; }
 export async function getSupportResponse() { return ""; }
-export async function recognizeSong() { return null; }
-export async function generateImage() { return null; }
-export async function fetchLyrics() { return null; }
-export async function generateSong() { return null; }
+export async function recognizeSong(apiKey?: string) { return null; }
+export async function generateImage(prompt?: string) { return null; }
+export async function fetchLyrics(song?: string) { return null; }
+export async function generateSong(lyrics?: string) { return null; }
 export async function validateWeatherKey() { return { success: true }; }
 export async function validateNewsKey() { return { success: true }; }
