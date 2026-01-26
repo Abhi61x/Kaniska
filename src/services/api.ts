@@ -9,7 +9,6 @@ const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
 // FIX for Android Black Screen: 
-// Browsers/WebViews do NOT have 'process'. Accessing 'process.env' throws a ReferenceError and crashes the app immediately.
 // We strictly use import.meta.env for Vite.
 const ENV_GEMINI_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
 
@@ -51,14 +50,16 @@ export class ServiceError extends Error {
   }
 }
 
-// Helper to get client instance on demand to avoid top-level crashes
+// HELPER: Lazy load the client to prevent crash on app startup if key is missing
 const getClient = (apiKey?: string | null) => {
     const activeKey = apiKey || ENV_GEMINI_KEY;
     if (!activeKey) {
-         throw new MainApiKeyError("No API Key available. Please check Vercel settings and add VITE_GEMINI_API_KEY.");
+        // Return null or throw specific error handled by caller, 
+        // but DO NOT crash the global scope.
+        throw new MainApiKeyError("API Key is missing. Please check settings or Vercel environment variables.");
     }
     return new GoogleGenAI({ apiKey: activeKey });
-}
+};
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
 function handleGeminiError(error: any, context = 'processing your request') {
