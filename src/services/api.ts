@@ -8,9 +8,10 @@ const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 // Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
-// FIX: Securely retrieve Gemini Key for Vite/Vercel environments
-// Vercel requires VITE_ prefix for client-side environment variables
-const ENV_GEMINI_KEY = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+// FIX for Android Black Screen: 
+// Browsers/WebViews do NOT have 'process'. Accessing 'process.env' throws a ReferenceError and crashes the app immediately.
+// We strictly use import.meta.env for Vite.
+const ENV_GEMINI_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
 
 // A custom error class to signal API key issues that the user can fix.
 export class ApiKeyError extends Error {
@@ -50,8 +51,14 @@ export class ServiceError extends Error {
   }
 }
 
-
-const ai = new GoogleGenAI({ apiKey: ENV_GEMINI_KEY });
+// Helper to get client instance on demand to avoid top-level crashes
+const getClient = (apiKey?: string | null) => {
+    const activeKey = apiKey || ENV_GEMINI_KEY;
+    if (!activeKey) {
+         throw new MainApiKeyError("No API Key available. Please check Vercel settings and add VITE_GEMINI_API_KEY.");
+    }
+    return new GoogleGenAI({ apiKey: activeKey });
+}
 
 // Centralized error handler for all Gemini API calls to provide consistent, specific feedback.
 function handleGeminiError(error: any, context = 'processing your request') {
@@ -276,7 +283,7 @@ async function retryOperation(operation: () => Promise<any>, retries = 3, delay 
 export async function connectLiveSession(callbacks: any, config: any) {
     const { 
         customInstructions, 
-        coreProtocol,
+        coreProtocol, 
         voiceName = 'Aoede', 
         apiKey = null,
         assistantName = 'Kaniska',
@@ -413,9 +420,9 @@ export async function connectLiveSession(callbacks: any, config: any) {
 }
 
 export async function processUserCommand(history: any[], systemInstruction: string, temperature: number, emotionTuning: any, apiKey: string | null = null) {
-  const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
-  const contents = history.map(msg => ({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }));
   try {
+    const client = getClient(apiKey);
+    const contents = history.map(msg => ({ role: msg.sender === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }));
     const response = await client.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: contents,
@@ -454,13 +461,15 @@ export async function searchYouTube(userApiKey: string, query: string) {
     return data.items?.[0] ? { videoId: data.items[0].id.videoId, title: data.items[0].snippet.title, channelTitle: data.items[0].snippet.channelTitle } : null;
 }
 
-export async function generateSpeech(text: string, voiceName: string, apiKey: string) {
-    const client = apiKey ? new GoogleGenAI({ apiKey }) : ai;
-    return await client.models.generateContentStream({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text }] }],
-        config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } },
-    });
+export async function generateSpeech(text: string, voiceName: string, apiKey?: string) {
+    try {
+        const client = getClient(apiKey);
+        return await client.models.generateContentStream({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text }] }],
+            config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } },
+        });
+    } catch (apiError) { throw handleGeminiError(apiError, 'generating speech'); }
 }
 
 export async function validateYouTubeKey(k: string) { return { success: !!k }; }
