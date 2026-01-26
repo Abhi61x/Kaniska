@@ -8,7 +8,7 @@ const NEWSDATA_API_KEY = "pub_1d16fd143f30495db9c3bb7b5698c2fd"; // NewsData.io
 // Environment Variable for YouTube Key (Set this in Vercel as VITE_YOUTUBE_API_KEY)
 const ENV_YOUTUBE_KEY = (import.meta as any).env?.VITE_YOUTUBE_API_KEY || "";
 
-// FIX for Android Black Screen: 
+// FIX for Android Black Screen & Vercel Issues: 
 // We strictly use import.meta.env for Vite.
 const ENV_GEMINI_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
 
@@ -54,9 +54,7 @@ export class ServiceError extends Error {
 const getClient = (apiKey?: string | null) => {
     const activeKey = apiKey || ENV_GEMINI_KEY;
     if (!activeKey) {
-        // Return null or throw specific error handled by caller, 
-        // but DO NOT crash the global scope.
-        throw new MainApiKeyError("API Key is missing. Please check settings or Vercel environment variables.");
+        throw new MainApiKeyError("API Key is missing. Please check settings or Vercel environment variables (VITE_GEMINI_API_KEY).");
     }
     return new GoogleGenAI({ apiKey: activeKey });
 };
